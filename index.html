@@ -684,13 +684,27 @@ body.modal-open{overflow:hidden}
   <script>
 /* ============ Adelcare Local API — no server needed ============ */
 const LocalDB = (() => {
-  const SESS = 'adelcare_sess';
+  const SESS  = 'adelcare_sess';
+  const DELTA = 'adelcare_delta'; // persists leaves + settings between reloads
 
-  // ── Storage: data lives in SEED (index.html), session in memory/localStorage ─
+  // ── Storage: doctors/branches from SEED, leaves/settings in localStorage ─
   let _memDB = null, _memSess = {auth:false,edit:false};
   const _fails = {}; // brute-force: {key:{count,until}}
   function load() { return _memDB; }
-  function save(db) { _memDB = db; }
+  function loadDelta() {
+    try { const s=localStorage.getItem(DELTA); return s ? JSON.parse(s) : null; } catch(e) { return null; }
+  }
+  function save(db) {
+    _memDB = db;
+    // Persist only mutable parts (leaves, settings, _seq) — doctors/branches come from SEED
+    try {
+      localStorage.setItem(DELTA, JSON.stringify({
+        leaves:   db.leaves,
+        settings: db.settings,
+        _seq:     db._seq
+      }));
+    } catch(e) {}
+  }
   function getSession() {
     try { const s=localStorage.getItem(SESS); return (s && JSON.parse(s)) || _memSess; } catch(e) { return _memSess; }
   }
@@ -703,15 +717,28 @@ const LocalDB = (() => {
   // ── البيانات في ملف data.js ──
 
   function initDB() {
-    // Always start fresh from SEED — index.html is the single source of truth
+    // Start from SEED (doctors/branches always from data.js)
     const db = JSON.parse(JSON.stringify({
       doctors:  SEED.doctors,
       branches: SEED.branches,
-      leaves:   SEED.leaves,
-      audit:    SEED.audit || [],
-      settings: SEED.settings,
-      _seq: SEED._seq || { doctors:200, branches:10, leaves:50, audit:100 }
+      leaves:   SEED.leaves   || [],
+      audit:    SEED.audit    || [],
+      settings: SEED.settings || {},
+      _seq:     SEED._seq     || { doctors:200, branches:10, leaves:50, audit:100 }
     }));
+    // Overlay localStorage delta: leaves/settings changed via UI persist here
+    const delta = loadDelta();
+    if (delta) {
+      if (Array.isArray(delta.leaves))   db.leaves   = delta.leaves;
+      if (delta.settings && typeof delta.settings === 'object') db.settings = delta.settings;
+      if (delta._seq) {
+        // Take the higher seq to avoid ID collisions after data.js updates
+        db._seq.doctors  = Math.max(db._seq.doctors,  delta._seq.doctors  || 0);
+        db._seq.branches = Math.max(db._seq.branches, delta._seq.branches || 0);
+        db._seq.leaves   = Math.max(db._seq.leaves,   delta._seq.leaves   || 0);
+        db._seq.audit    = Math.max(db._seq.audit,    delta._seq.audit    || 0);
+      }
+    }
     save(db);
     return db;
   }
@@ -1271,7 +1298,7 @@ const LocalDB = (() => {
     return db ? JSON.parse(JSON.stringify(db)) : null;
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: ()=>{ _memDB=null; initDB(); }, getSEED:()=>SEED };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: ()=>{ _memDB=null; try{localStorage.removeItem(DELTA);}catch(e){} initDB(); }, getSEED:()=>SEED };
 })();
 
   </script>
@@ -2310,12 +2337,16 @@ const App = (() => {
 
   async function leaveForm(docId,docName,onDone){
     const {doctors}=await api("/doctors");
+    const _n=new Date(),_p=x=>String(x).padStart(2,'0');
+    const _today=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
+    const _tom=new Date(_n); _tom.setDate(_tom.getDate()+1);
+    const _tomorrow=`${_tom.getFullYear()}-${_p(_tom.getMonth()+1)}-${_p(_tom.getDate())}`;
     const body=`<form id="lvf">
       <div class="field"><label>الممارس *</label><select name="doctor_id" required>
         ${doctors.map(d=>`<option value="${d.id}" ${docId==d.id?"selected":""}>${esc(d.name)} — ${esc(d.specialty)}</option>`).join("")}</select></div>
       <div class="grid2">
-        <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" required></div>
-        <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" required></div>
+        <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" value="${_today}" required></div>
+        <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" value="${_tomorrow}" required></div>
       </div>
       <div class="field"><label>النوع</label><select name="type">
         ${LEAVE_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div>
@@ -2663,9 +2694,10 @@ const App = (() => {
         <div class="card" style="padding:16px;background:var(--surface)">
           <div style="font-size:13px;color:var(--muted);line-height:1.8;text-align:right">
             <b>آلية العمل:</b><br>
-            ▪ جميع البيانات مخزنة داخل ملف <b>index.html</b><br>
-            ▪ لتعديل البيانات: عدّل الملف مباشرة من محرر Netlify<br>
-            ▪ لتحديث الأكواد: ارفع نسخة جديدة من index.html
+            ▪ البيانات محفوظة في ملف <b>data.js</b> على GitHub<br>
+            ▪ لتعديل البيانات (ممارسون، فروع، إجازات): عدّل <b>data.js</b><br>
+            ▪ لتحديث الأكواد فقط: عدّل <b>index.html</b><br>
+            ▪ النشر تلقائي عبر GitHub Pages عند حفظ أي تعديل
           </div>
         </div>
       </div>`;
