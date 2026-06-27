@@ -716,7 +716,8 @@ const LocalDB = (() => {
     _memDB = db;
     if (_docRef) {
       _lastWriteTs = Date.now();
-      _docRef.set(JSON.parse(JSON.stringify(db))).catch(e => console.error('[Adelcare] Firestore write failed:', e));
+      // Store as JSON string to avoid Firestore nested-array restriction
+      _docRef.set({ data: JSON.stringify(db) }).catch(e => console.error('[Adelcare] Firestore write failed:', e));
     }
   }
 
@@ -727,7 +728,8 @@ const LocalDB = (() => {
 
     const snap = await _docRef.get();
     if (snap.exists) {
-      _memDB = snap.data();
+      const raw = snap.data();
+      _memDB = raw.data ? JSON.parse(raw.data) : raw;
     } else {
       // First run — seed Firestore from data.js
       _memDB = JSON.parse(JSON.stringify({
@@ -738,14 +740,15 @@ const LocalDB = (() => {
         settings: SEED.settings || {},
         _seq:     SEED._seq     || {doctors:200, branches:10, leaves:50, audit:100}
       }));
-      await _docRef.set(_memDB);
+      await _docRef.set({ data: JSON.stringify(_memDB) });
     }
 
     // Real-time listener: update all devices when data changes
     _docRef.onSnapshot(snap => {
       if (!snap.exists || snap.metadata.hasPendingWrites) return;
       if (Date.now() - _lastWriteTs < 3000) return; // skip echo of our own writes
-      _memDB = snap.data();
+      const raw = snap.data();
+      _memDB = raw.data ? JSON.parse(raw.data) : raw;
       document.dispatchEvent(new CustomEvent('adelcare:sync'));
     });
   }
