@@ -680,68 +680,84 @@ body.modal-open{overflow:hidden}
   </div></div>
   <div id="modal-root"></div>
   <div id="toast-root"></div>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
   <script src="data.js"></script>
   <script>
-/* ============ Adelcare Local API — no server needed ============ */
+/* ============ Adelcare API — Firebase Firestore ============ */
 const LocalDB = (() => {
-  const SESS  = 'adelcare_sess';
-  const DELTA = 'adelcare_delta'; // persists leaves + settings between reloads
+  const SESS = 'adelcare_sess';
 
-  // ── Storage: doctors/branches from SEED, leaves/settings in localStorage ─
+  // ── Firebase ──────────────────────────────────────────────────
+  const _FB_CFG = {
+    apiKey: "AIzaSyA8iuJ9hyCavICOcVOn-LAr0dTW_5thzYQ",
+    authDomain: "adelcare7-26fd7.firebaseapp.com",
+    projectId: "adelcare7-26fd7",
+    storageBucket: "adelcare7-26fd7.firebasestorage.app",
+    messagingSenderId: "86720349255",
+    appId: "1:86720349255:web:9914fd1906ccd623349d62"
+  };
+
   let _memDB = null, _memSess = {auth:false,edit:false};
-  const _fails = {}; // brute-force: {key:{count,until}}
+  const _fails = {};
+  let _fsDB, _docRef, _initPromise, _lastWriteTs = 0;
+
   function load() { return _memDB; }
-  function loadDelta() {
-    try { const s=localStorage.getItem(DELTA); return s ? JSON.parse(s) : null; } catch(e) { return null; }
-  }
-  function save(db) {
-    _memDB = db;
-    // Persist only mutable parts (leaves, settings, _seq) — doctors/branches come from SEED
-    try {
-      localStorage.setItem(DELTA, JSON.stringify({
-        leaves:   db.leaves,
-        settings: db.settings,
-        _seq:     db._seq
-      }));
-    } catch(e) {}
-  }
+
   function getSession() {
     try { const s=localStorage.getItem(SESS); return (s && JSON.parse(s)) || _memSess; } catch(e) { return _memSess; }
   }
   function setSession(s) {
     _memSess = s;
-    try { localStorage.setItem(SESS,JSON.stringify(s)); } catch(e) {}
+    try { localStorage.setItem(SESS, JSON.stringify(s)); } catch(e) {}
   }
 
-  // ── Seed ─────────────────────────────────────────────────────
-  // ── البيانات في ملف data.js ──
-
-  function initDB() {
-    // Start from SEED (doctors/branches always from data.js)
-    const db = JSON.parse(JSON.stringify({
-      doctors:  SEED.doctors,
-      branches: SEED.branches,
-      leaves:   SEED.leaves   || [],
-      audit:    SEED.audit    || [],
-      settings: SEED.settings || {},
-      _seq:     SEED._seq     || { doctors:200, branches:10, leaves:50, audit:100 }
-    }));
-    // Overlay localStorage delta: leaves/settings changed via UI persist here
-    const delta = loadDelta();
-    if (delta) {
-      if (Array.isArray(delta.leaves))   db.leaves   = delta.leaves;
-      if (delta.settings && typeof delta.settings === 'object') db.settings = delta.settings;
-      if (delta._seq) {
-        // Take the higher seq to avoid ID collisions after data.js updates
-        db._seq.doctors  = Math.max(db._seq.doctors,  delta._seq.doctors  || 0);
-        db._seq.branches = Math.max(db._seq.branches, delta._seq.branches || 0);
-        db._seq.leaves   = Math.max(db._seq.leaves,   delta._seq.leaves   || 0);
-        db._seq.audit    = Math.max(db._seq.audit,    delta._seq.audit    || 0);
-      }
+  function save(db) {
+    _memDB = db;
+    if (_docRef) {
+      _lastWriteTs = Date.now();
+      _docRef.set(JSON.parse(JSON.stringify(db))).catch(e => console.error('[Adelcare] Firestore write failed:', e));
     }
-    save(db);
-    return db;
   }
+
+  async function _doInit() {
+    firebase.initializeApp(_FB_CFG);
+    _fsDB   = firebase.firestore();
+    _docRef = _fsDB.collection('adelcare').doc('main');
+
+    const snap = await _docRef.get();
+    if (snap.exists) {
+      _memDB = snap.data();
+    } else {
+      // First run — seed Firestore from data.js
+      _memDB = JSON.parse(JSON.stringify({
+        doctors:  SEED.doctors,
+        branches: SEED.branches,
+        leaves:   SEED.leaves   || [],
+        audit:    SEED.audit    || [],
+        settings: SEED.settings || {},
+        _seq:     SEED._seq     || {doctors:200, branches:10, leaves:50, audit:100}
+      }));
+      await _docRef.set(_memDB);
+    }
+
+    // Real-time listener: update all devices when data changes
+    _docRef.onSnapshot(snap => {
+      if (!snap.exists || snap.metadata.hasPendingWrites) return;
+      if (Date.now() - _lastWriteTs < 3000) return; // skip echo of our own writes
+      _memDB = snap.data();
+      document.dispatchEvent(new CustomEvent('adelcare:sync'));
+    });
+  }
+
+  function ensureInit() {
+    if (!_initPromise) _initPromise = _doInit();
+    return _initPromise;
+  }
+
+  // ── البيانات في Firestore — أول تشغيل يُهيئها من data.js ────────
+
+  function initDB() { return _memDB; }
 
   function nextId(db, table) {
     const id = db._seq[table] || 1;
@@ -1278,6 +1294,7 @@ const LocalDB = (() => {
 
   // ── Public call ───────────────────────────────────────────────
   async function call(path, opts={}) {
+    await ensureInit();
     const method=(opts.method||"GET").toUpperCase();
     const body=opts.body||{};
     let result;
@@ -1291,14 +1308,14 @@ const LocalDB = (() => {
     return result;
   }
 
-  initDB();
+  ensureInit(); // start loading in background
 
   function exportDB() {
     const db = load();
     return db ? JSON.parse(JSON.stringify(db)) : null;
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: ()=>{ _memDB=null; try{localStorage.removeItem(DELTA);}catch(e){} initDB(); }, getSEED:()=>SEED };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef) await _docRef.set(fresh); }, getSEED:()=>SEED };
 })();
 
   </script>
@@ -2864,11 +2881,14 @@ const App = (() => {
 
   async function boot(){
     initTheme();
+    // Show spinner while Firebase initializes
+    document.getElementById("app").innerHTML=`<div class="loader" style="height:100vh"><div class="spin"></div></div>`;
     try{ const {user}=await api("/me"); state.user=user; }catch(e){}
-    // always land on the home page after a refresh
     state.route="dashboard"; state.params={};
     if(location.hash) history.replaceState(null,"","#dashboard");
     render();
+    // Re-render when another device changes data in Firestore
+    document.addEventListener('adelcare:sync', ()=>render());
   }
   return { boot };
 })();
