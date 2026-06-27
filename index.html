@@ -1,0 +1,2847 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0ea5a4">
+<title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============ Adelcare design system ============ */
+:root{
+  --bg:#f1f5f9; --bg2:#e2e8f0; --surface:#ffffff; --surface2:#f8fafc;
+  --text:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  --brand:#0ea5a4; --brand-d:#0f766e; --brand-soft:#ccfbf1;
+  --green:#16a34a; --green-soft:#dcfce7;
+  --amber:#d97706; --amber-soft:#fef3c7;
+  --red:#dc2626; --red-soft:#fee2e2;
+  --black:#475569; --black-soft:#e2e8f0;
+  --leave:#dc2626; --leave-soft:#fee2e2;
+  --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+  --shadow-l:0 10px 30px -10px rgba(15,23,42,.25);
+  --r:14px; --r-s:10px;
+}
+[data-theme="dark"]{
+  --bg:#0b1220; --bg2:#0f172a; --surface:#111c30; --surface2:#162338;
+  --text:#e8eef7; --muted:#93a4bd; --line:#243349;
+  --brand:#2dd4bf; --brand-d:#14b8a6; --brand-soft:#0c3a37;
+  --green:#34d399; --green-soft:#0e3a2a;
+  --amber:#fbbf24; --amber-soft:#3a2e0c;
+  --red:#f87171; --red-soft:#3a1414;
+  --black:#94a3b8; --black-soft:#1e293b;
+  --leave:#f87171; --leave-soft:#3a1414;
+  --shadow:0 1px 3px rgba(0,0,0,.4); --shadow-l:0 14px 40px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'IBM Plex Sans Arabic',system-ui,'Segoe UI',sans-serif;
+  background:var(--bg);color:var(--text);font-size:15px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;transition:background .2s,color .2s;
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+a{color:inherit;text-decoration:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+
+/* ---------- Layout ---------- */
+.app-shell{display:flex;min-height:100vh}
+.sidebar{
+  width:248px;flex-shrink:0;background:var(--surface);border-inline-start:1px solid var(--line);
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;padding:18px 14px;gap:6px;
+  z-index:40;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 16px}
+.brand-logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--brand),var(--brand-d));
+  display:grid;place-items:center;color:#fff;font-weight:700;font-size:20px;box-shadow:var(--shadow)}
+.brand-name{font-weight:700;font-size:16px;line-height:1.2}
+.brand-sub{font-size:11px;color:var(--muted)}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:var(--r-s);
+  color:var(--muted);font-weight:500;transition:.12s;position:relative}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--brand-soft);color:var(--brand-d);font-weight:600}
+[data-theme="dark"] .nav-item.active{color:var(--brand)}
+.nav-item .ico{width:20px;text-align:center;font-size:17px}
+.nav-badge{margin-inline-start:auto;background:var(--green);color:#fff;font-size:11px;
+  font-weight:700;padding:1px 8px;border-radius:20px;min-width:22px;text-align:center}
+.nav-sep{height:1px;background:var(--line);margin:8px 6px}
+.sidebar-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:8px}
+.edit-flag{font-size:12.5px;font-weight:600;text-align:center;padding:7px;border-radius:9px;
+  background:var(--green-soft);color:var(--green)}
+.spec-chips{display:flex;flex-wrap:wrap;gap:8px}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 85%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  padding:12px 22px;display:flex;align-items:center;gap:14px}
+.content{padding:20px 22px 60px;max-width:1280px;width:100%;margin:0 auto}
+.page-title{font-size:22px;font-weight:700;margin-bottom:3px}
+.page-sub{color:var(--muted);font-size:13px}
+
+/* ---------- Search bar ---------- */
+.search-wrap{flex:1;position:relative;max-width:560px}
+.search-wrap .ico{position:absolute;inset-inline-start:14px;top:50%;transform:translateY(-50%);
+  color:var(--muted);font-size:18px;pointer-events:none}
+.search-input{width:100%;padding:11px 44px;border-radius:30px;border:1px solid var(--line);
+  background:var(--surface);box-shadow:var(--shadow);transition:.15s;outline:none}
+.search-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+/* search-dd: appended to <body> as position:fixed — bypasses every stacking context */
+#search-dd{
+  position:fixed;
+  z-index:9999;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  box-shadow:0 8px 32px -4px rgba(15,23,42,.22);
+  overflow-y:scroll;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  padding:6px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+  /* max-height set dynamically by positionDD() via visualViewport */
+}
+.search-hint{display:flex;gap:6px;flex-wrap:wrap;padding:6px}
+.chip{background:var(--surface2);border:1px solid var(--line);padding:4px 11px;border-radius:20px;
+  font-size:12.5px;color:var(--muted);transition:.12s}
+.chip:hover{border-color:var(--brand);color:var(--brand-d)}
+
+.icon-btn{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:18px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);transition:.12s}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand-d)}
+
+/* ---------- Topbar date widget ---------- */
+.topbar-date{
+  display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+  padding:4px 12px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-s);flex-shrink:0;white-space:nowrap;line-height:1.4;
+}
+.topbar-date .td-day{font-size:13px;font-weight:700;color:var(--brand)}
+.topbar-date .td-hijri,.topbar-date .td-greg{font-size:10.5px;color:var(--muted)}
+@media(max-width:700px){
+  .topbar-date .td-hijri,.topbar-date .td-greg{display:none}
+}
+@media(max-width:480px){.topbar-date{display:none}}
+
+/* ---------- Branch bar — uniform grid ---------- */
+/* Branch bar — single horizontal scroll row */
+.branch-bar{
+  display:flex;flex-wrap:nowrap;align-items:flex-start;gap:8px;
+  overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+  padding:10px 0 12px;margin-bottom:6px;
+}
+.branch-bar::-webkit-scrollbar{display:none}
+/* pill chips (base style) */
+.bchip{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:9px 16px;border-radius:30px;
+  border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);font-weight:600;font-size:14px;
+  transition:.14s;flex-shrink:0;cursor:pointer}
+.bchip:hover{border-color:var(--brand);color:var(--brand-d)}
+.bchip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.bchip-n{background:var(--green-soft);color:var(--green);font-size:12px;font-weight:700;
+  padding:0 8px;border-radius:20px;min-width:20px;text-align:center;flex-shrink:0}
+.bchip.on .bchip-n{background:rgba(255,255,255,.25);color:#fff}
+/* branch cards — identical fixed size, no exceptions */
+.bchip-branch{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-start!important;
+  justify-content:flex-start!important;
+  flex:0 0 152px!important;
+  width:152px!important;
+  height:86px!important;
+  box-sizing:border-box!important;
+  padding:9px 11px!important;
+  gap:5px!important;
+  border-radius:13px!important;
+  overflow:hidden!important;
+  white-space:normal!important;
+}
+/* "الكل" compact pill — overrides branch-card rules back to pill shape */
+.bchip-all{
+  flex:0 0 auto!important;width:auto!important;height:auto!important;
+  flex-direction:row!important;align-items:center!important;
+  padding:9px 14px!important;gap:7px!important;
+  border-radius:30px!important;white-space:nowrap!important;
+  overflow:visible!important;
+}
+.bchip-all .bchip-hours{display:none!important}
+/* name row: name truncates with ellipsis, badge stays */
+.bchip-branch .bchip-top{
+  display:flex!important;flex-direction:row!important;
+  align-items:center;gap:5px;
+  width:100%;min-width:0;overflow:hidden;
+  font-size:12.5px;font-weight:600;line-height:1.3;
+  flex-shrink:0;
+}
+.bchip-name{
+  flex:1 1 0;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+/* hours: 2-line clamp, never expands card */
+.bchip-hours{
+  font-size:10.5px;font-weight:500;color:var(--muted);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;width:100%;text-align:start;flex-shrink:0;
+}
+.bchip-branch.on .bchip-hours{color:rgba(255,255,255,.8)}
+/* branch bar: all items top-aligned */
+.branch-bar{align-items:flex-start}
+@media(max-width:600px){
+  .bchip-branch{flex:0 0 138px!important;width:138px!important;height:82px!important;padding:8px 10px!important}
+}
+
+/* ---------- Mini stat cards ---------- */
+.mini-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+.mini-stat{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:10px 13px;box-shadow:var(--shadow);border-inline-start:4px solid var(--line)}
+.mini-stat .ms-ico{font-size:20px;line-height:1;flex-shrink:0}
+.mini-stat .ms-v{font-size:22px;font-weight:700;line-height:1.1}
+.mini-stat .ms-l{font-size:11.5px;color:var(--muted);line-height:1.3;margin-top:1px}
+.mini-stat.s-green{border-inline-start-color:var(--green)} .mini-stat.s-green .ms-v{color:var(--green)}
+.mini-stat.s-amber{border-inline-start-color:var(--amber)} .mini-stat.s-amber .ms-v{color:var(--amber)}
+.mini-stat.s-brand{border-inline-start-color:var(--brand)} .mini-stat.s-brand .ms-v{color:var(--brand-d)}
+[data-theme="dark"] .mini-stat.s-brand .ms-v{color:var(--brand)}
+.mini-stat.s-black{border-inline-start-color:var(--black)} .mini-stat.s-black .ms-v{color:var(--black)}
+.mini-stat{cursor:pointer;text-align:start}
+.mini-stat:hover{transform:translateY(-1px);box-shadow:var(--shadow-l)}
+.mini-stat.active{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-soft)}
+.mini-stat.s-green.active{background:var(--green-soft)}
+.mini-stat.s-amber.active{background:var(--amber-soft)}
+.mini-stat.s-brand.active{background:var(--brand-soft)}
+.mini-stat.s-black.active{background:var(--black-soft)}
+.chip-clear{background:var(--red-soft);color:var(--red);border:1px solid transparent;border-radius:var(--r-s);
+  padding:6px 11px;font-weight:600;font-size:12.5px;transition:.12s}
+.chip-clear:hover{filter:brightness(.96)}
+@media(max-width:640px){.mini-stats{grid-template-columns:repeat(2,1fr);gap:7px}}
+@media(max-width:380px){.mini-stat .ms-ico{display:none}.mini-stat{gap:8px;padding:9px 11px}}
+#dash-body{transition:opacity .22s ease}
+#dash-body.fade{opacity:0}
+.branch-chips{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0 4px}
+.bchip.ghost{cursor:default;background:var(--surface);color:var(--text)}
+.bchip.ghost:hover{border-color:var(--line);color:var(--text)}
+.present-toggle{cursor:pointer}
+.present-toggle.on{background:var(--green);color:#fff;border-color:var(--green)}
+.present-toggle.on .dot{background:#fff!important}
+.present-toggle.on .bchip-n{background:rgba(255,255,255,.25);color:#fff}
+
+/* ---------- Stat cards ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin-bottom:22px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden;transition:.15s;cursor:pointer}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-l)}
+.stat .v{font-size:30px;font-weight:700;line-height:1.1}
+.stat .l{font-size:12.5px;color:var(--muted);margin-top:2px}
+.stat .badge{position:absolute;top:14px;inset-inline-start:16px;font-size:22px;opacity:.85}
+.stat.s-green{border-inline-start:4px solid var(--green)} .stat.s-green .v{color:var(--green)}
+.stat.s-amber{border-inline-start:4px solid var(--amber)} .stat.s-amber .v{color:var(--amber)}
+.stat.s-red{border-inline-start:4px solid var(--red)} .stat.s-red .v{color:var(--red)}
+.stat.s-brand{border-inline-start:4px solid var(--brand)} .stat.s-brand .v{color:var(--brand-d)}
+.stat.s-black{border-inline-start:4px solid var(--black)} .stat.s-black .v{color:var(--black)}
+/* compact stats (home dashboard) */
+.stats.compact{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:8px}
+.stats.compact .stat{padding:9px 13px}
+.stats.compact .v{font-size:20px}
+.stats.compact .l{font-size:11px;margin-top:0}
+.stats.compact .badge{font-size:15px;top:9px}
+
+/* ---------- Section / columns ---------- */
+.section-head{display:flex;align-items:center;gap:8px;margin:16px 0 8px}
+.section-head h2{font-size:15.5px;font-weight:700}
+.section-head .count{background:var(--surface2);color:var(--muted);font-size:12px;font-weight:600;
+  padding:2px 9px;border-radius:20px;border:1px solid var(--line)}
+.status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+
+/* ---------- Doctor card ---------- */
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px 13px;
+  box-shadow:var(--shadow);display:flex;gap:11px;transition:.14s;cursor:pointer;position:relative;
+  border-inline-start:4px solid var(--line);
+  height:120px;overflow:hidden;align-items:flex-start;box-sizing:border-box}
+.dcard:hover{transform:translateY(-2px);box-shadow:var(--shadow-l);border-inline-start-color:var(--brand)}
+.dcard.st-present{border-inline-start-color:var(--green)}
+.dcard.st-upcoming{border-inline-start-color:var(--amber)}
+.dcard.st-finished{border-inline-start-color:var(--red)}
+.dcard.st-leave{border-inline-start-color:var(--leave);background:color-mix(in srgb,var(--leave-soft) 60%,var(--surface))}
+.dcard.st-off{border-inline-start-color:var(--black)}
+.dcard-leave-info span{color:var(--leave)!important;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;display:block;max-width:100%}
+.leave-active-row{background:color-mix(in srgb,var(--leave-soft) 80%,var(--surface));border:1px solid var(--leave);
+  border-radius:10px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.leave-active-row .la-info{font-size:13px;font-weight:600;color:var(--leave)}
+.leave-active-row .la-dates{font-size:12px;color:var(--muted);margin-top:2px}
+.leave-active-row .la-actions{display:flex;gap:6px;flex-shrink:0}
+.leave-upcoming-row{background:color-mix(in srgb,var(--amber-soft,#fef9ec) 70%,var(--surface));border:1px solid var(--amber);
+  border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.leave-upcoming-row .lu-info{font-size:13px;font-weight:600;color:var(--amber)}
+.leave-upcoming-row .lu-dates{font-size:12px;color:var(--muted);margin-top:2px}
+.leave-upcoming-row .lu-actions{display:flex;gap:6px;flex-shrink:0}
+.btn-xs{padding:4px 10px;font-size:12px;border-radius:7px}
+.mini-stat.s-leave{border-inline-start-color:var(--leave)} .mini-stat.s-leave .ms-v{color:var(--leave)}
+.mini-stat.s-leave.active{background:var(--leave-soft)}
+.avatar{width:44px;height:44px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;
+  font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-d));
+  object-fit:cover;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.dcard-body{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.dcard-top{display:flex;justify-content:space-between;align-items:center;gap:6px;overflow:hidden;flex-shrink:0}
+.dcard-name{font-weight:700;font-size:15px;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcard-meta{font-size:12px;color:var(--muted);display:flex;gap:4px;
+  flex-wrap:nowrap;overflow:hidden;margin-top:3px;flex-shrink:0}
+.dcard-meta span{display:inline-flex;align-items:center;gap:3px;
+  white-space:nowrap;overflow:hidden;flex-shrink:0}
+.dcard-meta span:last-child{flex-shrink:1;min-width:0;text-overflow:ellipsis;overflow:hidden}
+/* Shift / leave info row — wraps to second line if needed, fits in fixed card height */
+.dcard-shift{font-size:11px;font-weight:700;color:var(--text);margin-top:3px;
+  display:flex;flex-wrap:wrap;gap:1px 3px;line-height:1.35;overflow:hidden;flex-shrink:0;
+  max-height:30px}
+.dcard-shift span{white-space:nowrap;display:inline-flex;align-items:center;gap:2px}
+.dcard-shift .shift-seg{color:var(--text)}
+.dcard-shift .shift-sep{color:var(--muted);font-weight:400;margin:0 1px;flex-shrink:0}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.spec-tag{background:var(--brand-soft);color:var(--brand-d);font-size:12px;font-weight:600;
+  padding:1px 8px;border-radius:7px}
+[data-theme="dark"] .spec-tag{color:var(--brand)}
+.status-pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px}
+.sp-present{background:var(--green-soft);color:var(--green)}
+.sp-upcoming{background:var(--amber-soft);color:var(--amber)}
+.sp-finished{background:var(--red-soft);color:var(--red)}
+.sp-leave{background:var(--leave-soft);color:var(--leave);font-weight:700}
+.sp-off{background:var(--black-soft);color:var(--black)}
+.hv-tag{font-size:10.5px;background:var(--amber-soft);color:var(--amber);padding:1px 7px;border-radius:6px;font-weight:600}
+
+/* ---- Specialties grid (management panel) ---- */
+.spec-add-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:18px 20px;margin-bottom:20px;display:flex;flex-direction:column;gap:10px}
+.spec-add-card h3{font-size:15px;font-weight:700;margin:0}
+.spec-add-row{display:flex;gap:8px;align-items:stretch}
+.spec-add-row input{flex:1;padding:10px 14px;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface2);color:var(--text);font-size:14px}
+.spec-add-row input:focus{outline:none;border-color:var(--brand)}
+.spec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.spec-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:.15s;
+  border-inline-start:3px solid var(--line)}
+.spec-card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.spec-card.manual{border-inline-start-color:var(--brand)}
+.spec-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.spec-card-name{font-weight:700;font-size:15px;line-height:1.3}
+.spec-doc-badge{background:var(--brand-soft);color:var(--brand-d);font-size:11px;font-weight:700;
+  padding:2px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.spec-card-foot{display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
+.spec-src-tag{font-size:11px;color:var(--muted);padding:2px 8px;border-radius:6px;
+  background:var(--surface2)}
+.spec-actions{display:flex;gap:5px;margin-inline-start:auto}
+
+/* ---- Management panel: doctor cards on mobile ---- */
+.mgr-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:13px 15px;display:flex;align-items:center;gap:12px;transition:.12s}
+.mgr-card:hover{box-shadow:var(--shadow)}
+.mgr-card-body{flex:1;min-width:0}
+.mgr-card-name{font-weight:700;font-size:14px;margin-bottom:3px}
+.mgr-card-meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px}
+.mgr-card-meta span{display:inline-flex;align-items:center;gap:2px}
+.mgr-card-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.mgr-cards{display:flex;flex-direction:column;gap:8px}
+.mgr-arch-section{margin-top:20px}
+.mgr-arch-section .section-head{cursor:pointer;user-select:none}
+.mgr-arch-section .section-head:hover{opacity:.85}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:var(--r-s);
+  font-weight:600;font-size:14px;transition:.14s;border:1px solid transparent;white-space:nowrap}
+.btn-primary{background:var(--brand);color:#fff;box-shadow:var(--shadow)}
+.btn-primary:hover{background:var(--brand-d)}
+.btn-ghost{background:var(--surface);border-color:var(--line);color:var(--text)}
+.btn-ghost:hover{border-color:var(--brand);color:var(--brand-d)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-block{width:100%;justify-content:center}
+
+/* ---------- Branch cards ---------- */
+.branch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:15px}
+.branch-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px;box-shadow:var(--shadow);transition:.15s;cursor:pointer}
+.branch-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-l)}
+.branch-card .bc-top{display:flex;justify-content:space-between;align-items:flex-start}
+.branch-card h3{font-size:17px;font-weight:700}
+.branch-card .grp{font-size:12px;color:var(--brand-d);font-weight:600}
+[data-theme="dark"] .branch-card .grp{color:var(--brand)}
+.bc-stat{display:flex;gap:18px;margin-top:14px}
+.bc-stat .n{font-size:22px;font-weight:700}
+.bc-stat .x{font-size:11.5px;color:var(--muted)}
+.bc-live{color:var(--green)}
+
+/* ---------- Forms ---------- */
+.field{margin-bottom:13px}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:5px;color:var(--muted)}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;border-radius:var(--r-s);
+  border:1px solid var(--line);background:var(--surface2);outline:none;transition:.14s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--brand);
+  box-shadow:0 0 0 3px var(--brand-soft);background:var(--surface)}
+.field textarea{resize:vertical;min-height:62px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.day-picker{display:flex;gap:6px;flex-wrap:wrap}
+.day-btn{padding:6px 11px;border-radius:8px;border:1px solid var(--line);background:var(--surface2);
+  font-size:13px;font-weight:600;transition:.12s}
+.day-btn.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+
+/* ---------- Modal ---------- */
+.modal-back{position:fixed;inset:0;background:rgba(8,12,22,.5);
+  z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;
+  animation:fadeIn .18s ease both;will-change:opacity}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+.modal-back.closing{animation:fadeOut .15s ease both}
+.modal{background:var(--surface);border-radius:18px;box-shadow:var(--shadow-l);width:100%;max-width:540px;
+  animation:pop .2s cubic-bezier(.2,.7,.3,1) both;
+  display:flex;flex-direction:column;max-height:88vh;overflow:hidden}
+.modal.wide{max-width:760px}
+.modal-back.closing .modal{animation:popOut .15s ease both}
+@keyframes pop{from{transform:translateY(10px) scale(.985);opacity:0}to{transform:none;opacity:1}}
+@keyframes popOut{from{transform:none;opacity:1}to{transform:translateY(6px) scale(.99);opacity:0}}
+body.modal-open{overflow:hidden}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;
+  justify-content:space-between;background:var(--surface);border-radius:18px 18px 0 0;z-index:2;flex-shrink:0}
+.modal-head h3{font-size:17px;font-weight:700}
+.modal-body{padding:18px 20px;overflow-y:auto;flex:1;min-height:0}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-start;flex-shrink:0}
+
+/* Quick doctor card modal */
+.qd-head{display:flex;gap:14px;padding:16px 20px;background:linear-gradient(135deg,var(--brand-soft),var(--surface));
+  border-bottom:1px solid var(--line)}
+.qd-avatar{width:56px;height:56px;border-radius:14px;font-size:22px}
+.qd-name{font-size:16px;font-weight:700}
+.qd-rows{padding:6px 20px 18px}
+.qd-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.qd-row:last-child{border:none}
+.qd-row .k{color:var(--muted);min-width:96px;font-weight:600;font-size:13px}
+.qd-row .vv{flex:1}
+
+/* ---------- Tables ---------- */
+.tbl{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--r);overflow:hidden;
+  box-shadow:var(--shadow);border:1px solid var(--line)}
+.tbl th{background:var(--surface2);text-align:start;padding:11px 14px;font-size:13px;color:var(--muted);font-weight:600}
+.tbl td{padding:11px 14px;border-top:1px solid var(--line);font-size:13.5px}
+.tbl tr:hover td{background:var(--surface2)}
+
+/* ---------- Toolbar / filters ---------- */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.select-mini{padding:8px 12px;border-radius:var(--r-s);border:1px solid var(--line);
+  background:var(--surface);box-shadow:var(--shadow)}
+
+/* ---------- Calendar ---------- */
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
+.cal-cell{min-height:78px;border:1px solid var(--line);border-radius:9px;padding:6px;background:var(--surface2);font-size:12px}
+.cal-cell .d{font-weight:700;color:var(--muted)}
+.cal-cell.today{border-color:var(--brand);background:var(--brand-soft)}
+.cal-ev{background:var(--black-soft);color:var(--black);border-radius:6px;padding:1px 5px;margin-top:3px;
+  font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-head{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;font-size:12px;color:var(--muted);font-weight:600;text-align:center}
+
+/* ---------- Login ---------- */
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px;
+  background:radial-gradient(1200px 600px at 80% -10%,var(--brand-soft),transparent),var(--bg)}
+.login-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-l);
+  width:100%;max-width:400px;padding:34px 30px}
+.login-card .brand{justify-content:center;padding-bottom:20px}
+.login-roles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.role-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.7}
+
+/* ---------- PIN login ---------- */
+.pin-card{max-width:340px}
+.pin-title{text-align:center;font-weight:600;color:var(--muted);margin:4px 0 10px;font-size:14px}
+.pin-input{width:100%;height:58px;text-align:center;font-size:26px;font-weight:700;letter-spacing:10px;
+  border:1px solid var(--line);background:var(--surface2);border-radius:var(--r);outline:none;transition:.15s;
+  color:var(--text);padding-inline-start:10px}
+.pin-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);background:var(--surface)}
+.pin-input::placeholder{letter-spacing:6px;color:var(--muted);font-size:20px}
+.pin-display{height:48px;display:flex;align-items:center;justify-content:center;gap:9px;
+  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px;letter-spacing:2px}
+.pin-display .pin-dot{font-size:13px;color:var(--brand-d)}
+[data-theme="dark"] .pin-display .pin-dot{color:var(--brand)}
+.pin-display .pin-empty{color:var(--muted);letter-spacing:4px;font-size:18px}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.pin-key{height:54px;border-radius:13px;border:1px solid var(--line);background:var(--surface);
+  font-size:22px;font-weight:600;box-shadow:var(--shadow);transition:.1s}
+.pin-key:hover{border-color:var(--brand);color:var(--brand-d)}
+.pin-key:active{transform:scale(.95);background:var(--brand-soft)}
+.pin-key.pin-aux{font-size:15px;font-weight:600;color:var(--muted)}
+
+/* ---------- Tabs (control panel) ---------- */
+.tabs{display:flex;gap:8px;border-bottom:1px solid var(--line);margin:16px 0 4px}
+.tab{padding:9px 16px;font-weight:600;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;
+  margin-bottom:-1px;transition:.12s}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--brand-d);border-bottom-color:var(--brand)}
+[data-theme="dark"] .tab.on{color:var(--brand)}
+.code-badge{font-family:monospace;font-weight:700;font-size:15px;background:var(--brand-soft);color:var(--brand-d);
+  padding:2px 12px;border-radius:8px;letter-spacing:1px}
+[data-theme="dark"] .code-badge{color:var(--brand)}
+
+/* ---------- Misc ---------- */
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty .big{font-size:46px;margin-bottom:10px}
+.loader{display:grid;place-items:center;padding:60px;color:var(--muted)}
+.spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;
+  animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(50%);
+  background:var(--text);color:var(--bg);padding:11px 20px;border-radius:30px;box-shadow:var(--shadow-l);
+  z-index:200;font-weight:600;font-size:14px;animation:pop .2s}
+.toast-ok{background:#16a34a;color:#fff}
+.toast-err{background:#dc2626;color:#fff}
+.active-ctrl{background:var(--brand-soft,rgba(0,180,150,.12));color:var(--brand)!important}
+.tp{display:inline-flex;align-items:center;gap:2px;background:var(--input-bg,var(--card));border:1px solid var(--border);border-radius:var(--r-s);padding:3px 6px;direction:ltr}
+.tp-s{background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:2px 1px;cursor:pointer}
+.tp-col{color:var(--muted);font-weight:700;padding:0 1px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+
+/* ---------- Schedule editor (doctor form) ---------- */
+.sched-grid{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.sched-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);
+  border-radius:var(--r-s);border:1px solid var(--line);flex-wrap:wrap}
+.sched-row-off{opacity:.6}
+.sched-day-lbl{width:64px;font-size:13px;font-weight:600;flex-shrink:0}
+.sched-shifts-col{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
+.shift-pair{display:flex;align-items:center;gap:5px}
+.shift-pair input[type=time]{padding:4px 7px;border:1px solid var(--line);border-radius:7px;
+  background:var(--surface);color:var(--text);font-size:13px;font-family:inherit;min-width:0;width:106px}
+.sched-sep{color:var(--muted);font-size:13px;flex-shrink:0}
+.sched-off-tag{font-size:12px;color:var(--muted);font-style:italic}
+.sdel{width:22px;height:22px;font-size:11px;padding:0;flex-shrink:0;color:var(--muted)}
+.sdel:hover{color:var(--red)}
+.btn-xs{padding:3px 9px;font-size:12px;border-radius:6px;line-height:1.5}
+.stoggle{flex-shrink:0}
+
+/* mobile utility */
+.hide-mob{} /* visible on desktop */
+@media(max-width:860px){.hide-mob{display:none!important}}
+
+/* mobile bottom nav */
+.mobile-nav{display:none}
+.hamburger{display:none}
+
+/* ============ MOBILE LAYOUT (≤860px) ============ */
+@media(max-width:860px){
+  /* -- Sidebar as overlay drawer -- */
+  .sidebar{position:fixed;right:0;top:0;bottom:0;left:auto;transform:translateX(100%);transition:.22s;
+    box-shadow:var(--shadow-l);z-index:41;overflow-y:auto}
+  .sidebar.open{transform:translateX(0)}
+  .hamburger{display:grid}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:39}
+
+  /* -- Content area -- */
+  .content{padding:14px 12px 100px}
+  .topbar{padding:10px 12px;gap:8px}
+  .search-wrap{max-width:none;flex:1}
+  /* font-size ≥16px prevents iOS auto-zoom on focus */
+  .search-input{padding:10px 40px;font-size:16px;height:44px}
+  .grid2{grid-template-columns:1fr}
+  /* Remove 300ms tap delay on interactive elements */
+  button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
+  /* Larger touch targets */
+  .icon-btn{width:44px;height:44px}
+
+  /* -- Bottom navigation (4 tabs) -- */
+  .mobile-nav{display:grid;grid-template-columns:repeat(2,1fr);position:fixed;bottom:0;inset-inline:0;
+    background:var(--surface);border-top:1px solid var(--line);z-index:45;
+    padding:4px 2px calc(4px + env(safe-area-inset-bottom))}
+  .mobile-nav a{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 4px;
+    color:var(--muted);font-size:10px;font-weight:600;border-radius:10px;transition:.12s}
+  .mobile-nav a.active{color:var(--brand-d);background:var(--brand-soft)}
+  [data-theme="dark"] .mobile-nav a.active{color:var(--brand)}
+  .mobile-nav a .ico{font-size:20px;line-height:1.2}
+
+  /* -- Stats cards -- */
+  .stats{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat .v{font-size:24px}
+  .status-grid{grid-template-columns:1fr}
+
+  /* -- Doctor cards: taller for touch, full-width -- */
+  .dcard{height:auto;min-height:90px;padding:11px 12px;gap:10px}
+  .dcard-name{font-size:14.5px}
+  .avatar{width:42px;height:42px;font-size:15px;border-radius:11px}
+
+  /* -- Mini stat cards -- */
+  .mini-stats{grid-template-columns:repeat(2,1fr);gap:7px}
+  .mini-stat{padding:10px 12px;gap:9px}
+  .mini-stat .ms-v{font-size:20px}
+
+  /* -- Branch bar mobile -- */
+  .bchip-branch{flex:0 0 138px!important;width:138px!important;height:80px!important;padding:8px 10px!important}
+  .bchip{padding:8px 14px;font-size:13px}
+
+  /* -- Modals: full-screen bottom sheet on mobile -- */
+  .modal-back{padding:0;align-items:flex-end}
+  .modal{max-width:100%;border-radius:20px 20px 0 0;max-height:88vh;max-height:88dvh;overflow:hidden;
+    animation:slideUp .25s cubic-bezier(.2,.7,.3,1) both;display:flex;flex-direction:column}
+  .modal.wide{max-width:100%}
+  .modal-back.closing .modal{animation:slideDown .2s ease both}
+  .modal-head{padding:14px 16px;border-radius:20px 20px 0 0;flex-shrink:0;
+    position:sticky;top:0;z-index:3;background:var(--surface);border-bottom:1px solid var(--line)}
+  .modal-head [data-x]{min-width:40px;min-height:40px;font-size:20px}
+  .modal-body{padding:14px 16px;overflow-y:auto;flex:1;min-height:0;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  .modal-foot{padding:12px 16px;flex-wrap:wrap;gap:8px;flex-shrink:0;
+    background:var(--surface);border-radius:0;border-top:1px solid var(--line)}
+
+  /* -- Quick doctor card mobile -- */
+  .qd-head{padding:16px;gap:12px;border-radius:20px 20px 0 0}
+  .qd-avatar{width:60px;height:60px;font-size:24px;border-radius:15px}
+  .qd-name{font-size:18px}
+  .qd-rows{padding:4px 16px 16px}
+  .qd-row{padding:8px 0;font-size:13px;gap:10px}
+  .qd-row .k{min-width:80px;font-size:12px}
+
+  /* -- Forms mobile (font-size ≥16px prevents iOS zoom) -- */
+  .field input,.field select,.field textarea{padding:11px 14px;font-size:16px}
+  .field label{font-size:13px;margin-bottom:6px}
+  .btn{padding:11px 18px;font-size:15px;min-height:44px}
+  .btn-block{padding:13px 18px}
+
+  /* -- Tables mobile -- */
+  .tbl{font-size:13px;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl thead,.tbl tbody{display:table;width:100%}
+  .tbl th,.tbl td{padding:10px 10px;white-space:nowrap}
+
+  /* -- Toolbar mobile -- */
+  .toolbar{gap:8px}
+  .select-mini{padding:9px 12px;font-size:16px;flex:1;min-width:0;height:44px}
+
+  /* -- Spec add input mobile -- */
+  .spec-add-row input{font-size:16px}
+
+  /* -- Time picker mobile -- */
+  .tp-s{font-size:16px}
+  .shift-pair input[type=time]{font-size:16px}
+
+  /* -- Leave rows mobile -- */
+  .leave-active-row,.leave-upcoming-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
+  .leave-active-row .la-actions,.leave-upcoming-row .lu-actions{align-self:flex-end}
+
+  /* -- Page title mobile -- */
+  .page-title{font-size:19px}
+
+  /* -- Schedule editor mobile -- */
+  .sched-row{flex-direction:column;align-items:stretch;gap:6px;padding:10px}
+  .sched-day-lbl{width:auto}
+  .shift-pair input[type=time]{width:100%;min-width:0}
+
+  /* -- Calendar mobile -- */
+  .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
+  .cal-head{font-size:10.5px}
+
+  /* -- Tabs mobile -- */
+  .tabs{overflow-x:auto;scrollbar-width:none;gap:2px;flex-wrap:nowrap}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:8px 12px;font-size:13px;white-space:nowrap;flex-shrink:0}
+}
+
+/* ============ SMALL PHONES (≤480px) ============ */
+@media(max-width:480px){
+  .stats{grid-template-columns:1fr 1fr}
+  .qd-head{flex-direction:column;text-align:center;align-items:center}
+  .mini-stat .ms-ico{display:none}
+  .mini-stat{gap:8px;padding:9px 11px}
+  .topbar-date{display:none}
+  .bchip-branch{flex:0 0 125px!important;width:125px!important;height:76px!important}
+  .modal{max-height:90vh;max-height:90dvh}
+  .search-input{font-size:16px;padding:9px 36px;height:44px}
+  .page-title{font-size:17px}
+  .content{padding:10px 10px 100px}
+}
+
+/* -- Mobile modal animations -- */
+@keyframes slideUp{from{transform:translateY(100%);opacity:.8}to{transform:none;opacity:1}}
+@keyframes slideDown{from{transform:none;opacity:1}to{transform:translateY(100%);opacity:0}}
+
+</style>
+</head>
+<body>
+  <div id="app"><div class="login-wrap">
+    <div class="login-card pin-card">
+      <div class="brand" style="justify-content:center">
+        <div class="brand-logo">ع</div>
+        <div><div class="brand-name">مجموعة عادل الطبية</div><div class="brand-sub">إدارة الممارسين والفروع</div></div>
+      </div>
+      <div class="pin-title">أدخل رمز الدخول</div>
+      <form onsubmit="return false">
+        <input class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • •">
+        <button class="btn btn-primary btn-block" type="submit" style="margin-top:14px">→ دخول</button>
+      </form>
+    </div>
+  </div></div>
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+  <script src="data.js"></script>
+  <script>
+/* ============ Adelcare Local API — no server needed ============ */
+const LocalDB = (() => {
+  const SESS = 'adelcare_sess';
+
+  // ── Storage: data lives in SEED (index.html), session in memory/localStorage ─
+  let _memDB = null, _memSess = {auth:false,edit:false};
+  const _fails = {}; // brute-force: {key:{count,until}}
+  function load() { return _memDB; }
+  function save(db) { _memDB = db; }
+  function getSession() {
+    try { const s=localStorage.getItem(SESS); return (s && JSON.parse(s)) || _memSess; } catch(e) { return _memSess; }
+  }
+  function setSession(s) {
+    _memSess = s;
+    try { localStorage.setItem(SESS,JSON.stringify(s)); } catch(e) {}
+  }
+
+  // ── Seed ─────────────────────────────────────────────────────
+  // ── البيانات في ملف data.js ──
+
+  function initDB() {
+    // Always start fresh from SEED — index.html is the single source of truth
+    const db = JSON.parse(JSON.stringify({
+      doctors:  SEED.doctors,
+      branches: SEED.branches,
+      leaves:   SEED.leaves,
+      audit:    SEED.audit || [],
+      settings: SEED.settings,
+      _seq: SEED._seq || { doctors:200, branches:10, leaves:50, audit:100 }
+    }));
+    save(db);
+    return db;
+  }
+
+  function nextId(db, table) {
+    const id = db._seq[table] || 1;
+    db._seq[table] = id + 1;
+    return id;
+  }
+
+  function log(db, action, entity, entity_id, detail) {
+    db.audit.unshift({
+      id: nextId(db,'audit'),
+      ts: new Date().toISOString().slice(0,19),
+      user: "محرّر", action, entity, entity_id: entity_id||null, detail: detail||""
+    });
+    if (db.audit.length > 300) db.audit.length = 300;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────
+  function fmtMin(m) {
+    m = ((m % 1440) + 1440) % 1440;
+    const h = Math.floor(m/60), mm = m%60;
+    const suf = h < 12 ? "ص" : "م";
+    return `${h%12||12}:${String(mm).padStart(2,"0")}${suf}`;
+  }
+
+  function normalizeAr(s) {
+    return (s||"").trim()
+      .replace(/[\u064B-\u065F\u0670\u0640]/g,"")
+      .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه");
+  }
+
+  function activeLeaveFn(leaves, doctorId, dateStr) {
+    return leaves.find(l =>
+      l.doctor_id == doctorId && l.start_date <= dateStr && l.end_date >= dateStr
+    );
+  }
+
+  function computeStatus(doc, nowMin, day, dateStr, leaves) {
+    if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
+    const lv = activeLeaveFn(leaves, doc.id, dateStr);
+    if (lv || doc.status === "leave") {
+      const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
+      const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
+      return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
+    }
+    const sc = doc.schedule || {};
+    // normalise shift: if end < start treat as overnight (end += 1440)
+    const norm = ([s,e]) => e < s ? [s, e+1440] : [s, e];
+    const todays = (sc[day] || sc[String(day)] || []).map(norm);
+    const yest   = (sc[(day+6)%7] || sc[String((day+6)%7)] || []).map(norm);
+
+    // still inside a shift that started today (before midnight portion)
+    for (const [s,e] of todays) {
+      if (s <= nowMin && nowMin < Math.min(e, 1440))
+        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,shift_end:e};
+    }
+    // inside overnight tail from yesterday's shift
+    for (const [s,e] of yest) {
+      if (e > 1440 && nowMin < e-1440)
+        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e-1440)}`,shift_end:e-1440};
+    }
+    // upcoming shift today
+    const starts = todays.filter(([s])=>s>nowMin).map(([s])=>s);
+    if (starts.length) {
+      const nx = Math.min(...starts);
+      return {state:"upcoming",label:"يبدأ لاحقاً",color:"amber",detail:`يبدأ ${fmtMin(nx)}`,next_start:nx};
+    }
+    // had a shift today but it's done, or still has an overnight tail running past midnight
+    if (todays.length) {
+      const overnightRunning = todays.some(([s,e])=>e>1440);
+      if (overnightRunning) {
+        // after midnight: still inside overnight tail — covered above; reaching here means past the end
+        return {state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم"};
+      }
+      return {state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم"};
+    }
+    return {state:"off",label:"إجازة أسبوعية",color:"black",detail:"يوم إجازة"};
+  }
+
+  function nowInfo() {
+    const now = new Date();
+    const day = now.getDay();
+    const nowMin = now.getHours()*60 + now.getMinutes();
+    const pad = n => String(n).padStart(2,'0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    return {day, nowMin, dateStr};
+  }
+
+  function withStatus(doc, db) {
+    const {day,nowMin,dateStr} = nowInfo();
+    return { ...doc, live: computeStatus(doc, nowMin, day, dateStr, db.leaves) };
+  }
+
+  function getExtra(db) {
+    try { return Array.isArray(db.settings.extra_specialties) ? db.settings.extra_specialties : JSON.parse(db.settings.extra_specialties||"[]"); }
+    catch(e) { return []; }
+  }
+  function setExtra(db, arr) {
+    db.settings.extra_specialties = arr;
+  }
+  function allSpecialties(db) {
+    const s = new Set(db.doctors.filter(d=>!d.archived&&d.specialty).map(d=>d.specialty));
+    getExtra(db).forEach(x=>s.add(x));
+    return [...s].sort();
+  }
+
+  // ── Routing ──────────────────────────────────────────────────
+  function route(method, path, body) {
+    const db = initDB();
+    const sess = getSession();
+
+    const needAuth = () => { if (!sess.auth) throw Object.assign(new Error("auth"),{status:401}); };
+    const needEdit = () => { needAuth(); if (!sess.edit) throw Object.assign(new Error("وضع التعديل مقفل"),{status:403}); };
+
+    // AUTH
+    if (method==="POST" && path==="/login") {
+      const fk="login"; const fl=_fails[fk]||{count:0,until:0};
+      if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
+      const code = (body.code||"").trim();
+      const ac = db.settings.access_code||"123";
+      const ec = db.settings.edit_code||"1212";
+      if (code===ec) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:true}); return getSession(); }
+      if (code===ac) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:false}); return getSession(); }
+      const nc=fl.count+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
+      throw Object.assign(new Error("رمز الدخول غير صحيح"),{status:401});
+    }
+    if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false}); return {ok:true}; }
+    if (method==="POST" && path==="/unlock") {
+      needAuth();
+      const fk="unlock"; const fl=_fails[fk]||{count:0,until:0};
+      if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
+      const code=(body.code||"").trim();
+      if (code===( db.settings.edit_code||"1212")) { _fails[fk]={count:0,until:0}; setSession({...sess,edit:true}); return getSession(); }
+      const nc=(fl.count||0)+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
+      throw Object.assign(new Error("رمز التعديل غير صحيح"),{status:403});
+    }
+    if (method==="POST" && path==="/lock") { needAuth(); setSession({...sess,edit:false}); return getSession(); }
+    if (method==="GET"  && path==="/me") {
+      if (sess.edit) setSession({...sess, edit:false});
+      return {user: sess.auth ? {...sess, edit:false} : null};
+    }
+    if (method==="POST" && path==="/verify-admin") {
+      needAuth();
+      const fk="admin"; const fl=_fails[fk]||{count:0,until:0};
+      if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
+      const code=(body.code||"").trim();
+      if (code===(db.settings.admin_code||"12345")) {
+        _fails[fk]={count:0,until:0};
+        setSession({...sess,edit:true});
+        return {ok:true};
+      }
+      const nc=(fl.count||0)+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
+      throw Object.assign(new Error("رمز الإدارة غير صحيح"),{status:403});
+    }
+
+    // SETTINGS
+    if (method==="GET" && path==="/settings") {
+      needAuth();
+      return {access_code:db.settings.access_code,edit_code:db.settings.edit_code,admin_code:db.settings.admin_code};
+    }
+    if (method==="PUT" && path==="/settings") {
+      needAuth();
+      ["access_code","edit_code","admin_code"].forEach(k=>{ if(body[k]&&body[k].trim()) db.settings[k]=body[k].trim(); });
+      log(db,"تغيير رموز الأمان","settings");
+      save(db); return {ok:true};
+    }
+
+    // SPECIALTIES
+    if (method==="GET" && path==="/specialties") {
+      needAuth();
+      return {specialties:allSpecialties(db), extra:getExtra(db)};
+    }
+    if (method==="POST" && path==="/specialties") {
+      needEdit();
+      const name=(body.name||"").trim(); if(!name) throw new Error("اسم القسم مطلوب");
+      const ex=getExtra(db); if(!ex.includes(name)){ ex.push(name); setExtra(db,ex); }
+      log(db,"إضافة قسم","specialty",null,name); save(db);
+      return {ok:true,specialties:allSpecialties(db),extra:getExtra(db)};
+    }
+    if (method==="DELETE" && path==="/specialties") {
+      needEdit();
+      const name=(body.name||"").trim();
+      const ex=getExtra(db).filter(x=>x!==name); setExtra(db,ex);
+      log(db,"حذف قسم","specialty",null,name); save(db);
+      return {ok:true,specialties:allSpecialties(db),extra:getExtra(db)};
+    }
+    if (method==="PUT" && path==="/specialties") {
+      needEdit();
+      const o=(body.old||"").trim(), n=(body.new||"").trim();
+      const ex=getExtra(db).map(x=>x===o?n:x); setExtra(db,ex);
+      db.doctors.forEach(d=>{ if(d.specialty===o) d.specialty=n; });
+      log(db,"تعديل قسم","specialty",null,`${o} → ${n}`); save(db);
+      return {ok:true,specialties:allSpecialties(db),extra:getExtra(db)};
+    }
+
+    // BRANCHES
+    if (method==="GET" && path==="/branches") {
+      needAuth();
+      const {day,nowMin,dateStr}=nowInfo();
+      return {branches: db.branches.map(b=>{
+        const docs=db.doctors.filter(d=>d.branch_id==b.id&&!d.archived);
+        const present=docs.filter(d=>computeStatus(d,nowMin,day,dateStr,db.leaves).state==="present").length;
+        return {...b,doctor_count:docs.length,present,specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
+      })};
+    }
+    const brM = path.match(/^\/branches\/(\d+)$/);
+    if (brM) {
+      const bid=+brM[1];
+      if (method==="GET") {
+        needAuth();
+        const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
+        const docs=db.doctors.filter(d=>d.branch_id===bid&&!d.archived).sort((a,b)=>a.name.localeCompare(b.name));
+        return {branch:b,doctors:docs.map(d=>withStatus(d,db)),specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
+      }
+      if (method==="PUT") {
+        needEdit();
+        const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
+        ["name","grp","info","hours","phone","landline","bank_account","iban","extra_info"].forEach(k=>{ if(k in body) b[k]=body[k]; });
+        log(db,"تعديل فرع","branch",bid,b.name); save(db); return {ok:true};
+      }
+      if (method==="DELETE") {
+        needEdit();
+        const n=db.doctors.filter(d=>d.branch_id===bid&&!d.archived).length;
+        if(n) throw new Error(`لا يمكن حذف فرع يضم ${n} طبيب`);
+        db.branches=db.branches.filter(x=>x.id!==bid);
+        log(db,"حذف فرع","branch",bid,""); save(db); return {ok:true};
+      }
+    }
+    if (method==="POST" && path==="/branches") {
+      needEdit();
+      const id=nextId(db,"branches");
+      const b={id,name:body.name||"",grp:body.grp||"",info:body.info||"",hours:body.hours||"",phone:body.phone||"",landline:body.landline||"",bank_account:body.bank_account||"",iban:body.iban||"",extra_info:body.extra_info||""};
+      db.branches.push(b); log(db,"إضافة فرع","branch",id,b.name); save(db); return {id};
+    }
+
+    // DOCTORS
+    if (method==="GET" && (path==="/doctors" || path.startsWith("/doctors?"))) {
+      needAuth();
+      const incArch=path.includes("archived=1");
+      let docs=db.doctors.filter(d=>incArch||!d.archived).sort((a,b)=>a.name.localeCompare(b.name));
+      return {doctors:docs.map(d=>withStatus(d,db))};
+    }
+    const docM = path.match(/^\/doctors\/(\d+)(\/archive)?$/);
+    if (docM) {
+      const did=+docM[1];
+      if (method==="GET") {
+        needAuth();
+        const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
+        const b=db.branches.find(x=>x.id===d.branch_id);
+        const doc={...withStatus(d,db), branch_name:b?b.name:"",
+          leaves:db.leaves.filter(l=>+l.doctor_id===did).sort((a,b)=>a.start_date.localeCompare(b.start_date))};
+        return {doctor:doc};
+      }
+      if (method==="PUT" && !docM[2]) {
+        needEdit();
+        const idx=db.doctors.findIndex(x=>x.id===did); if(idx<0) throw Object.assign(new Error("not found"),{status:404});
+        const old=db.doctors[idx];
+        const updated={...old,...body,id:did};
+        if(body.schedule) updated.schedule=body.schedule;
+        if(body.dayoff) updated.dayoff=body.dayoff;
+        updated.home_visit=body.home_visit?1:0;
+        db.doctors[idx]=updated;
+        log(db,"تعديل طبيب","doctor",did,updated.name); save(db); return {ok:true};
+      }
+      if (method==="POST" && docM[2]==="/archive") {
+        needEdit();
+        const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
+        d.archived=body.unarchive?0:1;
+        log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,d.name); save(db); return {ok:true};
+      }
+      if (method==="DELETE") {
+        needEdit();
+        const d=db.doctors.find(x=>x.id===did);
+        db.doctors=db.doctors.filter(x=>x.id!==did);
+        db.leaves=db.leaves.filter(l=>l.doctor_id!==did);
+        log(db,"حذف طبيب","doctor",did,d?d.name:""); save(db); return {ok:true};
+      }
+    }
+    if (method==="POST" && path==="/doctors") {
+      needEdit();
+      const id=nextId(db,"doctors");
+      const d={id,...body,home_visit:body.home_visit?1:0,archived:0,status:body.status||"active"};
+      db.doctors.push(d); log(db,"إضافة طبيب","doctor",id,d.name); save(db); return {id};
+    }
+
+    // LEAVES
+    if (method==="GET" && path==="/leaves") {
+      needAuth();
+      const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
+      const dmap={};db.doctors.forEach(d=>{dmap[d.id]={name:d.name,branch_id:d.branch_id,specialty:d.specialty||""};});
+      const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
+      const realLeaves=db.leaves.map(l=>{
+        const doc=dmap[l.doctor_id]||{};
+        return {...l,doctor_name:doc.name||"",branch_id:doc.branch_id||null,branch_name:bmap[doc.branch_id]||"",specialty:doc.specialty||""};
+      });
+      // Include doctors manually set to leave status with no active leave record
+      const docIdsWithActiveLeave=new Set(db.leaves.filter(l=>l.start_date<=today&&l.end_date>=today).map(l=>l.doctor_id));
+      const syntheticLeaves=db.doctors
+        .filter(d=>!d.archived&&d.status==="leave"&&!docIdsWithActiveLeave.has(d.id))
+        .map(d=>({id:"syn_"+d.id,doctor_id:d.id,start_date:today,end_date:today,type:"وضع يدوي",reason:"",synthetic:true,
+          doctor_name:d.name,branch_id:d.branch_id||null,branch_name:bmap[d.branch_id]||"",specialty:d.specialty||""}));
+      return {leaves:[...realLeaves,...syntheticLeaves].sort((a,b)=>b.start_date.localeCompare(a.start_date))};
+    }
+    if (method==="POST" && path==="/leaves") {
+      needEdit();
+      const id=nextId(db,"leaves");
+      const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||""};
+      db.leaves.push(lv);
+      const d=db.doctors.find(x=>x.id===lv.doctor_id);
+      log(db,"إضافة إجازة","leave",id,`${d?d.name:""} ${lv.start_date}→${lv.end_date}`); save(db); return {id};
+    }
+    const lvM=path.match(/^\/leaves\/(\d+)$/);
+    if(lvM&&method==="PUT"){
+      needEdit();
+      const l=db.leaves.find(x=>x.id===+lvM[1]);
+      if(!l) throw Object.assign(new Error("not found"),{status:404});
+      ["start_date","end_date","type","reason"].forEach(k=>{ if(k in body) l[k]=body[k]; });
+      log(db,"تعديل إجازة","leave",+lvM[1],""); save(db); return {ok:true};
+    }
+    if(lvM&&method==="DELETE"){
+      needEdit();
+      db.leaves=db.leaves.filter(l=>l.id!==+lvM[1]);
+      log(db,"حذف إجازة","leave",+lvM[1],""); save(db); return {ok:true};
+    }
+
+    // DASHBOARD
+    if (method==="GET" && path.startsWith("/dashboard")) {
+      needAuth();
+      const branch_id=path.includes("branch_id=")?+path.split("branch_id=")[1]:null;
+      const {day,nowMin,dateStr}=nowInfo();
+      const docs=db.doctors.filter(d=>!d.archived&&(!branch_id||d.branch_id===branch_id));
+      const buckets={present:[],upcoming:[],finished:[],leave:[],off:[]};
+      const stats={present:0,morning:0,evening:0,leave:0,home_visit_now:0,total:docs.length};
+      docs.forEach(d=>{
+        const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+        const doc={...d,live:st};
+        const bucket=st.state;
+        (buckets[bucket]||buckets.off).push(doc);
+        if(st.state==="present"){stats.present++;if(d.home_visit)stats.home_visit_now++;}
+        if(st.state==="leave") stats.leave++;
+        const sc=d.schedule||{};
+        const todays=sc[day]||sc[String(day)]||[];
+        if(todays.length){const first=Math.min(...todays.map(x=>x[0]));if(first<840)stats.morning++;else stats.evening++;}
+      });
+      Object.values(buckets).forEach(arr=>arr.sort((a,b)=>a.name.localeCompare(b.name)));
+      return {buckets,stats,now:fmtMin(nowMin),day};
+    }
+
+    // AVAILABLE NOW
+    if (method==="GET" && path==="/available-now") {
+      needAuth();
+      const {day,nowMin,dateStr}=nowInfo();
+      const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
+      const by_branch={},home=[];
+      db.doctors.filter(d=>!d.archived).forEach(d=>{
+        const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+        if(st.state!=="present") return;
+        const bn=bmap[d.branch_id]||"";
+        const doc={...d,live:st,branch_name:bn};
+        (by_branch[bn]=by_branch[bn]||[]).push(doc);
+        if(d.home_visit) home.push(doc);
+      });
+      return {by_branch,home_visit:home};
+    }
+
+    // SEARCH — comprehensive ranked search across all doctor fields
+    if (method==="GET" && path.startsWith("/search")) {
+      needAuth();
+      const rawQ=decodeURIComponent((path.split("q=")[1]||"").split("&")[0]).trim();
+      const qNorm=normalizeAr(rawQ).toLowerCase();
+      const {day,nowMin,dateStr}=nowInfo();
+      const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
+
+      // ── Intent detection (filter-level, before scoring) ─────────────────
+      const has=w=>qNorm.includes(w);
+      const wantAvail  = has("متاح الان")||has("موجود الان")||has("متاحين")||has("الحاضرين")||has("موجود الان")||has("حاضر الان");
+      const wantLeave  = (has("اجازه")||has("اجازة")||has("مجازه")) && !wantAvail;
+      const wantHome   = has("زياره منزليه")||has("زياره منزل")||has("منزليه");
+      const wantMorning= has("صباحي")||has("الشفت الصباحي")||has("شفت صباح");
+      const wantEvening= has("مسائي")||has("الشفت المسائي")||has("شفت مساء");
+
+      // ── Tokenise — strip stop words so "طبيب باطنة" → ["باطنه"] ─────────
+      const STOP=new Set(["طبيب","طبيبه","طبيبة","دكتور","دكتوره","دكتورة","الدكتور","د",
+        "الان","الآن","متاح","متاحين","موجود","حاضر","يوجد","عنده","عندهم",
+        "ابحث","ابغا","ابغى","ايش","في","من","هل","هو","هي"]);
+      const tokens=qNorm.split(/\s+/).map(t=>t.trim()).filter(t=>t.length>0&&!STOP.has(t));
+
+      // ── Scoring helpers ──────────────────────────────────────────────────
+      function scoreName(t,n){
+        if(!n||!t)return 0;
+        const ws=n.split(/\s+/).filter(Boolean);
+        if(n===t)                          return 10000;
+        if(n.startsWith(t))               return  5000;
+        if(ws[0]&&ws[0]===t)              return  4000;
+        if(ws[0]&&ws[0].startsWith(t))    return  3000;
+        if(ws.some(w=>w===t))             return  2000;
+        if(ws.some(w=>w.startsWith(t)))   return  1500;
+        if(n.includes(t))                 return   500;
+        return 0;
+      }
+      function scoreEnName(t,en){
+        if(!en||!t)return 0;
+        const tl=t.toLowerCase(),nl=en.toLowerCase();
+        const ws=nl.split(/\s+/).filter(Boolean);
+        if(nl===tl)                        return 8000;
+        if(nl.startsWith(tl))             return 4000;
+        if(ws[0]&&ws[0]===tl)             return 3500;
+        if(ws[0]&&ws[0].startsWith(tl))   return 2500;
+        if(ws.some(w=>w===tl))            return 1800;
+        if(ws.some(w=>w.startsWith(tl)))  return 1200;
+        if(nl.includes(tl))               return  400;
+        return 0;
+      }
+      function scoreField(t,v,w){
+        if(!v||!t)return 0;
+        const vn=normalizeAr(v).toLowerCase();
+        const ws=vn.split(/\s+/).filter(Boolean);
+        if(vn===t)                          return w*100;
+        if(vn.startsWith(t))               return w* 60;
+        if(ws.some(wd=>wd===t))            return w* 50;
+        if(ws.some(wd=>wd.startsWith(t)))  return w* 35;
+        if(vn.includes(t))                 return w* 15;
+        return 0;
+      }
+      // Status label matching (e.g. "موجود" → present doctors)
+      const STATUS_LABELS={present:["موجود الان","موجود","حاضر","متواجد"],
+        upcoming:["يبدا لاحقا","يبدا","قريبا"],finished:["انتهي","انتهي دوامه"],
+        leave:["اجازه","اجازة","مجازه","في اجازه"],off:["اجازه اسبوعيه","يوم اجازه"]};
+      function scoreStatus(t,state){
+        const labels=STATUS_LABELS[state]||[];
+        return labels.some(l=>l.includes(t)||t.includes(l.split(" ")[0]))?200:0;
+      }
+      // Shift-time text matching: "8" / "4م" / "10ص"
+      function scoreShifts(t,sc){
+        if(!sc)return 0;
+        const shiftStr=Object.values(sc).flat().map(([s,e])=>fmtMin(s)+"–"+fmtMin(e)).join(" ");
+        const shiftNorm=shiftStr.replace(/\s/g,"").toLowerCase();
+        return shiftStr.includes(t)||shiftNorm.includes(t)?30:0;
+      }
+      // ────────────────────────────────────────────────────────────────────
+
+      // Pre-compute first-shift hour for morning/evening filter
+      const firstShiftMin=(d)=>{
+        const sh=(d.schedule&&(d.schedule[day]||d.schedule[String(day)]))||[];
+        return sh.length?sh[0][0]:null;
+      };
+
+      const out=[];
+      db.doctors.filter(d=>!d.archived).forEach(d=>{
+        const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+
+        // Intent-level hard filters
+        if(wantAvail   && st.state!=="present") return;
+        if(wantLeave   && st.state!=="leave")   return;
+        if(wantHome    && !d.home_visit)        return;
+        if(wantMorning ){ const fs=firstShiftMin(d); if(fs===null||fs>=14*60) return; }
+        if(wantEvening ){ const fs=firstShiftMin(d); if(fs===null||fs< 14*60) return; }
+
+        if(!tokens.length&&!(wantAvail||wantLeave||wantHome||wantMorning||wantEvening)) return;
+
+        // Pre-normalise fields once per doctor
+        const nameN    = normalizeAr(d.name||"").toLowerCase();
+        const enName   = (d.en_name||d.name_en||"").trim().toLowerCase();
+        const specN    = normalizeAr(d.specialty||"").toLowerCase();
+        const rankN    = normalizeAr(d.rank||"").toLowerCase();
+        const natN     = normalizeAr(d.nationality||"").toLowerCase();
+        const branchN  = normalizeAr(bmap[d.branch_id]||"").toLowerCase();
+        const qualN    = normalizeAr(d.qualification||"").toLowerCase();
+        const genderN  = normalizeAr(d.gender||"").toLowerCase();
+        const expN     = normalizeAr(d.experience||"").toLowerCase();
+        const casesN   = normalizeAr(d.cases||"").toLowerCase();
+        const coordN   = normalizeAr(d.notes_coord||"").toLowerCase();
+        const hoursN   = normalizeAr(d.hours_raw||"").toLowerCase();
+
+        let totalScore=0, allMatch=true;
+        for(const t of tokens){
+          const s=Math.max(
+            scoreName   (t, nameN),                    // name:      10000
+            scoreEnName (t, enName),                   // en name:    8000
+            scoreField  (t, specN,    10),             // specialty:  1000 max
+            scoreField  (t, rankN,     9),             // rank:        900
+            scoreField  (t, branchN,   8),             // branch:      800
+            scoreField  (t, natN,      7),             // nationality: 700
+            scoreStatus (t, st.state),                 // status:      200
+            scoreField  (t, qualN,     5),             // qualification:500
+            scoreField  (t, genderN,   4),             // gender:       400
+            scoreField  (t, expN,      3),             // experience:   300
+            scoreField  (t, hoursN,    4),             // hours text:   400
+            scoreField  (t, casesN,    2),             // cases:        200
+            scoreField  (t, coordN,    2),             // coord notes:  200
+            scoreShifts (t, d.schedule)                // shift times:   30
+          );
+          if(!s){allMatch=false;break;}
+          totalScore+=s;
+        }
+        if(tokens.length&&!allMatch) return;
+
+        // Availability boost — never overrides name quality ranking
+        if(st.state==="present")       totalScore+=30;
+        else if(st.state==="upcoming") totalScore+=10;
+
+        out.push({...d,live:st,branch_name:bmap[d.branch_id]||"",_score:totalScore});
+      });
+
+      out.sort((a,b)=>b._score-a._score||a.name.localeCompare(b.name));
+      return {results:out.slice(0,80),count:out.length};
+    }
+
+    // BEST DOCTOR
+    if (method==="POST" && path==="/best-doctor") {
+      needAuth();
+      const {specialty, branch_id, gender} = body||{};
+      const {day,nowMin,dateStr} = nowInfo();
+      const bmap={}; db.branches.forEach(b=>bmap[b.id]=b.name);
+      const PRIO={present:0,upcoming:1,finished:2,off:3,leave:4,archived:5};
+      let docs=db.doctors.filter(d=>!d.archived);
+      if(specialty) docs=docs.filter(d=>d.specialty===specialty);
+      if(branch_id) docs=docs.filter(d=>d.branch_id===+branch_id);
+      if(gender) docs=docs.filter(d=>d.gender===gender);
+      docs=docs.map(d=>{const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+        return {...d,live:st,branch_name:bmap[d.branch_id]||""};});
+      docs.sort((a,b)=>{const pa=PRIO[a.live.state]??9,pb=PRIO[b.live.state]??9;
+        return pa!==pb?pa-pb:a.name.localeCompare(b.name);});
+      return {results:docs};
+    }
+
+    // AUDIT
+    if (method==="GET" && path==="/audit") {
+      needEdit();
+      return {audit:db.audit.slice(0,300)};
+    }
+
+    throw Object.assign(new Error("not found"),{status:404});
+  }
+
+  // ── Public call ───────────────────────────────────────────────
+  async function call(path, opts={}) {
+    const method=(opts.method||"GET").toUpperCase();
+    const body=opts.body||{};
+    let result;
+    try {
+      result = route(method, path, body);
+    } catch(e) {
+      const status=e.status||500;
+      if(status===401) throw Object.assign(new Error(e.message||"auth"),{isAuth:true});
+      throw new Error(e.message||"خطأ");
+    }
+    return result;
+  }
+
+  initDB();
+
+  function exportDB() {
+    const db = load();
+    return db ? JSON.parse(JSON.stringify(db)) : null;
+  }
+
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: ()=>{ _memDB=null; initDB(); }, getSEED:()=>SEED };
+})();
+
+  </script>
+  <script>
+/* ============ Adelcare SPA ============ */
+const App = (() => {
+  const state = { user: null, route: "dashboard", params: {}, sidebarOpen: false, adminUnlocked: false };
+  const DAYS = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+  // week starts on Saturday (Saudi). Display order of JS getDay() indices:
+  const WEEK_ORDER = [6,0,1,2,3,4,5];   // السبت، الأحد، ... الجمعة
+  const colOf = (jsDay)=>(jsDay+1)%7;   // calendar column for a getDay() value
+  const DEPT_ORDER = ["طب عام","باطنة","صدرية","أطفال","نساء وولادة","جلدية","عظام",
+    "أنف وأذن وحنجرة","عيون","مسالك بولية","جراحة","أسنان","علاج طبيعي","المختبر","الأشعة"];
+  const deptRank = (s)=>{ const i=DEPT_ORDER.indexOf(s); return i<0?999:i; };
+  // availability priority: present -> upcoming(soonest) -> finished -> off -> leave
+  const STATE_PRIORITY = {present:0, upcoming:1, finished:2, off:3, leave:4, archived:5};
+  function availSort(a,b){
+    const pa=STATE_PRIORITY[a.live.state]??9, pb=STATE_PRIORITY[b.live.state]??9;
+    if(pa!==pb) return pa-pb;
+    if(a.live.state==="upcoming") return (a.live.next_start??9999)-(b.live.next_start??9999) || a.name.localeCompare(b.name);
+    if(a.live.state==="present") return (b.live.shift_end??0)-(a.live.shift_end??0) || a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name);
+  }
+  const normAr = s=>(s||"").trim().replace(/[ً-ٰٟـ]/g,"")
+    .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").toLowerCase();
+
+  // ── Shared scoring helpers ────────────────────────────────────────────────
+  const _STOP=new Set(["طبيب","طبيبه","طبيبة","دكتور","دكتوره","دكتورة","الدكتور","د"]);
+  function scoreNameFn(t,n){
+    if(!n||!t)return 0;
+    const ws=n.split(/\s+/).filter(Boolean);
+    if(n===t)                          return 10000;
+    if(n.startsWith(t))               return  5000;
+    if(ws[0]&&ws[0]===t)              return  4000;
+    if(ws[0]&&ws[0].startsWith(t))    return  3000;
+    if(ws.some(w=>w===t))             return  2000;
+    if(ws.some(w=>w.startsWith(t)))   return  1500;
+    if(n.includes(t))                 return   500;
+    return 0;
+  }
+  function scoreEnNameFn(t,en){
+    if(!en||!t)return 0;
+    const tl=t,nl=en.toLowerCase();
+    const ws=nl.split(/\s+/).filter(Boolean);
+    if(nl===tl)                        return 8000;
+    if(nl.startsWith(tl))             return 4000;
+    if(ws[0]&&ws[0]===tl)             return 3500;
+    if(ws[0]&&ws[0].startsWith(tl))   return 2500;
+    if(ws.some(w=>w===tl))            return 1800;
+    if(ws.some(w=>w.startsWith(tl)))  return 1200;
+    if(nl.includes(tl))               return  400;
+    return 0;
+  }
+  function scoreFieldFn(t,v,w){
+    if(!v||!t)return 0;
+    const vn=normAr(v);
+    const ws=vn.split(/\s+/).filter(Boolean);
+    if(vn===t)                          return w*100;
+    if(vn.startsWith(t))               return w* 60;
+    if(ws.some(wd=>wd===t))            return w* 50;
+    if(ws.some(wd=>wd.startsWith(t)))  return w* 35;
+    if(vn.includes(t))                 return w* 15;
+    return 0;
+  }
+  function scoreDoctorMgmt(q,d,bname){
+    if(!q)return 1;
+    const qNorm=normAr(q);
+    const tokens=qNorm.split(/\s+/).filter(t=>t.length>0&&!_STOP.has(t));
+    if(!tokens.length)return 1;
+    const nameN=normAr(d.name||"");
+    const enName=(d.en_name||d.name_en||"").toLowerCase();
+    const specN=normAr(d.specialty||"");
+    const rankN=normAr(d.rank||"");
+    const natN=normAr(d.nationality||"");
+    const branchN=normAr(bname[d.branch_id]||"");
+    const qualN=normAr(d.qualification||"");
+    const genderN=normAr(d.gender||"");
+    const expN=normAr(d.experience||"");
+    const casesN=normAr(d.cases||"");
+    const coordN=normAr(d.notes_coord||"");
+    let total=0;
+    for(const t of tokens){
+      const s=Math.max(
+        scoreNameFn(t,nameN),
+        scoreEnNameFn(t,enName),
+        scoreFieldFn(t,specN,10),
+        scoreFieldFn(t,rankN,9),
+        scoreFieldFn(t,branchN,8),
+        scoreFieldFn(t,natN,7),
+        scoreFieldFn(t,qualN,5),
+        scoreFieldFn(t,genderN,4),
+        scoreFieldFn(t,expN,3),
+        scoreFieldFn(t,casesN,2),
+        scoreFieldFn(t,coordN,2)
+      );
+      if(!s)return 0;
+      total+=s;
+    }
+    return total;
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const $ = (s, r=document) => r.querySelector(s);
+  const el = (h) => { const d=document.createElement("div"); d.innerHTML=h.trim(); return d.firstElementChild; };
+  const esc = (s) => (s==null?"":String(s)).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  // ---------- API ----------
+  async function api(path, opts={}) {
+    try {
+      return await LocalDB.call(path, opts);
+    } catch(e) {
+      if (e.isAuth && state.user) { state.user=null; render(); }
+      throw e;
+    }
+  }
+  // every editable action is gated by edit-mode (unlocked with the edit code)
+  const can = (a) => !!(state.user && state.user.edit);
+
+  // ---------- Toast ----------
+  function toast(msg,type=""){
+    const cls=type==="ok"?" toast-ok":type==="err"?" toast-err":"";
+    const t=el(`<div class="toast${cls}">${esc(msg)}</div>`);
+    $("#toast-root").appendChild(t); setTimeout(()=>t.remove(),2400); }
+
+  // ---------- Theme ----------
+  function initTheme(){ const t=localStorage.getItem("theme")||"light";
+    document.documentElement.setAttribute("data-theme",t); }
+  function toggleTheme(){ const c=document.documentElement.getAttribute("data-theme");
+    const n=c==="dark"?"light":"dark"; document.documentElement.setAttribute("data-theme",n);
+    localStorage.setItem("theme",n); const b=$("#theme-ico"); if(b)b.textContent=n==="dark"?"☀️":"🌙"; }
+
+  // ---------- helpers ----------
+  const initials = (n)=> (n||"؟").replace(/^د\.?\s*/,"").trim().slice(0,2);
+  const avatar = (d)=> d.photo ? `<div class="avatar"><img src="${esc(d.photo)}"></div>`
+      : `<div class="avatar">${esc(initials(d.name))}</div>`;
+  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off"};
+  function statusPill(live){ const s=live.state;
+    return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
+
+  function todayShift(d){
+    if(!d.schedule) return "";
+    const day=new Date().getDay();
+    const sh=d.schedule[day]||d.schedule[String(day)];
+    if(!sh||!sh.length) return "";
+    return sh.map(([s,e])=>fmtRange(s,e)).join(" ، ");
+  }
+  function doctorCard(d){
+    const live=d.live||{state:"off",label:""};
+    const isLeave=live.state==="leave";
+    const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
+      .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
+    const shift=isLeave?"":todayShift(d);
+    // Unified info row: shift times for working doctors, leave info for on-leave doctors
+    const infoRow=shift
+      ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
+      :isLeave
+        ?`<div class="dcard-shift dcard-leave-info"><span>🔴 ${esc(live.leaveType||"إجازة")}${live.leave&&live.leave.end_date?` · حتى ${esc(fmtDate(live.leave.end_date))}`:""}  </span></div>`
+        :"";
+    const branchRow=d.branch_name?`<div class="dcard-meta" style="margin-top:3px"><span>🏥 ${esc(d.branch_name)}</span></div>`:"";
+    return `<div class="dcard st-${STATE_CLS[live.state]}" data-doc="${d.id}">
+      ${avatar(d)}
+      <div class="dcard-body">
+        <div class="dcard-top">
+          <div class="dcard-name">${esc(d.name)}</div>
+          ${statusPill(live)}
+        </div>
+        <div class="dcard-meta"><span class="spec-tag">${esc(d.specialty||"")}</span>${meta}</div>
+        ${infoRow}
+        ${branchRow}
+      </div></div>`;
+  }
+  function bindCards(root){ root.querySelectorAll("[data-doc]").forEach(c=>
+    c.addEventListener("click",()=>quickCard(c.dataset.doc).catch(e=>toast(e.message||"خطأ","err")))); }
+
+  // ---------- Quick doctor card (modal) ----------
+  async function quickCard(id){
+    const {doctor:d}=await api("/doctors/"+id);
+    const live=d.live||{};
+    const isOnLeave=live.state==="leave";
+    const sc=d.schedule||{};
+    const sched = WEEK_ORDER.map(i=>[i,sc[i]||sc[String(i)]]).filter(([i,v])=>v&&v.length)
+      .map(([i,v])=>`<div><b>${DAYS[i]}:</b> ${v.map(([s,e])=>fmtRange(s,e)).join(" ، ")}</div>`).join("")||"—";
+    const offs=(d.dayoff||[]).slice().sort((a,b)=>WEEK_ORDER.indexOf(a)-WEEK_ORDER.indexOf(b)).map(i=>DAYS[i]).join("، ")||"—";
+
+    // Active leave from live status
+    const activeLv=isOnLeave ? (live.leave || (d.leaves||[]).find(l=>{const n=new Date();const p=x=>String(x).padStart(2,'0');const t=`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;return l.start_date<=t&&l.end_date>=t;})) : null;
+    // Upcoming (future) leaves
+    const today=(()=>{const n=new Date(),p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
+    const upcomingLeaves=(d.leaves||[]).filter(l=>l.start_date>today).sort((a,b)=>a.start_date.localeCompare(b.start_date));
+
+    const rows=[
+      ["التخصص", `${esc(d.specialty)}${d.rank?` — ${esc(d.rank)}`:""}`],
+      ["الحالة الآن", statusPill(live)+(live.detail?` <span style="color:var(--muted)">${esc(live.detail)}</span>`:"")],
+      ["الفرع", esc(d.branch_name)],
+      ["الجنسية", esc(d.nationality)||"—"],
+      ["الخبرة", esc(fmtExp(d.experience))||"—"],
+      ["الجنس", esc(d.gender)||"—"],
+      ["الدوام", `<div style="font-size:13px;line-height:1.9">${sched}</div>`],
+      ["الإجازة الأسبوعية", offs],
+      ["الحالات المستقبلة", esc(d.cases)||"—"],
+      ["ملاحظات التنسيق", esc(d.notes_coord)||"—"],
+    ];
+    if(can("doctor.edit") && d.notes_admin) rows.push(["ملاحظات إدارية", esc(d.notes_admin)]);
+
+    const hasLeaveRecord=!!activeLv;
+    const leaveSection=isOnLeave?`
+      <div class="leave-active-row">
+        <div>
+          <div class="la-info">🔴 ${esc(activeLv?activeLv.type:live.leaveType||"إجازة")}</div>
+          ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
+        </div>
+        ${hasLeaveRecord?`<div class="la-actions">
+          <button class="btn btn-xs btn-ghost" data-edit-leave="${activeLv.id}">تعديل</button>
+          <button class="btn btn-xs btn-danger" data-del-leave="${activeLv.id}">إلغاء</button>
+        </div>`:""}
+      </div>`:"";
+
+    const upcomingSection=upcomingLeaves.map(ul=>`
+      <div class="leave-upcoming-row" data-ul-id="${ul.id}">
+        <div>
+          <div class="lu-info">🟡 إجازة قادمة · ${esc(ul.type||"إجازة")}</div>
+          <div class="lu-dates">من ${esc(fmtDate(ul.start_date))} إلى ${esc(fmtDate(ul.end_date))}${ul.reason?` · ${esc(ul.reason)}`:""}</div>
+        </div>
+        <div class="lu-actions">
+          <button class="btn btn-xs btn-ghost" data-edit-ul="${ul.id}">تعديل</button>
+          <button class="btn btn-xs btn-danger" data-del-ul="${ul.id}">إلغاء</button>
+        </div>
+      </div>`).join("");
+
+    const body=`
+      <div class="qd-head">
+        <div class="avatar qd-avatar">${d.photo?`<img src="${esc(d.photo)}">`:esc(initials(d.name))}</div>
+        <div>
+          <div class="qd-name">${esc(d.name)}</div>
+          <div style="margin-top:6px">${statusPill(live)}</div>
+        </div>
+      </div>
+      ${leaveSection}${upcomingSection}
+      <div class="qd-rows">${rows.map(([k,v])=>`<div class="qd-row"><div class="k">${k}</div><div class="vv">${v}</div></div>`).join("")}</div>`;
+
+    const foot=`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>
+      ${isOnLeave&&!hasLeaveRecord
+        ?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`
+        :`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة</button>`}`;
+
+    openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
+      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requireEdit(()=>doctorForm(d));
+      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requireEdit(()=>leaveForm(d.id,d.name));
+      // Active leave inline buttons
+      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requireEdit(()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}));
+      const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requireEdit(async()=>{
+        if(!confirm("إلغاء الإجازة الحالية؟"))return;
+        try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم إلغاء الإجازة","ok");closeModal();go(state.route);}
+        catch(e){toast("❌ "+e.message,"err");}
+      });
+      // End manual leave (doctor.status="leave" with no leave record)
+      const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requireEdit(async()=>{
+        if(!confirm("إلغاء الإجازة وإعادة الممارس للعمل؟"))return;
+        try{await api("/doctors/"+d.id,{method:"PUT",body:{...d,status:"active"}});
+          toast("✅ تم إلغاء الإجازة","ok");closeModal();go(state.route);}
+        catch(e){toast("❌ "+e.message,"err");}
+      });
+      // Upcoming leave inline buttons
+      upcomingLeaves.forEach(ul=>{
+        const eul=m.querySelector(`[data-edit-ul="${ul.id}"]`);
+        if(eul)eul.onclick=()=>requireEdit(()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}));
+        const dul=m.querySelector(`[data-del-ul="${ul.id}"]`);
+        if(dul)dul.onclick=()=>requireEdit(async()=>{
+          if(!confirm("إلغاء الإجازة القادمة؟"))return;
+          try{await api("/leaves/"+ul.id,{method:"DELETE"});toast("✅ تم إلغاء الإجازة","ok");closeModal();quickCard(id);}
+          catch(e){toast("❌ "+e.message,"err");}
+        });
+      });
+    }});
+  }
+  function fmtDate(iso){
+    if(!iso) return "";
+    const p=iso.split("-");
+    if(p.length<3) return iso;
+    return `${+p[2]}/${+p[1]}/${p[0]}`;
+  }
+  function fmtRange(s,e){ return `${fmtMin(s)}–${fmtMin(e)}`; }
+  function fmtMin(m){ m=((m%1440)+1440)%1440; let h=Math.floor(m/60),mm=m%60;
+    const suf=h<12?"ص":"م"; let h12=h%12||12;
+    return mm?`${h12}:${String(mm).padStart(2,"0")}${suf}`:`${h12}${suf}`; }
+  // Format experience: "3" → "3 سنوات", "13" → "13 سنة", already-formatted → as-is
+  function fmtExp(v){
+    if(!v)return "";
+    const s=String(v).trim();
+    if(/[أ-ي]/.test(s)) return s; // already has Arabic text
+    const n=parseFloat(s);
+    if(isNaN(n)) return s;
+    if(n===1) return "سنة واحدة";
+    if(n===2) return "سنتان";
+    if(n>=3&&n<=10) return `${n} سنوات`;
+    return `${n} سنة`;
+  }
+
+  // ---------- Modal infra ----------
+  function openModal({title,bodyHTML,footHTML,wide,onMount}){
+    const back=el(`<div class="modal-back"><div class="modal ${wide?'wide':''}">
+      <div class="modal-head"><h3>${esc(title)}</h3><button class="icon-btn" data-x>✕</button></div>
+      <div class="modal-body">${bodyHTML}</div>
+      ${footHTML?`<div class="modal-foot">${footHTML}</div>`:""}
+    </div></div>`);
+    back.addEventListener("click",e=>{if(e.target===back)closeModal();});
+    back.querySelector("[data-x]").onclick=closeModal;
+    const root=$("#modal-root");
+    root.querySelectorAll(".modal-back").forEach(b=>b.remove()); // replace any open modal instantly
+    root.appendChild(back);
+    document.body.classList.add("modal-open");   // lock background scroll (no reflow flash)
+    if(onMount)onMount(back.querySelector(".modal"));
+  }
+  function closeModal(){
+    const root=$("#modal-root"); const back=root.querySelector(".modal-back");
+    const finish=()=>{ root.innerHTML=""; document.body.classList.remove("modal-open");
+    };
+    // Re-lock edit mode after closing any modal outside admin/control panels
+    if(state.user && state.user.edit && state.route!=="control" && state.route!=="admin"){
+      api("/lock",{method:"POST"}).then(u=>{state.user=u; toast("🔒 تم قفل وضع التعديل");}).catch(()=>{});
+    }
+    if(back){ back.classList.add("closing"); setTimeout(finish,150); }
+    else finish();
+  }
+
+  // ---------- Edit-mode unlock (on demand) ----------
+  // Run fn now if already unlocked; otherwise ask for the edit code, then run it.
+  function requireEdit(fn){
+    if(state.adminUnlocked){ fn(); return; }
+    if(state.user && state.user.edit){ fn(); return; }
+    unlockPrompt(fn);
+  }
+  function unlockPrompt(onOk){
+    openModal({title:"🔒 أدخل رمز التعديل",
+      bodyHTML:`<div class="page-sub" style="margin-bottom:12px">للتعديل على البيانات أدخل رمز التعديل.</div>
+        <form id="uf"><input id="unlock-code" class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • •"></form>`,
+      footHTML:`<button class="btn btn-primary" id="do-unlock">متابعة</button><button class="btn btn-ghost" data-xu>إلغاء</button>`,
+      onMount:(m)=>{ const inp=m.querySelector("#unlock-code"); setTimeout(()=>inp.focus(),60);
+        m.querySelector("[data-xu]").onclick=closeModal;
+        const submit=async()=>{ const code=inp.value.trim(); if(!code)return;
+          try{ state.user=await api("/unlock",{method:"POST",body:{code}});
+            // clear this modal instantly, then run the pending action
+            $("#modal-root").innerHTML=""; document.body.classList.remove("modal-open");
+            if(typeof onOk==="function") onOk(); else render();
+          }catch(e){ toast(e.message); inp.value=""; inp.focus(); } };
+        m.querySelector("#do-unlock").onclick=submit;
+        m.querySelector("#uf").onsubmit=(e)=>{e.preventDefault();submit();};
+      }});
+  }
+
+  function adminUnlockPrompt(onOk){
+    if(state.adminUnlocked){if(typeof onOk==="function")onOk();return;}
+    openModal({title:"🔐 رمز الإدارة",
+      bodyHTML:`<div class="page-sub" style="margin-bottom:12px">هذا القسم محمي برمز الإدارة المنفصل.</div>
+        <form id="af"><input id="admin-code" class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • • •"></form>`,
+      footHTML:`<button class="btn btn-primary" id="do-admin">متابعة</button><button class="btn btn-ghost" data-xa>إلغاء</button>`,
+      onMount:(m)=>{ const inp=m.querySelector("#admin-code"); setTimeout(()=>inp.focus(),60);
+        m.querySelector("[data-xa]").onclick=closeModal;
+        const submit=async()=>{ const code=inp.value.trim(); if(!code)return;
+          try{ await api("/verify-admin",{method:"POST",body:{code}});
+            state.adminUnlocked=true;
+            $("#modal-root").innerHTML=""; document.body.classList.remove("modal-open");
+            if(typeof onOk==="function") onOk();
+          }catch(e){ toast("❌ "+e.message,"err"); inp.value=""; inp.focus(); } };
+        m.querySelector("#do-admin").onclick=submit;
+        m.querySelector("#af").onsubmit=(e)=>{e.preventDefault();submit();};
+      }});
+  }
+
+  // ============================================================ ROUTER
+  const routes={};
+  function go(route,params={}){
+    if((state.route==="control"||state.route==="admin")&&route!==state.route){
+      state.adminUnlocked=false;
+      if(state.user&&state.user.edit) api("/lock",{method:"POST"}).then(u=>state.user=u).catch(()=>{});
+    }
+    state.route=route; state.params=params; state.sidebarOpen=false;
+    location.hash=route+(params.id?("/"+params.id):""); render(); }
+  window.addEventListener("hashchange",()=>{
+    const [r,id]=location.hash.replace(/^#/,"").split("/");
+    if(r&&routes[r]&&(r!==state.route||id!=state.params.id)){state.route=r;state.params=id?{id}:{};render();}
+  });
+
+  // ============================================================ LOGIN (code via keyboard)
+  function renderLogin(){
+    const root=$("#app");
+    root.innerHTML=`<div class="login-wrap"><div class="login-card pin-card">
+      <div class="brand" style="justify-content:center"><div class="brand-logo">ع</div>
+        <div><div class="brand-name">مجموعة عادل الطبية</div><div class="brand-sub">إدارة الممارسين والفروع</div></div></div>
+      <div class="pin-title">أدخل رمز الدخول</div>
+      <form id="lf">
+        <input id="pin-input" class="pin-input" type="password" inputmode="numeric"
+          autocomplete="off" autofocus placeholder="• • • •">
+        <button class="btn btn-primary btn-block" type="submit" style="margin-top:14px">دخول</button>
+      </form>
+    </div></div>`;
+    const inp=$("#pin-input");
+    setTimeout(()=>inp.focus(),60);
+    $("#lf").onsubmit=async(e)=>{e.preventDefault();
+      const code=inp.value.trim();
+      if(!code){toast("أدخل الرمز");return;}
+      try{ const u=await api("/login",{method:"POST",body:{code}});
+        state.user=u; toast("مرحباً "+(u.name||"")); go("dashboard");
+      }catch(err){ toast(err.message); inp.value=""; inp.focus(); }
+    };
+  }
+
+  // ============================================================ SHELL
+  const NAV=[
+    {id:"dashboard",ico:"🏠",label:"دوام الفروع"},
+    {id:"doctors",ico:"🩺",label:"الممارسون"},
+  ];
+  const MNAV_ITEMS=[
+    {id:"dashboard",ico:"🏠",label:"الرئيسية"},
+    {id:"doctors",ico:"🩺",label:"الممارسون"},
+  ];
+
+  function shell(contentHTML){
+    const navItems=NAV.map(n=>
+      `<a class="nav-item ${state.route===n.id?'active':''}" data-nav="${n.id}">
+        <span class="ico">${n.ico}</span>${n.label}
+        ${n.id==="available"?'<span class="nav-badge" id="avail-badge">·</span>':""}</a>`).join("");
+    const mnav=MNAV_ITEMS.map(n=>
+      `<a class="${state.route===n.id?'active':''}" data-nav="${n.id}"><span class="ico">${n.ico}</span>${n.label}</a>`).join("");
+    $("#app").innerHTML=`<div class="app-shell">
+      ${state.sidebarOpen?'<div class="scrim" data-scrim></div>':""}
+      <aside class="sidebar ${state.sidebarOpen?'open':''}">
+        <div class="brand"><div class="brand-logo">ع</div>
+          <div><div class="brand-name">مجموعة عادل الطبية</div><div class="brand-sub">إدارة الممارسين والفروع</div></div></div>
+        ${navItems}
+        <div class="sidebar-foot">
+          <div class="nav-sep"></div>
+          <button class="btn btn-ghost btn-sm" id="logout">تسجيل الخروج</button>
+        </div>
+      </aside>
+      <div class="main">
+        <div class="topbar">
+          <button class="icon-btn hamburger" id="ham">☰</button>
+          <div class="search-wrap">
+            <span class="ico">🔍</span>
+            <input class="search-input" id="gsearch" placeholder="ابحث: اسم، تخصص، جنسية، فرع، شفت، حالة..." autocomplete="off">
+          </div>
+          ${buildTopbarDate()}
+          <button class="icon-btn${state.route==="admin"?" active-ctrl":""}" id="ctrl-btn" title="الإعدادات">⚙️</button>
+          <button class="icon-btn" id="theme-btn"><span id="theme-ico">${document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"}</span></button>
+        </div>
+        <div class="content" id="content">${contentHTML}</div>
+      </div>
+      <nav class="mobile-nav">${mnav}</nav>
+    </div>`;
+    $("#app").querySelectorAll("[data-nav]").forEach(a=>a.onclick=()=>go(a.dataset.nav));
+    $("#logout").onclick=async()=>{await api("/logout",{method:"POST"});state.user=null;render();};
+    $("#ctrl-btn").onclick=()=>go("admin");
+    $("#theme-btn").onclick=toggleTheme;
+
+    const ham=$("#ham"); if(ham)ham.onclick=()=>{state.sidebarOpen=!state.sidebarOpen;render();};
+    const scr=$("[data-scrim]"); if(scr)scr.onclick=()=>{state.sidebarOpen=false;render();};
+    setupSearch();
+    updateAvailBadge();
+  }
+
+  async function updateAvailBadge(){ try{ const d=await api("/dashboard");
+    const b=$("#avail-badge"); if(b)b.textContent=d.stats.present; }catch(e){} }
+
+  // ---------- Global search ----------
+  // Dropdown lives at body level (position:fixed) — outside topbar stacking context.
+  // We keep exactly ONE repos + ONE click handler across renders using module-level refs.
+  let searchT=null, _searchDD=null, _searchRepos=null, _searchClick=null;
+
+  function getDD(){
+    if(!_searchDD||!document.body.contains(_searchDD)){
+      _searchDD=document.createElement("div");
+      _searchDD.id="search-dd";
+      _searchDD.style.display="none";
+      document.body.appendChild(_searchDD);
+    }
+    return _searchDD;
+  }
+  function positionDD(inp,dd){
+    const r=inp.getBoundingClientRect();
+    if(!r.width) return; // element not visible / not in layout
+    const vvh=window.visualViewport?window.visualViewport.height:window.innerHeight;
+    const spaceBelow=Math.max(160, vvh - r.bottom - 16);
+    dd.style.top       =(r.bottom+5)+"px";
+    dd.style.bottom    ="auto";
+    dd.style.left      =r.left+"px";
+    dd.style.right     ="auto";
+    dd.style.width     =r.width+"px";
+    dd.style.maxHeight =Math.min(spaceBelow,520)+"px";
+  }
+  function setupSearch(){
+    const inp=$("#gsearch"); if(!inp)return;
+    const dd=getDD();
+
+    // Remove previous listeners so they don't accumulate across renders
+    if(_searchRepos){
+      window.removeEventListener("scroll",_searchRepos);
+      if(window.visualViewport) window.visualViewport.removeEventListener("resize",_searchRepos);
+    }
+    if(_searchClick) document.removeEventListener("click",_searchClick);
+
+    _searchRepos=()=>{ if(dd.style.display!=="none") positionDD(inp,dd); };
+    window.addEventListener("scroll",_searchRepos,{passive:true});
+    if(window.visualViewport) window.visualViewport.addEventListener("resize",_searchRepos);
+
+    _searchClick=(e)=>{
+      if(!e.target.closest(".search-wrap")&&!e.target.closest("#search-dd")&&!e.target.closest("#modal-root"))
+        dd.style.display="none";
+    };
+    document.addEventListener("click",_searchClick);
+
+    inp.addEventListener("input",()=>{clearTimeout(searchT);searchT=setTimeout(doSearch,80);});
+
+    async function doSearch(){
+      const q=inp.value.trim();
+      if(!q){dd.style.display="none";return;}
+      // Populate content first, then position + show — so errors in API don't hide the dropdown
+      let html=`<div class="empty" style="padding:24px">لا نتائج</div>`;
+      try{
+        const {results}=await api("/search?q="+encodeURIComponent(q));
+        if(results.length) html=`<div style="display:grid;gap:7px">${results.map(doctorCard).join("")}</div>`;
+      }catch(err){ html=`<div class="empty" style="padding:24px">حدث خطأ في البحث</div>`; }
+      dd.innerHTML=html;
+      positionDD(inp,dd);
+      dd.style.display="block";
+      bindCards(dd);
+      // Close dropdown & clear input when a search result is selected
+      dd.querySelectorAll("[data-doc]").forEach(c=>c.addEventListener("click",()=>{
+        dd.style.display="none";
+        inp.value="";
+      },{capture:true}));
+    }
+  }
+
+  // ---------- Topbar date widget ----------
+  function buildTopbarDate(){
+    const now=new Date();
+    const dayName=DAYS[now.getDay()];
+    let hijri="";
+    try{ hijri=new Intl.DateTimeFormat("ar",{calendar:"islamic",day:"numeric",month:"long",year:"numeric"}).format(now); }catch(e){}
+    let greg="";
+    try{ greg=new Intl.DateTimeFormat("ar",{calendar:"gregory",day:"numeric",month:"long",year:"numeric"}).format(now); }catch(e){
+      const AR_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+      greg=`${now.getDate()} ${AR_MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+    }
+    return `<div class="topbar-date">
+      <span class="td-day">${esc(dayName)}</span>
+      ${hijri?`<span class="td-hijri">🌙 ${esc(hijri)}</span>`:""}
+      ${greg?`<span class="td-greg">📅 ${esc(greg)}</span>`:""}
+    </div>`;
+  }
+
+  // ============================================================ DASHBOARD
+  let dashBranch="";   // "" = all branches
+  let dashSpec="";     // "" = all specialties
+  let dashStat="";     // "" | present | morning | evening | leave (stat-card filter)
+  let dashDay=-1;      // -1 = today (live), 0-6 = specific JS weekday
+  routes.dashboard=async()=>{
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
+    const bname={}; branches.forEach(b=>bname[b.id]=b.name);
+    doctors.forEach(d=>d.branch_name=bname[d.branch_id]||"");
+    const dayIdx=new Date().getDay();
+    const firstStart=(d)=>{const sh=(d.schedule&&(d.schedule[dayIdx]||d.schedule[String(dayIdx)]))||[];
+      return sh.length?Math.min(...sh.map(x=>x[0])):null;};
+    const presentInBranch=(bid)=>doctors.filter(d=>d.branch_id===bid&&d.live.state==="present").length;
+    const allSpecs=[...new Set(doctors.map(d=>d.specialty))].filter(Boolean).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
+
+    const totalPresent=doctors.filter(d=>d.live.state==="present").length;
+    const branchBar=`<div class="branch-bar" id="branch-bar">
+      <button class="bchip bchip-branch bchip-all ${dashBranch===""?"on":""}" data-bf="">
+        <span class="bchip-top">🏥 الكل <span class="bchip-n">${totalPresent}</span></span>
+        <span class="bchip-hours">جميع الممارسين والفروع</span>
+      </button>
+      ${branches.map(b=>`
+        <button class="bchip bchip-branch ${String(dashBranch)===String(b.id)?"on":""}" data-bf="${b.id}">
+          <span class="bchip-top"><span class="bchip-name">${esc(b.name)}</span><span class="bchip-n">${presentInBranch(b.id)}</span></span>
+          <span class="bchip-hours">${b.hours?`🕐 ${esc(b.hours)}`:""}</span>
+        </button>`).join("")}
+    </div>`;
+
+    // helper: does doctor have shifts on given JS weekday?
+    const hasShiftOn=(d,jsDay)=>{const sh=d.schedule&&(d.schedule[jsDay]||d.schedule[String(jsDay)]);return sh&&sh.length>0;};
+    // shifts for a given day as formatted string
+    const shiftsForDay=(d,jsDay)=>{const sh=(d.schedule&&(d.schedule[jsDay]||d.schedule[String(jsDay)]))||[];
+      return sh.map(([s,e])=>fmtRange(s,e)).join(" ، ");};
+
+    function drawBody(){
+      const body=$("#dash-body"); body.classList.add("fade");
+      const isToday=dashDay===-1;
+      const viewDay=isToday?dayIdx:dashDay;
+      const branchDocs=doctors.filter(d=>!dashBranch||String(d.branch_id)===String(dashBranch));
+
+      // stat cards only for today view
+      let statCardsHTML="";
+      if(isToday){
+        let present=0,leave=0,morning=0,evening=0;
+        branchDocs.forEach(d=>{const s=d.live.state;
+          if(s==="present")present++;
+          if(s==="leave"){leave++;return;}
+          const fs=firstStart(d); if(fs!=null){if(fs<14*60)morning++;else evening++;}});
+        const statLabels={present:"المتواجدون الآن",morning:"الشفت الصباحي",evening:"الشفت المسائي",leave:"الممارسون في إجازة"};
+        statCardsHTML=`<div class="mini-stats">${[
+          {k:"present",v:present,l:"متواجد الآن",c:"green",b:"🟢"},
+          {k:"morning",v:morning,l:"الشفت الصباحي",c:"amber",b:"🌅"},
+          {k:"evening",v:evening,l:"الشفت المسائي",c:"brand",b:"🌙"},
+          {k:"leave",v:leave,l:"في إجازة",c:"leave",b:"🔴"},
+        ].map(x=>`<button class="mini-stat s-${x.c} ${dashStat===x.k?"active":""}" data-stat="${x.k}">
+          <span class="ms-ico">${x.b}</span><div><div class="ms-v">${x.v}</div><div class="ms-l">${x.l}</div></div></button>`).join("")}</div>
+          ${dashStat?`<button class="chip-clear" id="clear-stat">✕ ${statLabels[dashStat]} (إلغاء)</button>`:""}`;
+      }
+
+      // combined filter
+      const matchStat=(d)=>{
+        if(!isToday||!dashStat) return true;
+        if(dashStat==="present") return d.live.state==="present";
+        if(dashStat==="leave")   return d.live.state==="leave";
+        const fs=firstStart(d);
+        if(dashStat==="morning") return fs!=null&&fs<14*60;
+        if(dashStat==="evening") return fs!=null&&fs>=14*60;
+        return true;
+      };
+      const listDocs=branchDocs.filter(d=>
+        (!dashSpec||d.specialty===dashSpec) &&
+        matchStat(d) &&
+        (isToday || hasShiftOn(d,viewDay))
+      );
+
+      const bySpec={}; listDocs.forEach(d=>{(bySpec[d.specialty]=bySpec[d.specialty]||[]).push(d);});
+      const ordered=Object.keys(bySpec).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
+
+      const sections=ordered.map(sp=>{
+        let arr=bySpec[sp];
+        if(isToday) arr=arr.slice().sort(availSort);
+        else arr=arr.slice().sort((a,b)=>{
+          const sa=(a.schedule&&(a.schedule[viewDay]||a.schedule[String(viewDay)])||[])[0]?.[0]??9999;
+          const sb=(b.schedule&&(b.schedule[viewDay]||b.schedule[String(viewDay)])||[])[0]?.[0]??9999;
+          return sa-sb||a.name.localeCompare(b.name);
+        });
+        const cards=isToday?arr.map(doctorCard).join(""):arr.map(d=>{
+          const shStr=shiftsForDay(d,viewDay);
+          const live=d.live||{state:"off"};
+          return `<div class="dcard" data-doc="${d.id}">
+            ${avatar(d)}
+            <div class="dcard-body">
+              <div class="dcard-top"><div class="dcard-name">${esc(d.name)}</div></div>
+              <div class="dcard-meta"><span class="spec-tag">${esc(d.specialty||"")}</span>${d.nationality?`<span>${esc(d.nationality)}</span>`:""}${d.branch_name?`<span>🏥 ${esc(d.branch_name)}</span>`:""}</div>
+              ${shStr?`<div class="dcard-meta"><span>🕐 ${esc(shStr)}</span></div>`:""}
+            </div></div>`;
+        }).join("");
+        return `<div class="section-head"><h2>${esc(sp)}</h2><span class="count">${arr.length}</span></div>
+          <div class="status-grid">${cards}</div>`;
+      }).join("")||`<div class="empty" style="padding:34px">لا يوجد ممارسون في هذا اليوم</div>`;
+
+      const now=new Date(); const nowTxt=fmtMin(now.getHours()*60+now.getMinutes());
+      const branchLabel=dashBranch?(" · "+(bname[dashBranch]||"")):"";
+      const dayOpts=`<option value="-1" ${dashDay===-1?"selected":""}>اليوم</option>`+
+        WEEK_ORDER.map(i=>`<option value="${i}" ${dashDay===i?"selected":""}>${DAYS[i]}</option>`).join("");
+
+      body.innerHTML=`
+        <div class="page-sub" style="margin:2px 0 12px">${DAYS[dayIdx]} · الساعة ${nowTxt} · ${branchDocs.length} ممارس${branchLabel}</div>
+        ${statCardsHTML}
+        <div class="toolbar" style="margin:12px 0 4px">
+          <select class="select-mini" id="fday">${dayOpts}</select>
+          <select class="select-mini" id="fspec"><option value="">كل التخصصات</option>
+            ${allSpecs.map(s=>`<option ${dashSpec===s?"selected":""}>${esc(s)}</option>`).join("")}</select>
+        </div>
+        ${sections}`;
+      bindCards(body);
+      body.querySelectorAll("[data-stat]").forEach(btn=>btn.onclick=()=>{dashStat=dashStat===btn.dataset.stat?"":btn.dataset.stat;drawBody();});
+      $("#fday").onchange=(e)=>{dashDay=e.target.value===-1||e.target.value==="-1"?-1:+e.target.value;dashStat="";drawBody();};
+      $("#fspec").onchange=(e)=>{dashSpec=e.target.value;drawBody();};
+      const cs=$("#clear-stat"); if(cs)cs.onclick=()=>{dashStat="";drawBody();};
+      requestAnimationFrame(()=>body.classList.remove("fade"));
+    }
+    $("#content").innerHTML=`
+      <div class="page-title">ممارسو اليوم</div>
+      ${branchBar}
+      <div id="dash-body"></div>`;
+    $("#branch-bar").querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{
+      dashBranch=b.dataset.bf;
+      $("#branch-bar").querySelectorAll(".bchip").forEach(x=>x.classList.toggle("on",x===b));
+      drawBody();
+    });
+    drawBody();
+  };
+
+  // ============================================================ BRANCHES (kept for deep-links, not in nav)
+  routes.branches=async()=>{
+    if(state.params.id) return renderBranch(state.params.id);
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const {branches}=await api("/branches");
+    $("#content").innerHTML=`<div class="page-title">الفروع</div>
+      <div class="page-sub">${branches.length} فروع — اضغط على الفرع لعرض أطبائه</div>
+      <div class="branch-grid" style="margin-top:18px">${branches.map(b=>`
+        <div class="branch-card" data-b="${b.id}">
+          <div class="bc-top"><div><h3>${esc(b.name)}</h3><div class="grp">${esc(b.grp||"")}</div></div><div style="font-size:26px">🏥</div></div>
+          ${b.info?`<div class="page-sub" style="margin-top:6px">${esc(b.info)}</div>`:""}
+          <div class="bc-stat">
+            <div><div class="n">${b.doctor_count}</div><div class="x">طبيب</div></div>
+            <div><div class="n bc-live">${b.present}</div><div class="x">متواجد الآن</div></div>
+            <div><div class="n">${b.specialties.length}</div><div class="x">تخصص</div></div>
+          </div>
+        </div>`).join("")}</div>`;
+    $("#content").querySelectorAll("[data-b]").forEach(c=>c.onclick=()=>go("branches",{id:c.dataset.b}));
+  };
+
+  async function renderBranch(id){
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const {branch,doctors}=await api("/branches/"+id);
+    const counts={present:0,upcoming:0,leave:0};
+    doctors.forEach(d=>{const s=d.live.state;
+      if(s==="present")counts.present++; else if(s==="upcoming")counts.upcoming++;
+      else if(s==="leave"||s==="off")counts.leave++;});
+    // group by department (specialty) and order: طب عام، باطنة، ...
+    const bySpec={}; doctors.forEach(d=>{(bySpec[d.specialty]=bySpec[d.specialty]||[]).push(d);});
+    const ordered=Object.keys(bySpec).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
+    let presentOnly=false, query="", queryNorm="";
+    $("#content").innerHTML=`
+      <button class="btn btn-ghost btn-sm" id="back">→ كل الفروع</button>
+      <div class="page-title" style="margin-top:12px">${esc(branch.name)}</div>
+      <div class="page-sub">${esc(branch.info||"")} ${branch.hours?"· "+esc(branch.hours):""}</div>
+      <div class="branch-chips">
+        <button class="bchip present-toggle" id="t-present"><span class="dot" style="background:var(--green)"></span> موجودون الآن <span class="bchip-n">${counts.present}</span></button>
+        <span class="bchip ghost"><span class="dot" style="background:var(--amber)"></span> يبدأ لاحقاً ${counts.upcoming}</span>
+        <span class="bchip ghost"><span class="dot" style="background:var(--black)"></span> إجازة/خارج ${counts.leave}</span>
+        <span class="bchip ghost">🩺 الإجمالي ${doctors.length}</span>
+      </div>
+      <div class="toolbar"><input class="search-input" id="bsearch" style="max-width:340px;border-radius:var(--r-s);padding:9px 14px" placeholder="بحث داخل الفرع..."></div>
+      <div id="branch-docs"></div>`;
+    const drawSecs=()=>{
+      const wrap=$("#branch-docs"); let html="";
+      ordered.forEach(sp=>{
+        let arr=bySpec[sp].slice().sort(availSort);
+        if(presentOnly) arr=arr.filter(d=>d.live.state==="present");
+        if(queryNorm){const tokens=queryNorm.split(/\s+/).filter(Boolean);arr=arr.filter(d=>{const hay=normAr([d.name,d.rank,d.nationality,d.cases].filter(Boolean).join(" "));return tokens.every(t=>hay.includes(t));});}
+        if(!arr.length) return;
+        html+=`<div class="section-head"><h2>${esc(sp)}</h2><span class="count">${arr.length}</span></div>
+          <div class="status-grid">${arr.map(doctorCard).join("")}</div>`;
+      });
+      wrap.innerHTML=html||`<div class="empty">${presentOnly?"لا يوجد ممارسون متواجدون الآن في هذا الفرع":"لا ممارسون مطابقون"}</div>`;
+      bindCards(wrap);
+    };
+    $("#back").onclick=()=>go("branches");
+    $("#t-present").onclick=()=>{presentOnly=!presentOnly;
+      $("#t-present").classList.toggle("on",presentOnly); drawSecs();};
+    $("#bsearch").addEventListener("input",e=>{query=e.target.value.trim();queryNorm=normAr(query);drawSecs();});
+    drawSecs();
+  }
+
+  // ============================================================ DOCTORS
+  routes.doctors=async()=>{
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
+    const specs=[...new Set(doctors.map(d=>d.specialty))].filter(Boolean).sort();
+    $("#content").innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div><div class="page-title">الممارسون</div><div class="page-sub">${doctors.length} ممارس</div></div>
+        <button class="icon-btn" id="go-manage" title="إدارة الممارسين" style="font-size:18px">⚙️</button>
+      </div>
+      <div class="toolbar" style="margin-top:16px">
+        <input class="search-input" id="dsearch" style="max-width:300px;border-radius:var(--r-s);padding:9px 14px" placeholder="ابحث: اسم، تخصص، جنسية، فرع، درجة...">
+        <select class="select-mini" id="fspec"><option value="">كل التخصصات</option>${specs.map(s=>`<option>${esc(s)}</option>`).join("")}</select>
+        <select class="select-mini" id="fbranch"><option value="">كل الفروع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
+        <select class="select-mini" id="fstatus"><option value="">كل الحالات</option>
+          <option value="present">موجود الآن</option><option value="upcoming">يبدأ لاحقاً</option>
+          <option value="finished">انتهى دوامه</option><option value="leave">إجازة</option></select>
+      </div>
+      <div class="status-grid" id="doc-list"></div>`;
+    const bname={}; branches.forEach(b=>bname[b.id]=b.name);
+    doctors.forEach(d=>d.branch_name=bname[d.branch_id]||"");
+
+    // Fuzzy helper: allow 1-char difference for tokens >= 3 chars
+    function fuzzyMatch(t,hay){
+      if(hay.includes(t))return true;
+      if(t.length<3)return false;
+      // try removing each char from token (handles insertions/typos)
+      for(let i=0;i<t.length;i++){
+        const reduced=t.slice(0,i)+t.slice(i+1);
+        if(reduced.length>=2&&hay.includes(reduced))return true;
+      }
+      return false;
+    }
+
+    function scoreDoctor(q,d){
+      if(!q)return 1;
+      const qNorm=normAr(q);
+      const tokens=qNorm.split(/\s+/).filter(t=>t.length>0&&!_STOP.has(t));
+      if(!tokens.length)return 1;
+      const nameN=normAr(d.name||"");
+      const enName=(d.en_name||d.name_en||"").toLowerCase();
+      const specN=normAr(d.specialty||""); const rankN=normAr(d.rank||"");
+      const natN=normAr(d.nationality||""); const branchN=normAr(bname[d.branch_id]||"");
+      const qualN=normAr(d.qualification||""); const genderN=normAr(d.gender||"");
+      const expN=normAr(d.experience||""); const casesN=normAr(d.cases||"");
+      const coordN=normAr(d.notes_coord||""); const statusN=normAr(d.live?.label||"");
+      const hoursN=normAr(d.hours_raw||""); const langN=normAr(d.languages||"");
+      let total=0;
+      const allFields=nameN+" "+enName+" "+specN+" "+rankN+" "+natN+" "+branchN+" "+qualN+" "+genderN+" "+expN+" "+casesN+" "+coordN+" "+statusN+" "+hoursN+" "+langN;
+      for(const t of tokens){
+        let s=Math.max(
+          scoreNameFn(t,nameN), scoreEnNameFn(t,enName),
+          scoreFieldFn(t,specN,10), scoreFieldFn(t,rankN,9),
+          scoreFieldFn(t,branchN,8), scoreFieldFn(t,natN,7),
+          scoreFieldFn(t,qualN,5), scoreFieldFn(t,genderN,4),
+          scoreFieldFn(t,expN,3), scoreFieldFn(t,casesN,2),
+          scoreFieldFn(t,coordN,2), scoreFieldFn(t,statusN,6),
+          scoreFieldFn(t,hoursN,1), scoreFieldFn(t,langN,3)
+        );
+        // Fuzzy fallback for typos
+        if(!s && fuzzyMatch(t,allFields)) s=50;
+        if(!s)return 0;
+        total+=s;
+      }
+      return total;
+    }
+
+    let _dsearchTimer;
+    const draw=()=>{ const rawQ=$("#dsearch").value.trim(); const sp=$("#fspec").value;
+      const br=$("#fbranch").value; const st=$("#fstatus").value;
+      // Filter by dropdown first
+      let filtered=doctors.filter(d=>
+        (!sp||d.specialty===sp)&&(!br||String(d.branch_id)===br)&&(!st||d.live.state===st));
+      // Score and sort by search query
+      let arr;
+      if(rawQ){
+        arr=filtered.map(d=>({d,s:scoreDoctor(rawQ,d)}))
+          .filter(x=>x.s>0)
+          .sort((a,b)=>b.s-a.s||(a.d.name||"").localeCompare(b.d.name||""))
+          .map(x=>x.d);
+      } else {
+        arr=filtered;
+      }
+      const list=$("#doc-list");
+      list.innerHTML=arr.length?arr.map(doctorCard).join(""):`<div class="empty">لا نتائج</div>`;
+      bindCards(list);
+    };
+    // Debounced live search (80ms) + instant filter changes
+    const dsInput=$("#dsearch");
+    dsInput.addEventListener("input",()=>{clearTimeout(_dsearchTimer);_dsearchTimer=setTimeout(draw,80);});
+    ["fspec","fbranch","fstatus"].forEach(id=>{$("#"+id).addEventListener("change",draw);});
+    $("#go-manage").onclick=()=>go("control");
+    draw();
+  };
+
+  // ---------- Doctor form ----------
+  async function doctorForm(doc){
+    const {branches}=await api("/branches");
+    const {specialties}=await api("/specialties");
+    const d=doc||{schedule:{},dayoff:[],gender:"",home_visit:false,status:"active"};
+    const sc=d.schedule||{};
+    const offSet=new Set(d.dayoff||[]);
+    const minToTime=(m)=>{m=((m%1440)+1440)%1440;return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;};
+    const timeToMin=(t)=>{const[h,mm]=(t||"08:00").split(":").map(Number);return h*60+(mm||0);};
+    // convert HH:MM → {h12,min,ap}  and back
+    const hhmm2ampm=(t)=>{const[h,m]=(t||"08:00").split(":").map(Number);return{h:h%12||12,m,ap:h<12?"am":"pm"};};
+    const ampm2hhmm=(h,m,ap)=>{const h24=ap==="am"?(h===12?0:h):(h===12?12:h+12);return`${String(h24).padStart(2,"0")}:${String(m).padStart(2,"0")}`;};
+    const mkTP=(val,id)=>{const{h,m,ap}=hhmm2ampm(val);
+      const hrs=Array.from({length:12},(_,i)=>i+1).map(x=>`<option${x===h?" selected":""}>${x}</option>`).join("");
+      const mins=[0,5,10,15,20,25,30,35,40,45,50,55].map(x=>`<option value="${x}"${x===m?" selected":""}>${String(x).padStart(2,"0")}</option>`).join("");
+      return`<span class="tp" data-tp="${id}"><select class="tp-h tp-s">${hrs}</select><span class="tp-col">:</span><select class="tp-m tp-s">${mins}</select><select class="tp-ap tp-s"><option value="am"${ap==="am"?" selected":""}>ص</option><option value="pm"${ap==="pm"?" selected":""}>م</option></select></span>`;};
+    const readTP=(el)=>{const h=+el.querySelector(".tp-h").value,m=+el.querySelector(".tp-m").value,ap=el.querySelector(".tp-ap").value;return ampm2hhmm(h,m,ap);};
+    const schedState=WEEK_ORDER.map(day=>{
+      const ex=sc[day]||sc[String(day)];
+      const isOff=offSet.has(day)||!ex||!ex.length;
+      return {day,off:isOff,shifts:ex&&ex.length?ex.map(([s,e])=>({start:minToTime(s),end:minToTime(e)})):[{start:"08:00",end:"16:00"}]};
+    });
+    const body=`<form id="docf">
+      <div class="grid2">
+        <div class="field"><label>الاسم *</label><input name="name" value="${esc(d.name||"")}" required></div>
+        <div class="field"><label>الفرع *</label><select name="branch_id" required>${branches.map(b=>`<option value="${b.id}" ${d.branch_id==b.id?"selected":""}>${esc(b.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>التخصص *</label><input name="specialty" list="speclist" value="${esc(d.specialty||"")}" required>
+          <datalist id="speclist">${specialties.map(s=>`<option>${esc(s)}</option>`).join("")}</datalist></div>
+        <div class="field"><label>الدرجة / التخصص الدقيق *</label><input name="rank" value="${esc(d.rank||"")}" placeholder="أخصائي، مقيم..." required></div>
+        <div class="field"><label>الجنسية *</label><input name="nationality" value="${esc(d.nationality||"")}" required></div>
+        <div class="field"><label>الجنس *</label><select name="gender" required>
+          <option value="" disabled ${!d.gender?"selected":""}>اختر الجنس</option>
+          <option value="ذكر" ${d.gender==="ذكر"?"selected":""}>ذكر</option>
+          <option value="أنثى" ${d.gender==="أنثى"?"selected":""}>أنثى</option></select></div>
+        <div class="field"><label>سنوات الخبرة *</label><input name="experience" value="${esc(d.experience||"")}" required></div>
+        <div class="field"><label>المؤهل</label><input name="qualification" value="${esc(d.qualification||"")}"></div>
+        <div class="field"><label>رابط الصورة</label><input name="photo" value="${esc(d.photo||"")}" placeholder="https://..."></div>
+        <div class="field"><label>الحالة</label><select name="status">
+          <option value="active" ${(d.status||"active")==="active"?"selected":""}>على رأس العمل</option>
+          <option value="leave" ${d.status==="leave"?"selected":""}>إجازة</option></select></div>
+      </div>
+      <div class="field">
+        <label>جدول الدوام الأسبوعي</label>
+        <div id="sched-grid" class="sched-grid"></div>
+      </div>
+      <div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
+      <div class="field"><label>ملاحظات التنسيق</label><textarea name="notes_coord">${esc(d.notes_coord||"")}</textarea></div>
+      <div class="field"><label>ملاحظات إدارية داخلية</label><textarea name="notes_admin">${esc(d.notes_admin||"")}</textarea></div>
+    </form>`;
+    const foot=`<button class="btn btn-primary" id="save-doc">${doc?"حفظ التعديلات":"إضافة"}</button>
+      <button class="btn btn-ghost" data-x2>إلغاء</button>`;
+    openModal({title:doc?("تعديل: "+doc.name):"إضافة ممارس",bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
+      m.querySelector("[data-x2]").onclick=closeModal;
+      function buildSchedUI(container,ss){
+        container.innerHTML=ss.map((row,idx)=>`
+          <div class="sched-row${row.off?" sched-row-off":""}" data-srow="${idx}">
+            <div class="sched-day-lbl">${DAYS[row.day]}</div>
+            <div class="sched-shifts-col">${row.off?'<span class="sched-off-tag">إجازة أسبوعية</span>':
+              row.shifts.map((sh,si)=>`<div class="shift-pair" data-si="${si}">
+                ${mkTP(sh.start,`s-${idx}-${si}`)}
+                <span class="sched-sep">–</span>
+                ${mkTP(sh.end,`e-${idx}-${si}`)}
+                ${row.shifts.length>1?`<button type="button" class="icon-btn sdel" data-del="${si}">✕</button>`:""}</div>`).join("")
+              +(!row.off&&row.shifts.length<2?`<button type="button" class="btn btn-ghost btn-xs sadd">＋ شفت ثاني</button>`:"")}</div>
+            <button type="button" class="btn btn-ghost btn-xs stoggle">${row.off?"تفعيل":"يوم إجازة"}</button>
+          </div>`).join("");
+        container.querySelectorAll("[data-srow]").forEach(rowEl=>{
+          const idx=+rowEl.dataset.srow,row=ss[idx];
+          rowEl.querySelector(".stoggle").onclick=()=>{row.off=!row.off;buildSchedUI(container,ss);};
+          if(!row.off){
+            const addBtn=rowEl.querySelector(".sadd");
+            if(addBtn)addBtn.onclick=()=>{row.shifts.push({start:"08:00",end:"16:00"});buildSchedUI(container,ss);};
+            rowEl.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>{row.shifts.splice(+btn.dataset.del,1);buildSchedUI(container,ss);});
+          }
+        });
+      }
+      buildSchedUI(m.querySelector("#sched-grid"),schedState);
+      m.querySelector("#save-doc").onclick=async()=>{
+        const f=new FormData(m.querySelector("#docf"));
+        const payload=Object.fromEntries(f.entries());
+        payload.branch_id=+payload.branch_id;
+        const schedule={},dayoff=[];
+        const grid=m.querySelector("#sched-grid");
+        schedState.forEach(({day,off,shifts},idx)=>{
+          if(off){dayoff.push(day);return;}
+          schedule[day]=shifts.map((s,si)=>{
+            const startEl=grid.querySelector(`[data-tp="s-${idx}-${si}"]`);
+            const endEl=grid.querySelector(`[data-tp="e-${idx}-${si}"]`);
+            const st=startEl?readTP(startEl):s.start;
+            const en=endEl?readTP(endEl):s.end;
+            const sm=timeToMin(st), em=timeToMin(en);
+            return [sm, em<sm ? em+1440 : em];
+          });
+        });
+        payload.schedule=schedule; payload.dayoff=dayoff;
+        delete payload.hours_raw;
+        try{
+          if(doc)await api("/doctors/"+doc.id,{method:"PUT",body:payload});
+          else await api("/doctors",{method:"POST",body:payload});
+          toast(doc?"✅ تم الحفظ":"✅ تمت الإضافة","ok"); closeModal();
+          if(state.route==="control") drawDoctorsMgmtPanel(); else render();
+        }catch(e){toast("❌ "+e.message,"err");}
+      };
+    }});
+  }
+
+  // ============================================================ AVAILABLE NOW
+  routes.available=async()=>{
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const d=await api("/available-now");
+    const branchKeys=Object.keys(d.by_branch);
+    const total=branchKeys.reduce((a,k)=>a+d.by_branch[k].length,0);
+    let html=`<div class="page-title">⚡ من المتاح الآن؟</div>
+      <div class="page-sub">${total} ممارس متواجد حالياً</div>`;
+    if(!total){ html+=`<div class="empty"><div class="big">😴</div>لا يوجد ممارسون متواجدون حالياً</div>`; }
+    branchKeys.forEach(k=>{ html+=`<div class="section-head"><h2>🏥 ${esc(k)}</h2><span class="count">${d.by_branch[k].length}</span></div>
+      <div class="status-grid">${d.by_branch[k].map(doctorCard).join("")}</div>`; });
+    $("#content").innerHTML=html; bindCards($("#content"));
+  };
+
+  // ============================================================ BEST DOCTOR
+  routes.best=async()=>{
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const [{specialties},{branches}]=await Promise.all([api("/specialties"),api("/branches")]);
+    $("#content").innerHTML=`<div class="page-title">🎯 أفضل ممارس للحالة</div>
+      <div class="page-sub">حدّد المعايير ليرتّب النظام الممارسين المناسبين والمتاحين</div>
+      <div class="cal" style="margin-top:18px;max-width:760px">
+        <div class="grid2">
+          <div class="field"><label>التخصص</label><select id="b-spec"><option value="">أي تخصص</option>${specialties.map(s=>`<option>${esc(s)}</option>`).join("")}</select></div>
+          <div class="field"><label>الفرع</label><select id="b-branch"><option value="">أي فرع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select></div>
+          <div class="field"><label>الجنس</label><select id="b-gender"><option value="">أي</option><option>ذكر</option><option>أنثى</option></select></div>
+        </div>
+        <button class="btn btn-primary btn-block" id="b-go">🔎 ابحث عن الأنسب</button>
+      </div>
+      <div id="b-results" style="margin-top:18px"></div>`;
+    $("#b-go").onclick=async()=>{
+      const body={specialty:$("#b-spec").value,branch_id:+$("#b-branch").value||null,
+        gender:$("#b-gender").value};
+      const {results}=await api("/best-doctor",{method:"POST",body});
+      const r=$("#b-results");
+      if(!results.length){r.innerHTML=`<div class="empty">لا يوجد ممارس مطابق</div>`;return;}
+      r.innerHTML=`<div class="section-head"><h2>النتائج مرتبة حسب التوافق والتواجد</h2><span class="count">${results.length}</span></div>
+        <div class="status-grid">${results.map((d,i)=>doctorCard(d).replace('class="dcard',
+          `data-rank="${i+1}" class="dcard`)).join("")}</div>`;
+      bindCards(r);
+    };
+  };
+
+  // ============================================================ CALENDAR
+  routes.calendar=async()=>{
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const {leaves}=await api("/leaves");
+    const now=new Date(); const y=now.getFullYear(),mo=now.getMonth();
+    const first=new Date(y,mo,1); const startDay=colOf(first.getDay());
+    const daysIn=new Date(y,mo+1,0).getDate();
+    const monthNames=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+    const evByDay={};
+    leaves.forEach(l=>{ const s=new Date(l.start_date),e=new Date(l.end_date);
+      for(let dt=new Date(s);dt<=e;dt.setDate(dt.getDate()+1)){
+        if(dt.getFullYear()===y&&dt.getMonth()===mo){(evByDay[dt.getDate()]=evByDay[dt.getDate()]||[]).push(l);}}});
+    let cells="";
+    for(let i=0;i<startDay;i++)cells+=`<div></div>`;
+    for(let dnum=1;dnum<=daysIn;dnum++){ const evs=evByDay[dnum]||[];
+      const isToday=dnum===now.getDate();
+      cells+=`<div class="cal-cell ${isToday?"today":""}"><div class="d">${dnum}</div>
+        ${evs.slice(0,3).map(e=>`<div class="cal-ev" title="${esc(e.doctor_name)} - ${esc(e.type)}">${esc(e.doctor_name)}</div>`).join("")}
+        ${evs.length>3?`<div class="cal-ev">+${evs.length-3}</div>`:""}</div>`;
+    }
+    const upcoming=leaves.filter(l=>new Date(l.end_date)>=new Date()).sort((a,b)=>a.start_date.localeCompare(b.start_date)).slice(0,12);
+    $("#content").innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div><div class="page-title">📅 تقويم الإجازات</div><div class="page-sub">${monthNames[mo]} ${y}</div></div>
+        ${can("leave.manage")?`<button class="btn btn-primary" id="add-leave">＋ إضافة إجازة</button>`:""}
+      </div>
+      <div class="cal" style="margin-top:16px">
+        <div class="cal-head">${WEEK_ORDER.map(i=>`<div>${DAYS[i]}</div>`).join("")}</div>
+        <div class="cal-grid">${cells}</div>
+      </div>
+      <div class="section-head"><h2>الإجازات القادمة</h2><span class="count">${upcoming.length}</span></div>
+      ${upcoming.length?`<table class="tbl"><thead><tr><th>الممارس</th><th>الفرع</th><th>النوع</th><th>من</th><th>إلى</th>${can("leave.manage")?"<th></th>":""}</tr></thead>
+        <tbody>${upcoming.map(l=>`<tr><td>${esc(l.doctor_name)}</td><td>${esc(l.branch_name||"")}</td><td>${esc(l.type)}</td>
+          <td>${esc(l.start_date)}</td><td>${esc(l.end_date)}</td>
+          ${can("leave.manage")?`<td><button class="btn btn-ghost btn-sm" data-dl="${l.id}">حذف</button></td>`:""}</tr>`).join("")}</tbody></table>`
+        :`<div class="empty">لا توجد إجازات قادمة</div>`}`;
+    const al=$("#add-leave"); if(al)al.onclick=()=>leaveForm();
+    $("#content").querySelectorAll("[data-dl]").forEach(b=>b.onclick=async()=>{
+      if(!confirm("حذف الإجازة؟"))return; await api("/leaves/"+b.dataset.dl,{method:"DELETE"});toast("✅ تم الحذف","ok");render();});
+  };
+
+  const LEAVE_TYPES=["إجازة سنوية","إجازة طارئة","إجازة مرضية","ندب","أخرى"];
+
+  async function leaveForm(docId,docName,onDone){
+    const {doctors}=await api("/doctors");
+    const body=`<form id="lvf">
+      <div class="field"><label>الممارس *</label><select name="doctor_id" required>
+        ${doctors.map(d=>`<option value="${d.id}" ${docId==d.id?"selected":""}>${esc(d.name)} — ${esc(d.specialty)}</option>`).join("")}</select></div>
+      <div class="grid2">
+        <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" required></div>
+        <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" required></div>
+      </div>
+      <div class="field"><label>النوع</label><select name="type">
+        ${LEAVE_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>ملاحظات</label><input name="reason"></div>
+    </form>`;
+    openModal({title:"إضافة إجازة"+(docName?" — "+docName:""),bodyHTML:body,
+      footHTML:`<button class="btn btn-primary" id="save-lv">حفظ</button><button class="btn btn-ghost" data-x3>إلغاء</button>`,
+      onMount:(m)=>{ m.querySelector("[data-x3]").onclick=closeModal;
+        m.querySelector("#save-lv").onclick=async()=>{
+          const f=new FormData(m.querySelector("#lvf")); const p=Object.fromEntries(f.entries());
+          if(!p.start_date||!p.end_date){toast("أدخل التواريخ");return;}
+          if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
+          p.doctor_id=+p.doctor_id;
+          try{
+            await api("/leaves",{method:"POST",body:p});
+            toast("✅ تمت إضافة الإجازة","ok");
+            closeModal();
+            if(typeof onDone==="function") onDone(); else go(state.route);
+          }catch(e){toast("❌ "+e.message,"err");}
+        };}});
+  }
+
+  async function leaveEditForm(lv,onDone){
+    const body=`<form id="lvf-edit">
+      <div class="grid2">
+        <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" value="${esc(lv.start_date)}" required></div>
+        <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" value="${esc(lv.end_date)}" required></div>
+      </div>
+      <div class="field"><label>النوع</label><select name="type">
+        ${LEAVE_TYPES.map(t=>`<option ${(lv.type||"")==t?"selected":""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>ملاحظات</label><input name="reason" value="${esc(lv.reason||"")}"></div>
+    </form>`;
+    openModal({title:"تعديل إجازة"+(lv.doctor_name?" — "+lv.doctor_name:""),bodyHTML:body,
+      footHTML:`<button class="btn btn-primary" id="save-lv-edit">حفظ</button><button class="btn btn-ghost" data-xe>إلغاء</button>`,
+      onMount:(m)=>{ m.querySelector("[data-xe]").onclick=closeModal;
+        m.querySelector("#save-lv-edit").onclick=async()=>{
+          const f=new FormData(m.querySelector("#lvf-edit")); const p=Object.fromEntries(f.entries());
+          if(!p.start_date||!p.end_date){toast("أدخل التواريخ");return;}
+          if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
+          try{
+            await api("/leaves/"+lv.id,{method:"PUT",body:p});
+            toast("✅ تم تعديل الإجازة","ok");
+            closeModal();
+            if(typeof onDone==="function") onDone(); else go(state.route);
+          }catch(e){toast("❌ "+e.message,"err");}
+        };}});
+  }
+
+  // ============================================================ AUDIT
+  routes.audit=async()=>{
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const {audit}=await api("/audit");
+    $("#content").innerHTML=`<div class="page-title">📋 سجل التعديلات</div>
+      <div class="page-sub">آخر ${audit.length} عملية</div>
+      <table class="tbl" style="margin-top:16px"><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead>
+      <tbody>${audit.map(a=>`<tr><td style="white-space:nowrap">${esc(a.ts.replace("T"," "))}</td>
+        <td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.detail||"")}</td></tr>`).join("")}</tbody></table>`;
+  };
+
+  // ============================================================ PRACTITIONERS MANAGEMENT (control panel tab)
+  async function drawDoctorsMgmtPanel(){
+    const [{doctors},{branches}]=await Promise.all([api("/doctors?archived=1"),api("/branches")]);
+    const bname={}; branches.forEach(b=>bname[b.id]=b.name);
+    const active=doctors.filter(d=>!d.archived), arch=doctors.filter(d=>d.archived);
+
+    const renderCards=(list,isArch)=>{
+      if(!list.length) return `<div class="empty" style="padding:16px">لا يوجد</div>`;
+      return `<div class="mgr-cards">
+        ${list.map(d=>`<div class="mgr-card">
+          ${avatar(d)}
+          <div class="mgr-card-body">
+            <div class="mgr-card-name">${esc(d.name)}</div>
+            <div class="mgr-card-meta">
+              ${d.specialty?`<span class="spec-tag">${esc(d.specialty)}</span>`:""}
+              ${bname[d.branch_id]?`<span>🏥 ${esc(bname[d.branch_id])}</span>`:""}
+              ${d.nationality?`<span>· ${esc(d.nationality)}</span>`:""}
+            </div>
+          </div>
+          <div class="mgr-card-actions">
+            <button class="btn btn-ghost btn-xs" data-edit-doc="${d.id}">✎</button>
+            <button class="btn btn-ghost btn-xs" data-arch="${d.id}" data-unarch="${isArch?1:0}">${isArch?"استرجاع":"أرشفة"}</button>
+            <button class="btn btn-danger btn-xs" data-del="${d.id}">حذف</button>
+          </div>
+        </div>`).join("")}
+      </div>`;
+    };
+
+    const bindEvents=()=>{
+      document.querySelectorAll("[data-edit-doc]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
+        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)doctorForm(d);
+      }));
+      document.querySelectorAll("[data-arch]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
+        const u=+btn.dataset.unarch;
+        await api("/doctors/"+btn.dataset.arch+"/archive",{method:"POST",body:{unarchive:u}});
+        toast(u?"✅ تم الاسترجاع":"✅ تمت الأرشفة","ok"); drawDoctorsMgmtPanel();
+      }));
+      document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
+        if(!confirm("حذف الممارس نهائياً؟ لا يمكن التراجع."))return;
+        await api("/doctors/"+btn.dataset.del,{method:"DELETE"});
+        toast("✅ تم حذف الممارس","ok"); drawDoctorsMgmtPanel();
+      }));
+    };
+
+    const sortedByScore=(list,q)=>
+      list.map(d=>({d,s:scoreDoctorMgmt(q,d,bname)}))
+          .filter(x=>x.s>0)
+          .sort((a,b)=>b.s-a.s||(a.d.name.localeCompare(b.d.name)))
+          .map(x=>x.d);
+
+    let archOpen=false;
+
+    const redraw=(q)=>{
+      const activeList=q?sortedByScore(active,q):active;
+      const archList=q?sortedByScore(arch,q):arch;
+      const activeEl=$("#active-rows"), archEl=$("#arch-rows");
+      if(activeEl) activeEl.innerHTML=renderCards(activeList,false);
+      if(archEl){
+        archEl.innerHTML=renderCards(archList,true);
+        // auto-expand archive section when search has results there
+        if(q&&archList.length&&!archOpen){ archEl.style.display=""; }
+        else if(!q&&!archOpen){ archEl.style.display="none"; }
+      }
+      const cnt=$("#active-count"); if(cnt) cnt.textContent=activeList.length;
+      bindEvents();
+    };
+
+    $("#ctrl-body").innerHTML=`
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+        <input class="search-input" id="mgr-search" style="flex:1;min-width:200px;border-radius:10px;padding:9px 14px;font-size:16px" placeholder="بحث: اسم، تخصص، فرع، جنسية...">
+        <button class="btn btn-primary" id="add-doc-ctrl">＋ إضافة ممارس</button>
+      </div>
+      <div class="section-head"><h2>الممارسون النشطون</h2><span class="count" id="active-count">${active.length}</span></div>
+      <div id="active-rows">${renderCards(active,false)}</div>
+      ${arch.length?`
+        <div class="mgr-arch-section">
+          <div class="section-head" style="margin-top:20px;cursor:pointer" id="arch-toggle">
+            <h2>المؤرشفون</h2><span class="count">${arch.length}</span>
+            <span style="font-size:12px;color:var(--muted);margin-inline-start:auto" id="arch-chevron">▼</span>
+          </div>
+          <div id="arch-rows" style="display:none">${renderCards(arch,true)}</div>
+        </div>`:""}`;
+
+    bindEvents();
+
+    const archToggle=$("#arch-toggle");
+    if(archToggle) archToggle.onclick=()=>{
+      const rows=$("#arch-rows"), chev=$("#arch-chevron");
+      archOpen=rows.style.display==="none";
+      rows.style.display=archOpen?"":"none";
+      if(chev) chev.textContent=archOpen?"▲":"▼";
+    };
+
+    $("#add-doc-ctrl").onclick=()=>doctorForm(null);
+
+    let mgrSearchTimer;
+    const mgrSearch=$("#mgr-search");
+    if(mgrSearch) mgrSearch.addEventListener("input",()=>{
+      clearTimeout(mgrSearchTimer);
+      mgrSearchTimer=setTimeout(()=>redraw(mgrSearch.value.trim()),80);
+    });
+  }
+
+  // ============================================================ LEAVES PANEL
+  async function drawLeavesPanel(){
+    const [{leaves},{branches}]=await Promise.all([api("/leaves"),api("/branches")]);
+    const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
+    const lvStatus=(l)=>{if(l.end_date<today)return"expired";if(l.start_date>today)return"upcoming";return"active";};
+    const activeL=leaves.filter(l=>lvStatus(l)==="active");
+    const upcomingL=leaves.filter(l=>lvStatus(l)==="upcoming");
+    const expiredL=leaves.filter(l=>lvStatus(l)==="expired");
+    const specs=[...new Set(leaves.map(l=>l.specialty))].filter(Boolean).sort();
+
+    let fBranch="",fSpec="",fSearch="",fStatus="",fFrom="",fTo="";
+
+    const stBadge=(st)=>st==="active"
+      ?`<span class="sp-leave" style="font-size:11px;padding:2px 8px">نشطة</span>`
+      :st==="upcoming"
+        ?`<span class="status-pill sp-upcoming" style="font-size:11px">قادمة</span>`
+        :`<span class="status-pill sp-off" style="font-size:11px">منتهية</span>`;
+
+    function drawList(){
+      let list=leaves;
+      if(fBranch) list=list.filter(l=>String(l.branch_id)===fBranch);
+      if(fSpec)   list=list.filter(l=>l.specialty===fSpec);
+      if(fSearch){const q=fSearch.toLowerCase();list=list.filter(l=>l.doctor_name.toLowerCase().includes(q));}
+      if(fStatus) list=list.filter(l=>lvStatus(l)===fStatus);
+      if(fFrom)   list=list.filter(l=>l.end_date>=fFrom);
+      if(fTo)     list=list.filter(l=>l.start_date<=fTo);
+
+      const el=$("#leaves-list"); if(!el)return;
+      if(!list.length){el.innerHTML=`<div class="empty">لا نتائج</div>`;return;}
+      el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} إجازة</div>
+        <table class="tbl"><thead><tr>
+          <th>الممارس</th><th>الفرع</th><th>التخصص</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th></th>
+        </tr></thead><tbody>
+        ${list.map(l=>`<tr>
+          <td><b>${esc(l.doctor_name)}</b></td>
+          <td>${esc(l.branch_name||"—")}</td>
+          <td>${esc(l.specialty||"—")}</td>
+          <td>${esc(l.type||"—")}</td>
+          <td>${l.synthetic?"—":esc(l.start_date)}</td>
+          <td>${l.synthetic?"—":esc(l.end_date)}</td>
+          <td>${l.synthetic?`<span class="status-pill sp-leave" style="font-size:11px">يدوي ⚙️</span>`:stBadge(lvStatus(l))}</td>
+          <td style="white-space:nowrap">
+            ${l.synthetic
+              ? `<span style="font-size:11px;color:var(--muted)">من حالة الممارس</span>`
+              : `<button class="btn btn-ghost btn-sm" data-el='${esc(JSON.stringify(l))}'>تعديل</button>
+                 <button class="btn btn-danger btn-sm" data-dlo="${l.id}">حذف</button>`
+            }
+          </td></tr>`).join("")}
+        </tbody></table>`;
+      el.querySelectorAll("[data-el]").forEach(btn=>btn.onclick=()=>requireEdit(()=>{
+        const lv=JSON.parse(btn.dataset.el);
+        leaveEditForm(lv,()=>{drawLeavesPanel();});
+      }));
+      el.querySelectorAll("[data-dlo]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
+        if(!confirm("حذف الإجازة؟"))return;
+        try{await api("/leaves/"+btn.dataset.dlo,{method:"DELETE"});toast("✅ تم الحذف","ok");drawLeavesPanel();}
+        catch(e){toast("❌ "+e.message,"err");}
+      }));
+    }
+
+    $("#ctrl-body").innerHTML=`
+      <div class="mini-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+        <button class="mini-stat s-leave ${fStatus==="active"?"active":""}" data-fst="active">
+          <span class="ms-ico">🔴</span><div><div class="ms-v">${activeL.length}</div><div class="ms-l">نشطة الآن</div></div>
+        </button>
+        <button class="mini-stat s-amber ${fStatus==="upcoming"?"active":""}" data-fst="upcoming">
+          <span class="ms-ico">🕐</span><div><div class="ms-v">${upcomingL.length}</div><div class="ms-l">قادمة</div></div>
+        </button>
+        <button class="mini-stat s-black ${fStatus==="expired"?"active":""}" data-fst="expired">
+          <span class="ms-ico">✅</span><div><div class="ms-v">${expiredL.length}</div><div class="ms-l">منتهية</div></div>
+        </button>
+      </div>
+      <div class="toolbar" style="margin:0 0 14px;flex-wrap:wrap">
+        <input class="search-input" id="lf-search" style="max-width:220px" placeholder="ابحث باسم الممارس...">
+        <select class="select-mini" id="lf-branch"><option value="">كل الفروع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
+        <select class="select-mini" id="lf-spec"><option value="">كل التخصصات</option>${specs.map(s=>`<option>${esc(s)}</option>`).join("")}</select>
+        <select class="select-mini" id="lf-status">
+          <option value="">كل الحالات</option>
+          <option value="active">نشطة</option>
+          <option value="upcoming">قادمة</option>
+          <option value="expired">منتهية</option>
+        </select>
+        <input type="date" class="select-mini" id="lf-from" title="إجازات تنتهي في هذا التاريخ أو بعده">
+        <input type="date" class="select-mini" id="lf-to" title="إجازات تبدأ في هذا التاريخ أو قبله">
+        <button class="btn btn-primary btn-sm" id="add-lv-panel">＋ إضافة إجازة</button>
+      </div>
+      <div id="leaves-list"></div>`;
+
+    drawList();
+
+    const bind=(id,fn)=>{const e=$("#"+id);if(e){e.addEventListener("input",fn);e.addEventListener("change",fn);}};
+    bind("lf-search",()=>{fSearch=$("#lf-search").value.trim();drawList();});
+    bind("lf-branch",()=>{fBranch=$("#lf-branch").value;drawList();});
+    bind("lf-spec",()=>{fSpec=$("#lf-spec").value;drawList();});
+    bind("lf-status",()=>{fStatus=$("#lf-status").value;drawList();});
+    bind("lf-from",()=>{fFrom=$("#lf-from").value;drawList();});
+    bind("lf-to",()=>{fTo=$("#lf-to").value;drawList();});
+
+    $("#ctrl-body").querySelectorAll("[data-fst]").forEach(btn=>btn.onclick=()=>{
+      fStatus=fStatus===btn.dataset.fst?"":btn.dataset.fst;
+      const sel=$("#lf-status"); if(sel)sel.value=fStatus;
+      $("#ctrl-body").querySelectorAll("[data-fst]").forEach(b=>b.classList.toggle("active",b.dataset.fst===fStatus&&!!fStatus));
+      drawList();
+    });
+
+    const alBtn=$("#add-lv-panel"); if(alBtn)alBtn.onclick=()=>requireEdit(()=>leaveForm(null,null,()=>drawLeavesPanel()));
+  }
+
+  // ============================================================ MANAGE (doctors + specialties, edit code)
+  let mgrTab="doctors";
+  routes.control=()=>{
+    requireEdit(async()=>{
+      shell(`<div class="loader"><div class="spin"></div></div>`);
+      const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🗓️ الإجازات"],["specialties","🩺 الأقسام"]];
+      $("#content").innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+          <div>
+            <div class="page-title">إدارة الممارسين</div>
+            <div class="page-sub">الممارسون · الإجازات · الأقسام</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="ctrl-exit">← العودة للممارسين</button>
+        </div>
+        <div class="tabs" id="ctrl-tabs" style="margin-bottom:16px">${tabs.map(([k,l])=>`<button class="tab ${mgrTab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
+        <div id="ctrl-body"><div class="loader"><div class="spin"></div></div></div>`;
+      $("#ctrl-exit").onclick=()=>go("doctors");
+      $("#ctrl-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{mgrTab=b.dataset.tab;routes.control();});
+      if(mgrTab==="specialties") drawSpecialtiesPanel();
+      else if(mgrTab==="leaves") drawLeavesPanel();
+      else drawDoctorsMgmtPanel();
+    });
+  };
+
+  // ============================================================ ADMIN (branches + security, admin code)
+  let adminTab="branches";
+  routes.admin=()=>{
+    adminUnlockPrompt(async()=>{
+      shell(`<div class="loader"><div class="spin"></div></div>`);
+      const tabs=[["branches","🏥 الفروع"],["security","🔐 الأمان"],["data","💾 البيانات"]];
+      $("#content").innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div class="page-title">⚙️ الإعدادات</div>
+          <button class="btn btn-ghost btn-sm" id="admin-exit">← خروج</button>
+        </div>
+        <div class="tabs" id="admin-tabs">${tabs.map(([k,l])=>`<button class="tab ${adminTab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
+        <div id="ctrl-body"><div class="loader"><div class="spin"></div></div></div>`;
+      $("#admin-exit").onclick=()=>go("dashboard");
+      $("#admin-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{adminTab=b.dataset.tab;routes.admin();});
+      if(adminTab==="security") drawSecurityPanel();
+      else if(adminTab==="data") drawDataPanel();
+      else drawBranchesPanel();
+    });
+  };
+
+  function drawDataPanel(){
+    const db=LocalDB.call("GET","/export-db");
+    const dc=db?db.doctors.filter(d=>!d.archived).length:0;
+    const ac=db?db.doctors.filter(d=>d.archived).length:0;
+    const bc=db?db.branches.length:0;
+    const lc=db?db.leaves.length:0;
+    $("#ctrl-body").innerHTML=`
+      <div style="max-width:520px;margin:16px auto;display:flex;flex-direction:column;gap:16px">
+        <div class="card" style="padding:20px">
+          <div style="font-size:17px;font-weight:700;margin-bottom:12px">📊 ملخص البيانات</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div style="padding:12px;background:var(--bg);border-radius:10px;text-align:center">
+              <div style="font-size:24px;font-weight:700;color:var(--brand)">${dc}</div>
+              <div style="font-size:12px;color:var(--muted)">ممارس نشط</div>
+            </div>
+            <div style="padding:12px;background:var(--bg);border-radius:10px;text-align:center">
+              <div style="font-size:24px;font-weight:700;color:var(--muted)">${ac}</div>
+              <div style="font-size:12px;color:var(--muted)">مؤرشف</div>
+            </div>
+            <div style="padding:12px;background:var(--bg);border-radius:10px;text-align:center">
+              <div style="font-size:24px;font-weight:700;color:var(--brand)">${bc}</div>
+              <div style="font-size:12px;color:var(--muted)">فرع</div>
+            </div>
+            <div style="padding:12px;background:var(--bg);border-radius:10px;text-align:center">
+              <div style="font-size:24px;font-weight:700;color:var(--brand)">${lc}</div>
+              <div style="font-size:12px;color:var(--muted)">إجازة مسجلة</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:16px;background:var(--surface)">
+          <div style="font-size:13px;color:var(--muted);line-height:1.8;text-align:right">
+            <b>آلية العمل:</b><br>
+            ▪ جميع البيانات مخزنة داخل ملف <b>index.html</b><br>
+            ▪ لتعديل البيانات: عدّل الملف مباشرة من محرر Netlify<br>
+            ▪ لتحديث الأكواد: ارفع نسخة جديدة من index.html
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function drawBranchesPanel(){
+    const {branches}=await api("/branches");
+    $("#ctrl-body").innerHTML=`
+      <div style="display:flex;justify-content:flex-end;margin:6px 0 12px">
+        <button class="btn btn-primary btn-sm" id="add-branch">＋ إضافة فرع</button></div>
+      <table class="tbl"><thead><tr><th>الفرع</th><th>المجموعة</th><th>ساعات الدوام</th><th>المعلومات</th><th>الممارسون</th><th></th></tr></thead>
+      <tbody>${branches.map(b=>`<tr>
+        <td><b>${esc(b.name)}</b></td><td>${esc(b.grp||"")}</td>
+        <td style="font-size:12.5px">${esc(b.hours||"—")}</td>
+        <td style="font-size:12.5px">${esc(b.info||"—")}</td>
+        <td>${b.doctor_count}</td>
+        <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-eb='${esc(JSON.stringify(b))}'>تعديل</button>
+        <button class="btn btn-ghost btn-sm" data-db="${b.id}">حذف</button></td></tr>`).join("")}</tbody></table>`;
+    $("#add-branch").onclick=()=>requireEdit(()=>branchForm(null));
+    $("#ctrl-body").querySelectorAll("[data-eb]").forEach(b=>b.onclick=()=>requireEdit(()=>branchForm(JSON.parse(b.dataset.eb))));
+    $("#ctrl-body").querySelectorAll("[data-db]").forEach(b=>b.onclick=()=>requireEdit(async()=>{
+      if(!confirm("حذف الفرع؟"))return;
+      try{await api("/branches/"+b.dataset.db,{method:"DELETE"});toast("✅ تم الحذف","ok");drawBranchesPanel();}
+      catch(e){toast("❌ "+e.message,"err");}}));
+  }
+
+  function branchForm(b){
+    const body=`<form id="bf">
+      <div class="field"><label>اسم الفرع *</label><input name="name" value="${esc(b?b.name:"")}" required></div>
+      <div class="grid2">
+        <div class="field"><label>المجموعة</label><input name="grp" value="${esc(b?b.grp:"")}" placeholder="عادل كير / بلوديم"></div>
+        <div class="field"><label>ساعات الدوام</label><input name="hours" value="${esc(b?b.hours:"")}" placeholder="من 8ص حتى 1ص"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>رقم الجوال</label><input name="phone" inputmode="tel" value="${esc(b?b.phone:"")}"></div>
+        <div class="field"><label>هاتف ثابت</label><input name="landline" inputmode="tel" value="${esc(b?b.landline||"":"")}"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>الحساب البنكي</label><input name="bank_account" value="${esc(b?b.bank_account||"":"")}"></div>
+        <div class="field"><label>الآيبان (IBAN)</label><input name="iban" style="direction:ltr" value="${esc(b?b.iban||"":"")}"></div>
+      </div>
+      <div class="field"><label>العنوان</label><input name="info" value="${esc(b?b.info:"")}"></div>
+      <div class="field"><label>معلومات إضافية</label><textarea name="extra_info" rows="2">${esc(b?b.extra_info||"":"")}</textarea></div>
+    </form>`;
+    openModal({title:b?"تعديل فرع":"إضافة فرع",bodyHTML:body,
+      footHTML:`<button class="btn btn-primary" id="save-b">حفظ</button><button class="btn btn-ghost" data-xb>إلغاء</button>`,
+      onMount:(m)=>{m.querySelector("[data-xb]").onclick=closeModal;
+        m.querySelector("#save-b").onclick=async()=>{
+          const p=Object.fromEntries(new FormData(m.querySelector("#bf")).entries());
+          try{ if(b)await api("/branches/"+b.id,{method:"PUT",body:p});
+            else await api("/branches",{method:"POST",body:p});
+            toast("✅ تم الحفظ","ok");closeModal();drawBranchesPanel();}catch(e){toast("❌ "+e.message,"err");}
+        };}});
+  }
+
+  // ---- Security (codes) ----
+  async function drawSecurityPanel(){
+    const s=await api("/settings");
+    $("#ctrl-body").innerHTML=`
+      <div class="cal" style="max-width:520px;margin-top:6px">
+        <form id="secf">
+          <div class="field"><label>رمز الدخول (للعرض)</label>
+            <input name="access_code" type="password" inputmode="numeric" value="${esc(s.access_code)}" required>
+            <div class="page-sub" style="font-size:11px;margin-top:4px">يُدخله الموظف لفتح النظام والاطلاع فقط.</div></div>
+          <div class="field"><label>رمز التعديل</label>
+            <input name="edit_code" type="password" inputmode="numeric" value="${esc(s.edit_code)}" required>
+            <div class="page-sub" style="font-size:11px;margin-top:4px">يفتح وضع إضافة/تعديل الممارسين والأقسام.</div></div>
+          <div class="field"><label>رمز الإدارة</label>
+            <input name="admin_code" type="password" inputmode="numeric" value="${esc(s.admin_code)}" required>
+            <div class="page-sub" style="font-size:11px;margin-top:4px">مطلوب للوصول لتبويبَي الفروع والأمان. اجعله مختلفاً وأكثر سرية.</div></div>
+          <button class="btn btn-primary btn-block" id="save-sec" type="button">حفظ الرموز</button>
+        </form>
+      </div>`;
+    $("#save-sec").onclick=async()=>{
+      const p=Object.fromEntries(new FormData($("#secf")).entries());
+      try{ await api("/settings",{method:"PUT",body:p}); toast("✅ تم حفظ الرموز","ok"); }
+      catch(e){toast("❌ "+e.message,"err");}
+    };
+  }
+
+  // ---- Specialties (sections) ----
+  async function drawSpecialtiesPanel(){
+    const [{specialties,extra},{doctors}]=await Promise.all([api("/specialties"),api("/doctors")]);
+    const extraSet=new Set(extra);
+    const docCount={};
+    doctors.forEach(d=>{if(d.specialty)docCount[d.specialty]=(docCount[d.specialty]||0)+1;});
+
+    const renderCards=()=>`
+      <div class="spec-grid" id="spec-grid">
+        ${specialties.map(s=>`
+          <div class="spec-card ${extraSet.has(s)?"manual":""}">
+            <div class="spec-card-top">
+              <div class="spec-card-name">${esc(s)}</div>
+              <span class="spec-doc-badge">${docCount[s]||0} ممارس</span>
+            </div>
+            <div class="spec-card-foot">
+              <span class="spec-src-tag">${extraSet.has(s)?"مُضاف يدوياً":"تلقائي"}</span>
+              ${extraSet.has(s)?`<div class="spec-actions">
+                <button class="btn btn-ghost btn-xs" data-rename="${esc(s)}">✎ تعديل</button>
+                <button class="btn btn-danger btn-xs" data-dspec="${esc(s)}">✕ حذف</button>
+              </div>`:""}
+            </div>
+          </div>`).join("")}
+      </div>`;
+
+    $("#ctrl-body").innerHTML=`
+      <div class="spec-add-card">
+        <h3>＋ إضافة قسم جديد</h3>
+        <div class="spec-add-row">
+          <input id="new-spec" placeholder="اسم القسم مثل: طب أسرة، نفسية...">
+          <button class="btn btn-primary" id="add-spec">إضافة</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-weight:700;font-size:14px">الأقسام (${specialties.length})</div>
+        <div style="font-size:12px;color:var(--muted)">
+          <span style="border-inline-start:3px solid var(--brand);padding-inline-start:6px;margin-inline-end:12px">مُضاف يدوياً</span>
+          <span style="border-inline-start:3px solid var(--line);padding-inline-start:6px">تلقائي من الممارسين</span>
+        </div>
+      </div>
+      ${renderCards()}`;
+
+    const add=()=>{
+      const name=$("#new-spec").value.trim();
+      if(!name){toast("اكتب اسم القسم");return;}
+      api("/specialties",{method:"POST",body:{name}})
+        .then(()=>{toast("✅ تمت إضافة القسم","ok");drawSpecialtiesPanel();})
+        .catch(e=>toast("❌ "+e.message,"err"));
+    };
+    $("#add-spec").onclick=add;
+    $("#new-spec").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();add();}});
+
+    document.querySelectorAll("[data-dspec]").forEach(btn=>btn.onclick=async()=>{
+      if(!confirm(`حذف قسم "${btn.dataset.dspec}"؟`))return;
+      try{await api("/specialties",{method:"DELETE",body:{name:btn.dataset.dspec}});toast("✅ تم الحذف","ok");drawSpecialtiesPanel();}
+      catch(e){toast("❌ "+e.message,"err");}
+    });
+
+    document.querySelectorAll("[data-rename]").forEach(btn=>btn.onclick=()=>{
+      const oldName=btn.dataset.rename;
+      openModal({title:"تعديل اسم القسم",
+        bodyHTML:`<div class="field"><label>الاسم الجديد</label><input id="spec-new-name" value="${esc(oldName)}"></div>`,
+        footHTML:`<button class="btn btn-primary" id="do-rename">حفظ</button><button class="btn btn-ghost" data-xr>إلغاء</button>`,
+        onMount:(m)=>{
+          m.querySelector("[data-xr]").onclick=closeModal;
+          m.querySelector("#do-rename").onclick=async()=>{
+            const newName=m.querySelector("#spec-new-name").value.trim();
+            if(!newName)return;
+            try{await api("/specialties",{method:"PUT",body:{old:oldName,new:newName}});
+              toast("✅ تم التعديل","ok");closeModal();drawSpecialtiesPanel();}
+            catch(e){toast("❌ "+e.message,"err");}
+          };
+        }
+      });
+    });
+  }
+
+  // ============================================================ RENDER
+  function render(){
+    if(!state.user){ renderLogin(); return; }
+    const fn=routes[state.route]||routes.dashboard;
+    fn();
+  }
+
+  async function boot(){
+    initTheme();
+    try{ const {user}=await api("/me"); state.user=user; }catch(e){}
+    // always land on the home page after a refresh
+    state.route="dashboard"; state.params={};
+    if(location.hash) history.replaceState(null,"","#dashboard");
+    render();
+  }
+  return { boot };
+})();
+document.addEventListener("DOMContentLoaded",App.boot);
+
+  </script>
+</body>
+</html>
