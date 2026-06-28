@@ -551,7 +551,7 @@ body.modal-open{overflow:hidden}
 
   /* -- Content area -- */
   .content{padding:14px 12px 100px}
-  .topbar{padding:10px 12px;gap:8px}
+  .topbar{padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));gap:8px}
   .search-wrap{max-width:none;flex:1}
   /* font-size ≥16px prevents iOS auto-zoom on focus */
   .search-input{padding:10px 40px;font-size:16px;height:44px}
