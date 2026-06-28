@@ -503,11 +503,19 @@ body.modal-open{overflow:hidden}
 .spin{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;
   animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.toast{position:fixed;bottom:22px;inset-inline-start:50%;transform:translateX(50%);
-  background:var(--text);color:var(--bg);padding:11px 20px;border-radius:30px;box-shadow:var(--shadow-l);
-  z-index:200;font-weight:600;font-size:14px;animation:pop .2s}
+#toast-root{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+  z-index:200;display:flex;flex-direction:column-reverse;align-items:center;gap:8px;pointer-events:none}
+.toast{padding:11px 20px;border-radius:30px;box-shadow:var(--shadow-l);
+  font-weight:600;font-size:14px;animation:toastIn .25s ease-out;
+  display:flex;align-items:center;gap:6px;background:var(--text);color:var(--bg);
+  white-space:nowrap;pointer-events:auto}
 .toast-ok{background:#16a34a;color:#fff}
 .toast-err{background:#dc2626;color:#fff}
+.toast-warn{background:#d97706;color:#fff}
+.toast-info{background:var(--brand);color:#fff}
+.toast-out{animation:toastOut .2s ease-in forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(12px)}}
 .active-ctrl{background:var(--brand-soft,rgba(0,180,150,.12));color:var(--brand)!important}
 .tp{display:inline-flex;align-items:center;gap:2px;background:var(--input-bg,var(--card));border:1px solid var(--border);border-radius:var(--r-s);padding:3px 6px;direction:ltr}
 .tp-s{background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:2px 1px;cursor:pointer}
@@ -546,7 +554,7 @@ body.modal-open{overflow:hidden}
   .sidebar{position:fixed;right:0;top:0;bottom:0;left:auto;transform:translateX(100%);transition:.22s;
     box-shadow:var(--shadow-l);z-index:41;overflow-y:auto}
   .sidebar.open{transform:translateX(0)}
-  .hamburger{display:grid}
+  .hamburger{display:none}
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:39}
 
   /* -- Content area -- */
@@ -712,7 +720,7 @@ const LocalDB = (() => {
 
   let _memDB = null, _memSess = {auth:false,edit:false};
   const _fails = {};
-  let _fsDB, _docRef, _initPromise, _lastWriteTs = 0;
+  let _fsDB, _docRef, _auditRef, _initPromise, _lastWriteTs = 0;
 
   function load() { return _memDB; }
 
@@ -728,40 +736,54 @@ const LocalDB = (() => {
     _memDB = db;
     if (_docRef) {
       _lastWriteTs = Date.now();
-      // Store as JSON string to avoid Firestore nested-array restriction
-      _docRef.set({ data: JSON.stringify(db) }).catch(e => console.error('[Adelcare] Firestore write failed:', e));
+      const {audit, ...main} = db;
+      _docRef.set({ data: JSON.stringify(main) }).catch(e => console.error('[Adelcare] Firestore write:', e));
+      _auditRef.set({ data: JSON.stringify(audit || []) }).catch(e => console.error('[Adelcare] Firestore audit:', e));
     }
   }
 
   async function _doInit() {
     firebase.initializeApp(_FB_CFG);
-    _fsDB   = firebase.firestore();
-    _docRef = _fsDB.collection('adelcare').doc('main');
+    _fsDB    = firebase.firestore();
+    _docRef  = _fsDB.collection('adelcare').doc('main');
+    _auditRef= _fsDB.collection('adelcare').doc('audit');
 
-    const snap = await _docRef.get();
-    if (snap.exists) {
-      const raw = snap.data();
-      _memDB = raw.data ? JSON.parse(raw.data) : raw;
+    const [mainSnap, auditSnap] = await Promise.all([_docRef.get(), _auditRef.get()]);
+    if (mainSnap.exists) {
+      const raw = mainSnap.data();
+      const main = raw.data ? JSON.parse(raw.data) : raw;
+      const audit = auditSnap.exists && auditSnap.data().data ? JSON.parse(auditSnap.data().data) : [];
+      _memDB = { ...main, audit };
     } else {
-      // First run — seed Firestore from data.js
       _memDB = JSON.parse(JSON.stringify({
         doctors:  SEED.doctors,
         branches: SEED.branches,
         leaves:   SEED.leaves   || [],
-        audit:    SEED.audit    || [],
+        audit:    [],
         settings: SEED.settings || {},
         _seq:     SEED._seq     || {doctors:200, branches:10, leaves:50, audit:100}
       }));
-      await _docRef.set({ data: JSON.stringify(_memDB) });
+      const {audit, ...main} = _memDB;
+      await Promise.all([
+        _docRef.set({ data: JSON.stringify(main) }),
+        _auditRef.set({ data: JSON.stringify(audit) })
+      ]);
     }
 
-    // Real-time listener: update all devices when data changes
     _docRef.onSnapshot(snap => {
       if (!snap.exists || snap.metadata.hasPendingWrites) return;
-      if (Date.now() - _lastWriteTs < 3000) return; // skip echo of our own writes
+      if (Date.now() - _lastWriteTs < 3000) return;
       const raw = snap.data();
-      _memDB = raw.data ? JSON.parse(raw.data) : raw;
+      const main = raw.data ? JSON.parse(raw.data) : raw;
+      const currentAudit = _memDB ? _memDB.audit : [];
+      _memDB = { ...main, audit: currentAudit };
       document.dispatchEvent(new CustomEvent('adelcare:sync'));
+    });
+    _auditRef.onSnapshot(snap => {
+      if (!snap.exists || snap.metadata.hasPendingWrites) return;
+      if (Date.now() - _lastWriteTs < 3000) return;
+      const audit = snap.data().data ? JSON.parse(snap.data().data) : [];
+      if (_memDB) _memDB.audit = audit;
     });
   }
 
@@ -1330,7 +1352,7 @@ const LocalDB = (() => {
     return db ? JSON.parse(JSON.stringify(db)) : null;
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef) await _docRef.set(fresh); }, getSEED:()=>SEED };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } }, getSEED:()=>SEED };
 })();
 
   </script>
@@ -1451,9 +1473,12 @@ const App = (() => {
 
   // ---------- Toast ----------
   function toast(msg,type=""){
-    const cls=type==="ok"?" toast-ok":type==="err"?" toast-err":"";
+    const cls=type==="ok"?" toast-ok":type==="err"?" toast-err":type==="warn"?" toast-warn":type==="info"?" toast-info":"";
     const t=el(`<div class="toast${cls}">${esc(msg)}</div>`);
-    $("#toast-root").appendChild(t); setTimeout(()=>t.remove(),2400); }
+    $("#toast-root").appendChild(t);
+    const dur=type==="err"?3500:2400;
+    setTimeout(()=>{t.classList.add("toast-out");t.addEventListener("animationend",()=>t.remove());},dur);
+  }
 
   // ---------- Theme ----------
   function initTheme(){ const t=localStorage.getItem("theme")||"light";
@@ -1583,14 +1608,14 @@ const App = (() => {
       const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requireEdit(()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}));
       const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requireEdit(async()=>{
         if(!confirm("إلغاء الإجازة الحالية؟"))return;
-        try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم إلغاء الإجازة","ok");closeModal();go(state.route);}
+        try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       });
       // End manual leave (doctor.status="leave" with no leave record)
       const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requireEdit(async()=>{
         if(!confirm("إلغاء الإجازة وإعادة الممارس للعمل؟"))return;
         try{await api("/doctors/"+d.id,{method:"PUT",body:{...d,status:"active"}});
-          toast("✅ تم إلغاء الإجازة","ok");closeModal();go(state.route);}
+          toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       });
       // Upcoming leave inline buttons
@@ -1600,7 +1625,7 @@ const App = (() => {
         const dul=m.querySelector(`[data-del-ul="${ul.id}"]`);
         if(dul)dul.onclick=()=>requireEdit(async()=>{
           if(!confirm("إلغاء الإجازة القادمة؟"))return;
-          try{await api("/leaves/"+ul.id,{method:"DELETE"});toast("✅ تم إلغاء الإجازة","ok");closeModal();quickCard(id);}
+          try{await api("/leaves/"+ul.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();quickCard(id);}
           catch(e){toast("❌ "+e.message,"err");}
         });
       });
@@ -1650,7 +1675,7 @@ const App = (() => {
     };
     // Re-lock edit mode after closing any modal outside admin/control panels
     if(state.user && state.user.edit && state.route!=="control" && state.route!=="admin"){
-      api("/lock",{method:"POST"}).then(u=>{state.user=u; toast("🔒 تم قفل وضع التعديل");}).catch(()=>{});
+      api("/lock",{method:"POST"}).then(u=>{state.user=u; toast("🔒 تم قفل وضع التعديل","info");}).catch(()=>{});
     }
     if(back){ back.classList.add("closing"); setTimeout(finish,150); }
     else finish();
@@ -1731,9 +1756,9 @@ const App = (() => {
     setTimeout(()=>inp.focus(),60);
     $("#lf").onsubmit=async(e)=>{e.preventDefault();
       const code=inp.value.trim();
-      if(!code){toast("أدخل الرمز");return;}
+      if(!code){toast("أدخل الرمز","warn");return;}
       try{ const u=await api("/login",{method:"POST",body:{code}});
-        state.user=u; toast("مرحباً "+(u.name||"")); go("dashboard");
+        state.user=u; toast("مرحباً "+(u.name||""),"ok"); go("dashboard");
       }catch(err){ toast(err.message); inp.value=""; inp.focus(); }
     };
   }
@@ -2229,6 +2254,31 @@ const App = (() => {
       <button class="btn btn-ghost" data-x2>إلغاء</button>`;
     openModal({title:doc?("تعديل: "+doc.name):"إضافة ممارس",bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
       m.querySelector("[data-x2]").onclick=closeModal;
+      function _syncSchedFromDOM(container, ss) {
+        ss.forEach((row, idx) => {
+          if (row.off) return;
+          row.shifts.forEach((sh, si) => {
+            const sEl = container.querySelector(`[data-tp="s-${idx}-${si}"]`);
+            const eEl = container.querySelector(`[data-tp="e-${idx}-${si}"]`);
+            if (sEl) sh.start = readTP(sEl);
+            if (eEl) sh.end = readTP(eEl);
+          });
+        });
+      }
+      function _applyAllDays(container, ss) {
+        _syncSchedFromDOM(container, ss);
+        const source = ss.find(r => !r.off && r.shifts.length > 0);
+        if (!source) { toast("لا يوجد يوم مفعّل لنسخه","err"); return; }
+        const hasData = ss.some(r => r !== source && !r.off && r.shifts.length > 0);
+        if (hasData && !confirm("سيتم استبدال جدول جميع الأيام بجدول يوم " + DAYS[source.day] + ". متأكد؟")) return;
+        ss.forEach(r => {
+          if (r === source) return;
+          r.off = false;
+          r.shifts = source.shifts.map(s => ({start:s.start, end:s.end}));
+        });
+        buildSchedUI(container, ss);
+        toast("✅ تم تطبيق جدول الدوام على جميع الأيام بنجاح","ok");
+      }
       function buildSchedUI(container,ss){
         container.innerHTML=ss.map((row,idx)=>`
           <div class="sched-row${row.off?" sched-row-off":""}" data-srow="${idx}">
@@ -2239,12 +2289,14 @@ const App = (() => {
                 <span class="sched-sep">–</span>
                 ${mkTP(sh.end,`e-${idx}-${si}`)}
                 ${row.shifts.length>1?`<button type="button" class="icon-btn sdel" data-del="${si}">✕</button>`:""}</div>`).join("")
-              +(!row.off&&row.shifts.length<2?`<button type="button" class="btn btn-ghost btn-xs sadd">＋ شفت ثاني</button>`:"")}</div>
+              +(!row.off&&row.shifts.length<2?`<button type="button" class="btn btn-ghost btn-xs sadd">＋ شفت ثاني</button>`:"")
+              +(!row.off?`<button type="button" class="btn btn-ghost btn-xs sapply" style="color:var(--brand);font-weight:600">📋 تطبيق على الكل</button>`:"")}</div>
             <button type="button" class="btn btn-ghost btn-xs stoggle">${row.off?"تفعيل":"يوم إجازة"}</button>
           </div>`).join("");
         container.querySelectorAll("[data-srow]").forEach(rowEl=>{
           const idx=+rowEl.dataset.srow,row=ss[idx];
           rowEl.querySelector(".stoggle").onclick=()=>{row.off=!row.off;buildSchedUI(container,ss);};
+          rowEl.querySelectorAll(".sapply").forEach(ab=>ab.onclick=()=>_applyAllDays(container,ss));
           if(!row.off){
             const addBtn=rowEl.querySelector(".sadd");
             if(addBtn)addBtn.onclick=()=>{row.shifts.push({start:"08:00",end:"16:00"});buildSchedUI(container,ss);};
@@ -2252,7 +2304,8 @@ const App = (() => {
           }
         });
       }
-      buildSchedUI(m.querySelector("#sched-grid"),schedState);
+      const _schedGrid = m.querySelector("#sched-grid");
+      buildSchedUI(_schedGrid, schedState);
       m.querySelector("#save-doc").onclick=async()=>{
         const f=new FormData(m.querySelector("#docf"));
         const payload=Object.fromEntries(f.entries());
@@ -2275,7 +2328,7 @@ const App = (() => {
         try{
           if(doc)await api("/doctors/"+doc.id,{method:"PUT",body:payload});
           else await api("/doctors",{method:"POST",body:payload});
-          toast(doc?"✅ تم الحفظ":"✅ تمت الإضافة","ok"); closeModal();
+          toast(doc?"✅ تم تحديث بيانات الممارس بنجاح":"✅ تمت إضافة الممارس بنجاح","ok"); closeModal();
           if(state.route==="control") drawDoctorsMgmtPanel(); else render();
         }catch(e){toast("❌ "+e.message,"err");}
       };
@@ -2362,7 +2415,7 @@ const App = (() => {
         :`<div class="empty">لا توجد إجازات قادمة</div>`}`;
     const al=$("#add-leave"); if(al)al.onclick=()=>leaveForm();
     $("#content").querySelectorAll("[data-dl]").forEach(b=>b.onclick=async()=>{
-      if(!confirm("حذف الإجازة؟"))return; await api("/leaves/"+b.dataset.dl,{method:"DELETE"});toast("✅ تم الحذف","ok");render();});
+      if(!confirm("حذف الإجازة؟"))return; await api("/leaves/"+b.dataset.dl,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");render();});
   };
 
   const LEAVE_TYPES=["إجازة سنوية","إجازة طارئة","إجازة مرضية","ندب","أخرى"];
@@ -2389,12 +2442,12 @@ const App = (() => {
       onMount:(m)=>{ m.querySelector("[data-x3]").onclick=closeModal;
         m.querySelector("#save-lv").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf")); const p=Object.fromEntries(f.entries());
-          if(!p.start_date||!p.end_date){toast("أدخل التواريخ");return;}
+          if(!p.start_date||!p.end_date){toast("أدخل التواريخ","warn");return;}
           if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
           p.doctor_id=+p.doctor_id;
           try{
             await api("/leaves",{method:"POST",body:p});
-            toast("✅ تمت إضافة الإجازة","ok");
+            toast("✅ تمت إضافة الإجازة بنجاح","ok");
             closeModal();
             if(typeof onDone==="function") onDone(); else go(state.route);
           }catch(e){toast("❌ "+e.message,"err");}
@@ -2416,11 +2469,11 @@ const App = (() => {
       onMount:(m)=>{ m.querySelector("[data-xe]").onclick=closeModal;
         m.querySelector("#save-lv-edit").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf-edit")); const p=Object.fromEntries(f.entries());
-          if(!p.start_date||!p.end_date){toast("أدخل التواريخ");return;}
+          if(!p.start_date||!p.end_date){toast("أدخل التواريخ","warn");return;}
           if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
           try{
             await api("/leaves/"+lv.id,{method:"PUT",body:p});
-            toast("✅ تم تعديل الإجازة","ok");
+            toast("✅ تم تعديل الإجازة بنجاح","ok");
             closeModal();
             if(typeof onDone==="function") onDone(); else go(state.route);
           }catch(e){toast("❌ "+e.message,"err");}
@@ -2473,12 +2526,12 @@ const App = (() => {
       document.querySelectorAll("[data-arch]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
         const u=+btn.dataset.unarch;
         await api("/doctors/"+btn.dataset.arch+"/archive",{method:"POST",body:{unarchive:u}});
-        toast(u?"✅ تم الاسترجاع":"✅ تمت الأرشفة","ok"); drawDoctorsMgmtPanel();
+        toast(u?"✅ تم استرجاع الممارس بنجاح":"✅ تمت أرشفة الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
       }));
       document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
         if(!confirm("حذف الممارس نهائياً؟ لا يمكن التراجع."))return;
         await api("/doctors/"+btn.dataset.del,{method:"DELETE"});
-        toast("✅ تم حذف الممارس","ok"); drawDoctorsMgmtPanel();
+        toast("✅ تم حذف الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
       }));
     };
 
@@ -2596,7 +2649,7 @@ const App = (() => {
       }));
       el.querySelectorAll("[data-dlo]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
         if(!confirm("حذف الإجازة؟"))return;
-        try{await api("/leaves/"+btn.dataset.dlo,{method:"DELETE"});toast("✅ تم الحذف","ok");drawLeavesPanel();}
+        try{await api("/leaves/"+btn.dataset.dlo,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");drawLeavesPanel();}
         catch(e){toast("❌ "+e.message,"err");}
       }));
     }
@@ -2678,7 +2731,7 @@ const App = (() => {
   routes.admin=()=>{
     adminUnlockPrompt(async()=>{
       shell(`<div class="loader"><div class="spin"></div></div>`);
-      const tabs=[["branches","🏥 الفروع"],["security","🔐 الأمان"],["data","💾 البيانات"]];
+      const tabs=[["branches","🏥 الفروع"],["stats","📊 الإحصائيات"],["security","🔐 الأمان"],["data","💾 البيانات"]];
       $("#content").innerHTML=`
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <div class="page-title">⚙️ الإعدادات</div>
@@ -2690,9 +2743,168 @@ const App = (() => {
       $("#admin-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{adminTab=b.dataset.tab;routes.admin();});
       if(adminTab==="security") drawSecurityPanel();
       else if(adminTab==="data") drawDataPanel();
+      else if(adminTab==="stats") drawStatsPanel();
       else drawBranchesPanel();
     });
   };
+
+  async function drawStatsPanel(){
+    const [{leaves},{branches},{doctors}]=await Promise.all([api("/leaves"),api("/branches"),api("/doctors")]);
+    const bmap={};branches.forEach(b=>bmap[b.id]=b.name);
+    const activeDocs=doctors.filter(d=>!d.archived);
+    activeDocs.forEach(d=>d.branch_name=bmap[d.branch_id]||"");
+    const now=new Date();
+    let selYear=now.getFullYear(), selMonth=now.getMonth(), viewMode="month";
+    const monthNames=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+
+    function countDays(start,end,rStart,rEnd){
+      const s=start>rStart?start:rStart;
+      const e=end<rEnd?end:rEnd;
+      if(s>e)return 0;
+      return Math.round((new Date(e)-new Date(s))/86400000)+1;
+    }
+
+    function draw(){
+      const pad=x=>String(x).padStart(2,'0');
+      let rStart,rEnd,label;
+      if(viewMode==="month"){
+        rStart=`${selYear}-${pad(selMonth+1)}-01`;
+        const lastDay=new Date(selYear,selMonth+1,0).getDate();
+        rEnd=`${selYear}-${pad(selMonth+1)}-${pad(lastDay)}`;
+        label=`${monthNames[selMonth]} ${selYear}`;
+      } else {
+        rStart=`${selYear}-01-01`;
+        rEnd=`${selYear}-12-31`;
+        label=`${selYear}`;
+      }
+
+      const realLeaves=leaves.filter(l=>!l.synthetic&&l.start_date<=rEnd&&l.end_date>=rStart);
+      const docStats=[], branchTotals={}, typeTotals={}, specTotals={};
+
+      for(const d of activeDocs){
+        const dLeaves=realLeaves.filter(l=>l.doctor_id===d.id);
+        let totalDays=0;
+        const types={};
+        for(const l of dLeaves){
+          const days=countDays(l.start_date,l.end_date,rStart,rEnd);
+          totalDays+=days;
+          const t=l.type||"أخرى";
+          types[t]=(types[t]||0)+days;
+          typeTotals[t]=(typeTotals[t]||0)+days;
+        }
+        if(totalDays>0){
+          const bName=d.branch_name||"—";
+          const spec=d.specialty||"—";
+          branchTotals[bName]=(branchTotals[bName]||0)+totalDays;
+          specTotals[spec]=(specTotals[spec]||0)+totalDays;
+          docStats.push({name:d.name,branch:bName,specialty:spec,days:totalDays,count:dLeaves.length,types});
+        }
+      }
+      docStats.sort((a,b)=>b.days-a.days);
+
+      const totalDays=docStats.reduce((s,d)=>s+d.days,0);
+      const totalCount=docStats.reduce((s,d)=>s+d.count,0);
+      const avgPerDoc=docStats.length?Math.round(totalDays/docStats.length*10)/10:0;
+      const topDoc=docStats[0];
+
+      const branchRows=Object.entries(branchTotals).sort((a,b)=>b[1]-a[1]);
+      const typeRows=Object.entries(typeTotals).sort((a,b)=>b[1]-a[1]);
+      const specRows=Object.entries(specTotals).sort((a,b)=>b[1]-a[1]);
+      const maxDays=topDoc?topDoc.days:1;
+
+      const colors=["#0ea5a4","#6366f1","#f59e0b","#ef4444","#22c55e","#8b5cf6","#ec4899","#14b8a6"];
+
+      $("#ctrl-body").innerHTML=`
+        <div style="max-width:740px;margin:0 auto">
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:18px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" id="st-prev">→</button>
+            <div style="font-size:18px;font-weight:700;min-width:160px;text-align:center">${label}</div>
+            <button class="btn btn-ghost btn-sm" id="st-next">←</button>
+            <div style="display:flex;gap:4px;margin-right:8px">
+              <button class="btn btn-sm ${viewMode==="month"?"btn-primary":"btn-ghost"}" id="st-vm">شهري</button>
+              <button class="btn btn-sm ${viewMode==="year"?"btn-primary":"btn-ghost"}" id="st-vy">سنوي</button>
+            </div>
+          </div>
+
+          <div class="mini-stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+            <div class="mini-stat"><span class="ms-ico">👨‍⚕️</span><div><div class="ms-v">${docStats.length}</div><div class="ms-l">ممارس</div></div></div>
+            <div class="mini-stat"><span class="ms-ico">📋</span><div><div class="ms-v">${totalCount}</div><div class="ms-l">إجازة</div></div></div>
+            <div class="mini-stat"><span class="ms-ico">📅</span><div><div class="ms-v">${totalDays}</div><div class="ms-l">يوم إجازة</div></div></div>
+            <div class="mini-stat"><span class="ms-ico">📐</span><div><div class="ms-v">${avgPerDoc}</div><div class="ms-l">متوسط / ممارس</div></div></div>
+          </div>
+
+          ${topDoc?`<div class="card" style="padding:14px;margin-bottom:14px;border-right:4px solid #d97706">
+            <div style="font-size:13px;color:var(--muted)">🏆 الأكثر إجازة</div>
+            <div style="font-size:16px;font-weight:700;margin-top:4px">${esc(topDoc.name)} <span style="color:#d97706">${topDoc.days} يوم</span></div>
+            <div style="font-size:12px;color:var(--muted)">${esc(topDoc.branch)} · ${esc(topDoc.specialty)}</div>
+          </div>`:""}
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            ${branchRows.length?`<div class="card" style="padding:16px">
+              <div style="font-weight:700;font-size:14px;margin-bottom:12px">🏥 حسب الفرع</div>
+              ${branchRows.map(([b,d],i)=>`
+                <div style="margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                    <span style="font-weight:600">${esc(b)}</span><span style="color:var(--muted)">${d} يوم</span>
+                  </div>
+                  <div style="background:var(--bg);border-radius:6px;height:18px;overflow:hidden">
+                    <div style="height:100%;background:${colors[i%colors.length]};border-radius:6px;width:${Math.round(d/(branchRows[0][1])*100)}%;transition:width .3s"></div>
+                  </div>
+                </div>`).join("")}
+            </div>`:"<div></div>"}
+
+            ${typeRows.length?`<div class="card" style="padding:16px">
+              <div style="font-weight:700;font-size:14px;margin-bottom:12px">📂 حسب النوع</div>
+              ${typeRows.map(([t,d],i)=>`
+                <div style="margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                    <span style="font-weight:600">${esc(t)}</span><span style="color:var(--muted)">${d} يوم (${Math.round(d/totalDays*100)}%)</span>
+                  </div>
+                  <div style="background:var(--bg);border-radius:6px;height:18px;overflow:hidden">
+                    <div style="height:100%;background:${colors[(i+3)%colors.length]};border-radius:6px;width:${Math.round(d/totalDays*100)}%;transition:width .3s"></div>
+                  </div>
+                </div>`).join("")}
+            </div>`:"<div></div>"}
+          </div>
+
+          ${docStats.length?`
+          <div class="card" style="padding:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div style="font-weight:700;font-size:14px">👨‍⚕️ تفاصيل الممارسين</div>
+              <div style="font-size:12px;color:var(--muted)">${docStats.length} ممارس</div>
+            </div>
+            <div style="overflow-x:auto">
+            <table class="tbl"><thead><tr>
+              <th>#</th><th>الممارس</th><th>الفرع</th><th>التخصص</th><th>الإجازات</th><th>الأيام</th><th>التفاصيل</th>
+            </tr></thead><tbody>
+            ${docStats.map((d,i)=>`<tr>
+              <td style="color:var(--muted);font-weight:700">${i+1}</td>
+              <td><b>${esc(d.name)}</b></td>
+              <td style="font-size:12px">${esc(d.branch)}</td>
+              <td style="font-size:12px">${esc(d.specialty)}</td>
+              <td style="text-align:center">${d.count}</td>
+              <td style="min-width:120px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="flex:1;background:var(--bg);border-radius:4px;height:16px;overflow:hidden">
+                    <div style="height:100%;background:${d.days>=20?"#dc2626":d.days>=10?"#d97706":"var(--brand)"};border-radius:4px;width:${Math.round(d.days/maxDays*100)}%;transition:width .3s"></div>
+                  </div>
+                  <span style="font-weight:700;font-size:13px;min-width:30px">${d.days}</span>
+                </div>
+              </td>
+              <td style="font-size:11px;color:var(--muted);white-space:nowrap">${Object.entries(d.types).map(([t,v])=>esc(t)+": "+v).join(" · ")}</td>
+            </tr>`).join("")}
+            </tbody></table>
+            </div>
+          </div>`:`<div class="empty" style="margin-top:30px">لا توجد إجازات في هذه الفترة</div>`}
+        </div>`;
+
+      $("#st-prev").onclick=()=>{if(viewMode==="month"){selMonth--;if(selMonth<0){selMonth=11;selYear--;}}else selYear--;draw();};
+      $("#st-next").onclick=()=>{if(viewMode==="month"){selMonth++;if(selMonth>11){selMonth=0;selYear++;}}else selYear++;draw();};
+      $("#st-vm").onclick=()=>{viewMode="month";draw();};
+      $("#st-vy").onclick=()=>{viewMode="year";draw();};
+    }
+    draw();
+  }
 
   function drawDataPanel(){
     const db=LocalDB.call("GET","/export-db");
@@ -2724,15 +2936,33 @@ const App = (() => {
           </div>
         </div>
         <div class="card" style="padding:16px;background:var(--surface)">
+          <div style="font-size:15px;font-weight:700;margin-bottom:10px">📦 نسخة احتياطية</div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px">تنزيل نسخة من جميع البيانات (ممارسون، فروع، إجازات، إعدادات) كملف JSON يمكن الاحتفاظ به.</div>
+          <button class="btn btn-primary" id="btn-backup" style="width:100%">⬇ تنزيل نسخة احتياطية</button>
+        </div>
+        <div class="card" style="padding:16px;background:var(--surface)">
           <div style="font-size:13px;color:var(--muted);line-height:1.8;text-align:right">
             <b>آلية العمل:</b><br>
-            ▪ البيانات محفوظة في ملف <b>data.js</b> على GitHub<br>
-            ▪ لتعديل البيانات (ممارسون، فروع، إجازات): عدّل <b>data.js</b><br>
-            ▪ لتحديث الأكواد فقط: عدّل <b>index.html</b><br>
-            ▪ النشر تلقائي عبر GitHub Pages عند حفظ أي تعديل
+            ▪ البيانات محفوظة في <b>Firebase Firestore</b> (سحابية)<br>
+            ▪ أي تعديل يظهر فوراً لجميع المستخدمين<br>
+            ▪ لتحديث الأكواد فقط: ارفع <b>index.html</b> على GitHub<br>
+            ▪ البيانات لا تتأثر عند تحديث الأكواد
           </div>
         </div>
       </div>`;
+    const backupBtn=$("#btn-backup");
+    if(backupBtn) backupBtn.onclick=()=>{
+      const db=LocalDB.call("GET","/export-db");
+      if(!db){toast("❌ لا توجد بيانات","err");return;}
+      const now=new Date();
+      const ts=`${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+      const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download=`adelcare_backup_${ts}.json`;
+      a.click(); URL.revokeObjectURL(a.href);
+      toast("✅ تم تنزيل النسخة الاحتياطية بنجاح","ok");
+    };
   }
 
   async function drawBranchesPanel(){
@@ -2752,7 +2982,7 @@ const App = (() => {
     $("#ctrl-body").querySelectorAll("[data-eb]").forEach(b=>b.onclick=()=>requireEdit(()=>branchForm(JSON.parse(b.dataset.eb))));
     $("#ctrl-body").querySelectorAll("[data-db]").forEach(b=>b.onclick=()=>requireEdit(async()=>{
       if(!confirm("حذف الفرع؟"))return;
-      try{await api("/branches/"+b.dataset.db,{method:"DELETE"});toast("✅ تم الحذف","ok");drawBranchesPanel();}
+      try{await api("/branches/"+b.dataset.db,{method:"DELETE"});toast("✅ تم حذف الفرع بنجاح","ok");drawBranchesPanel();}
       catch(e){toast("❌ "+e.message,"err");}}));
   }
 
@@ -2781,7 +3011,7 @@ const App = (() => {
           const p=Object.fromEntries(new FormData(m.querySelector("#bf")).entries());
           try{ if(b)await api("/branches/"+b.id,{method:"PUT",body:p});
             else await api("/branches",{method:"POST",body:p});
-            toast("✅ تم الحفظ","ok");closeModal();drawBranchesPanel();}catch(e){toast("❌ "+e.message,"err");}
+            toast("✅ تم حفظ بيانات الفرع بنجاح","ok");closeModal();drawBranchesPanel();}catch(e){toast("❌ "+e.message,"err");}
         };}});
   }
 
@@ -2805,7 +3035,7 @@ const App = (() => {
       </div>`;
     $("#save-sec").onclick=async()=>{
       const p=Object.fromEntries(new FormData($("#secf")).entries());
-      try{ await api("/settings",{method:"PUT",body:p}); toast("✅ تم حفظ الرموز","ok"); }
+      try{ await api("/settings",{method:"PUT",body:p}); toast("✅ تم حفظ الإعدادات بنجاح","ok"); }
       catch(e){toast("❌ "+e.message,"err");}
     };
   }
@@ -2854,9 +3084,9 @@ const App = (() => {
 
     const add=()=>{
       const name=$("#new-spec").value.trim();
-      if(!name){toast("اكتب اسم القسم");return;}
+      if(!name){toast("اكتب اسم القسم","warn");return;}
       api("/specialties",{method:"POST",body:{name}})
-        .then(()=>{toast("✅ تمت إضافة القسم","ok");drawSpecialtiesPanel();})
+        .then(()=>{toast("✅ تمت إضافة القسم بنجاح","ok");drawSpecialtiesPanel();})
         .catch(e=>toast("❌ "+e.message,"err"));
     };
     $("#add-spec").onclick=add;
@@ -2864,7 +3094,7 @@ const App = (() => {
 
     document.querySelectorAll("[data-dspec]").forEach(btn=>btn.onclick=async()=>{
       if(!confirm(`حذف قسم "${btn.dataset.dspec}"؟`))return;
-      try{await api("/specialties",{method:"DELETE",body:{name:btn.dataset.dspec}});toast("✅ تم الحذف","ok");drawSpecialtiesPanel();}
+      try{await api("/specialties",{method:"DELETE",body:{name:btn.dataset.dspec}});toast("✅ تم حذف القسم بنجاح","ok");drawSpecialtiesPanel();}
       catch(e){toast("❌ "+e.message,"err");}
     });
 
@@ -2879,7 +3109,7 @@ const App = (() => {
             const newName=m.querySelector("#spec-new-name").value.trim();
             if(!newName)return;
             try{await api("/specialties",{method:"PUT",body:{old:oldName,new:newName}});
-              toast("✅ تم التعديل","ok");closeModal();drawSpecialtiesPanel();}
+              toast("✅ تم تعديل القسم بنجاح","ok");closeModal();drawSpecialtiesPanel();}
             catch(e){toast("❌ "+e.message,"err");}
           };
         }
@@ -2902,8 +3132,10 @@ const App = (() => {
     state.route="dashboard"; state.params={};
     if(location.hash) history.replaceState(null,"","#dashboard");
     render();
-    // Re-render when another device changes data in Firestore
     document.addEventListener('adelcare:sync', ()=>render());
+    setInterval(()=>{
+      if(state.route==="dashboard"||state.route==="doctors") render();
+    },60000);
   }
   return { boot };
 })();
