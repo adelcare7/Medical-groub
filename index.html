@@ -517,28 +517,31 @@ body.modal-open{overflow:hidden}
 @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(12px)}}
 .active-ctrl{background:var(--brand-soft,rgba(0,180,150,.12));color:var(--brand)!important}
-.tp{display:inline-flex;align-items:center;gap:2px;background:var(--input-bg,var(--card));border:1px solid var(--border);border-radius:var(--r-s);padding:3px 6px;direction:ltr}
-.tp-s{background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:2px 1px;cursor:pointer}
-.tp-col{color:var(--muted);font-weight:700;padding:0 1px}
+.tp{display:inline-flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:7px;padding:3px 6px;direction:ltr}
+.tp-seg{display:flex;flex-direction:column;align-items:center}
+.tp-seg-lbl{font-size:11px;font-weight:700;color:var(--text);line-height:1;direction:rtl}
+.tp-s{background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:0 1px;cursor:pointer;text-align:center;font-weight:600;-webkit-appearance:none}
+.tp-div{font-size:13px;font-weight:700;color:var(--muted);margin-top:10px}
+.shift-pair{display:flex;align-items:center;gap:5px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 
 /* ---------- Schedule editor (doctor form) ---------- */
 .sched-grid{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.sched-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);
+.sched-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface2);
   border-radius:var(--r-s);border:1px solid var(--line);flex-wrap:wrap}
 .sched-row-off{opacity:.6}
-.sched-day-lbl{width:64px;font-size:13px;font-weight:600;flex-shrink:0}
-.sched-shifts-col{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:7px;min-width:0}
-.shift-pair{display:flex;align-items:center;gap:5px}
-.shift-pair input[type=time]{padding:4px 7px;border:1px solid var(--line);border-radius:7px;
-  background:var(--surface);color:var(--text);font-size:13px;font-family:inherit;min-width:0;width:106px}
-.sched-sep{color:var(--muted);font-size:13px;flex-shrink:0}
-.sched-off-tag{font-size:12px;color:var(--muted);font-style:italic}
-.sdel{width:22px;height:22px;font-size:11px;padding:0;flex-shrink:0;color:var(--muted)}
+.sched-day-lbl{width:52px;font-size:12px;font-weight:600;flex-shrink:0}
+.sched-shifts-col{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0}
+.shift-pair{display:flex;align-items:center;gap:3px}
+.shift-pair input[type=time]{padding:3px 5px;border:1px solid var(--line);border-radius:6px;
+  background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;min-width:0;width:96px}
+.sched-sep{color:var(--muted);font-size:12px;flex-shrink:0}
+.sched-off-tag{font-size:11px;color:var(--muted);font-style:italic}
+.sdel{width:18px;height:18px;font-size:10px;padding:0;flex-shrink:0;color:var(--muted)}
 .sdel:hover{color:var(--red)}
-.btn-xs{padding:3px 9px;font-size:12px;border-radius:6px;line-height:1.5}
-.stoggle{flex-shrink:0}
+.btn-xs{padding:2px 7px;font-size:11px;border-radius:5px;line-height:1.5}
+.stoggle{flex-shrink:0;font-size:11px}
 
 /* mobile utility */
 .hide-mob{} /* visible on desktop */
@@ -639,7 +642,11 @@ body.modal-open{overflow:hidden}
   .spec-add-row input{font-size:16px}
 
   /* -- Time picker mobile -- */
-  .tp-s{font-size:16px}
+  .tp{gap:1px;padding:2px 4px;border-radius:6px}
+  .tp-s{font-size:13px;padding:0}
+  .tp-seg-lbl{font-size:9px}
+  .tp-div{font-size:12px;margin-top:9px}
+  .shift-pair{gap:2px}
   .shift-pair input[type=time]{font-size:16px}
 
   /* -- Leave rows mobile -- */
@@ -650,9 +657,12 @@ body.modal-open{overflow:hidden}
   .page-title{font-size:19px}
 
   /* -- Schedule editor mobile -- */
-  .sched-row{flex-direction:column;align-items:stretch;gap:6px;padding:10px}
-  .sched-day-lbl{width:auto}
+  .sched-row{align-items:center;gap:5px;padding:6px 8px}
+  .sched-day-lbl{width:44px;font-size:12px}
+  .sched-shifts-col{gap:4px}
   .shift-pair input[type=time]{width:100%;min-width:0}
+  .stoggle{font-size:10px;padding:2px 6px}
+  .sched-row .btn-xs{font-size:10px;padding:2px 6px}
 
   /* -- Calendar mobile -- */
   .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
@@ -740,6 +750,10 @@ const LocalDB = (() => {
       _docRef.set({ data: JSON.stringify(main) }).catch(e => console.error('[Adelcare] Firestore write:', e));
       _auditRef.set({ data: JSON.stringify(audit || []) }).catch(e => console.error('[Adelcare] Firestore audit:', e));
     }
+    try{
+      localStorage.setItem('adelcare_backup', JSON.stringify(db));
+      localStorage.setItem('adelcare_backup_ts', new Date().toISOString());
+    }catch(e){}
   }
 
   async function _doInit() {
@@ -1352,7 +1366,12 @@ const LocalDB = (() => {
     return db ? JSON.parse(JSON.stringify(db)) : null;
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } }, getSEED:()=>SEED };
+  function importDB(data){
+    const db={doctors:data.doctors||[],branches:data.branches||[],leaves:data.leaves||[],audit:data.audit||[],settings:data.settings||{},_seq:data._seq||{doctors:200,branches:10,leaves:50,audit:100}};
+    save(db);
+  }
+
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); if(m==="POST"&&p==="/import-db"){importDB(b);return{ok:true};} return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } }, getSEED:()=>SEED };
 })();
 
   </script>
@@ -2216,7 +2235,7 @@ const App = (() => {
     const mkTP=(val,id)=>{const{h,m,ap}=hhmm2ampm(val);
       const hrs=Array.from({length:12},(_,i)=>i+1).map(x=>`<option${x===h?" selected":""}>${x}</option>`).join("");
       const mins=[0,5,10,15,20,25,30,35,40,45,50,55].map(x=>`<option value="${x}"${x===m?" selected":""}>${String(x).padStart(2,"0")}</option>`).join("");
-      return`<span class="tp" data-tp="${id}"><select class="tp-h tp-s">${hrs}</select><span class="tp-col">:</span><select class="tp-m tp-s">${mins}</select><select class="tp-ap tp-s"><option value="am"${ap==="am"?" selected":""}>ص</option><option value="pm"${ap==="pm"?" selected":""}>م</option></select></span>`;};
+      return`<span class="tp" data-tp="${id}"><span class="tp-seg"><span class="tp-seg-lbl">س</span><select class="tp-h tp-s">${hrs}</select></span><span class="tp-div">:</span><span class="tp-seg"><span class="tp-seg-lbl">د</span><select class="tp-m tp-s">${mins}</select></span><span class="tp-seg"><span class="tp-seg-lbl">ص/م</span><select class="tp-ap tp-s"><option value="am"${ap==="am"?" selected":""}>ص</option><option value="pm"${ap==="pm"?" selected":""}>م</option></select></span></span>`;};
     const readTP=(el)=>{const h=+el.querySelector(".tp-h").value,m=+el.querySelector(".tp-m").value,ap=el.querySelector(".tp-ap").value;return ampm2hhmm(h,m,ap);};
     const schedState=WEEK_ORDER.map(day=>{
       const ex=sc[day]||sc[String(day)];
@@ -2937,8 +2956,17 @@ const App = (() => {
         </div>
         <div class="card" style="padding:16px;background:var(--surface)">
           <div style="font-size:15px;font-weight:700;margin-bottom:10px">📦 نسخة احتياطية</div>
-          <div style="font-size:13px;color:var(--muted);margin-bottom:12px">تنزيل نسخة من جميع البيانات (ممارسون، فروع، إجازات، إعدادات) كملف JSON يمكن الاحتفاظ به.</div>
-          <button class="btn btn-primary" id="btn-backup" style="width:100%">⬇ تنزيل نسخة احتياطية</button>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px;background:var(--bg);border-radius:10px">
+            <span style="font-size:20px">🟢</span>
+            <div>
+              <div style="font-size:13px;font-weight:600">الحفظ التلقائي مفعّل</div>
+              <div style="font-size:12px;color:var(--muted)" id="backup-ts">${(()=>{const t=localStorage.getItem('adelcare_backup_ts');if(!t)return'لم يتم الحفظ بعد';const d=new Date(t);return'آخر حفظ: '+d.toLocaleDateString('ar-SA')+' '+d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});})()}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" id="btn-backup" style="flex:1">⬇ تنزيل نسخة</button>
+            <button class="btn btn-ghost" id="btn-restore" style="flex:1">⬆ استعادة نسخة</button>
+          </div>
         </div>
         <div class="card" style="padding:16px;background:var(--surface)">
           <div style="font-size:13px;color:var(--muted);line-height:1.8;text-align:right">
@@ -2962,6 +2990,27 @@ const App = (() => {
       a.download=`adelcare_backup_${ts}.json`;
       a.click(); URL.revokeObjectURL(a.href);
       toast("✅ تم تنزيل النسخة الاحتياطية بنجاح","ok");
+    };
+    const restoreBtn=$("#btn-restore");
+    if(restoreBtn) restoreBtn.onclick=()=>{
+      const inp=document.createElement("input");
+      inp.type="file"; inp.accept=".json";
+      inp.onchange=()=>{
+        const f=inp.files[0]; if(!f)return;
+        const r=new FileReader();
+        r.onload=()=>{
+          try{
+            const data=JSON.parse(r.result);
+            if(!data.doctors||!data.branches){toast("❌ ملف غير صالح","err");return;}
+            if(!confirm(`استعادة النسخة الاحتياطية؟\nسيتم استبدال جميع البيانات الحالية.\n\nالملف يحتوي على:\n• ${data.doctors.length} ممارس\n• ${data.branches.length} فرع\n• ${(data.leaves||[]).length} إجازة`))return;
+            LocalDB.call("POST","/import-db",data);
+            toast("✅ تم استعادة النسخة الاحتياطية بنجاح","ok");
+            setTimeout(()=>drawDataPanel(),500);
+          }catch(e){toast("❌ خطأ في قراءة الملف","err");}
+        };
+        r.readAsText(f);
+      };
+      inp.click();
     };
   }
 
