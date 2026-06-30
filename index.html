@@ -84,6 +84,56 @@ a{color:inherit;text-decoration:none}
   background:var(--green-soft);color:var(--green)}
 .spec-chips{display:flex;flex-wrap:wrap;gap:8px}
 
+/* ---------- User info (sidebar) ---------- */
+.user-info{text-align:center;padding:8px 6px;border-radius:var(--r-s);background:var(--surface2)}
+.user-info-name{display:block;font-weight:600;font-size:13px}
+.user-info-role{display:block;font-size:11px;color:var(--muted)}
+
+/* ---------- Users management ---------- */
+.user-grid{display:grid;gap:12px}
+.user-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
+  box-shadow:var(--shadow);transition:border-color .15s}
+.user-card:hover{border-color:var(--brand)}
+.user-card.user-inactive{opacity:.55}
+.user-card-head{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.user-card-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand-d));
+  color:#fff;font-weight:700;font-size:18px;display:grid;place-items:center;flex-shrink:0}
+.user-card-name{font-weight:600;font-size:14px}
+.user-badge-super{display:inline-block;font-size:10px;font-weight:700;background:var(--amber-soft);color:var(--amber);
+  padding:1px 7px;border-radius:10px;margin-inline-start:6px;vertical-align:middle}
+.user-card-meta{font-size:12px;color:var(--muted)}
+.user-status-on{color:var(--green);font-weight:600}
+.user-status-off{color:var(--red);font-weight:600}
+.user-card-perms{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.perm-chip{font-size:11px;padding:2px 8px;border-radius:8px;background:var(--brand-soft);color:var(--brand-d);font-weight:500}
+[data-theme="dark"] .perm-chip{color:var(--brand)}
+.perm-chip.perm-all{background:var(--amber-soft);color:var(--amber)}
+.perm-chip.perm-none{background:var(--bg2);color:var(--muted)}
+.user-card-actions{display:flex;gap:6px;flex-wrap:wrap}
+.perms-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+.perm-check{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:4px 0}
+.perm-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--brand)}
+.perm-select-all{font-weight:600;color:var(--brand-d)}
+[data-theme="dark"] .perm-select-all{color:var(--brand)}
+.user-card-branches{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.branch-chip{background:var(--green-soft,#e8f5e9);color:var(--green,#388e3c)}
+[data-theme="dark"] .branch-chip{color:#66bb6a}
+
+/* ---------- Audit log ---------- */
+.audit-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.audit-filters .input{font-size:13px;padding:6px 8px;min-width:0;flex:1}
+.audit-cards{display:flex;flex-direction:column;gap:8px}
+.audit-row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);padding:10px 14px}
+.audit-row:hover{border-color:var(--brand)}
+.audit-row-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:4px}
+.audit-user{font-weight:600;font-size:13px;color:var(--text)}
+.audit-action{font-size:12px;padding:2px 8px;border-radius:8px;background:var(--brand-soft);color:var(--brand-d);font-weight:500}
+[data-theme="dark"] .audit-action{color:var(--brand)}
+.audit-branch{font-size:12px;color:var(--green,#388e3c);font-weight:500}
+[data-theme="dark"] .audit-branch{color:#66bb6a}
+.audit-row-detail{font-size:13px;color:var(--text);margin-bottom:2px}
+.audit-row-time{font-size:11px;color:var(--muted)}
+
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 85%,transparent);
   backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
@@ -517,31 +567,41 @@ body.modal-open{overflow:hidden}
 @keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(12px)}}
 .active-ctrl{background:var(--brand-soft,rgba(0,180,150,.12));color:var(--brand)!important}
-.tp{display:inline-flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:7px;padding:3px 6px;direction:ltr}
+.tp{display:inline-flex;align-items:center;gap:0;direction:ltr}
 .tp-seg{display:flex;flex-direction:column;align-items:center}
-.tp-seg-lbl{font-size:11px;font-weight:700;color:var(--text);line-height:1;direction:rtl}
-.tp-s{background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:0 1px;cursor:pointer;text-align:center;font-weight:600;-webkit-appearance:none}
-.tp-div{font-size:13px;font-weight:700;color:var(--muted);margin-top:10px}
+.tp-seg-lbl{display:none}
+.tp-s{background:transparent;border:none;outline:none;font-size:14px;color:var(--text);padding:0;cursor:pointer;text-align:center;font-weight:600;-webkit-appearance:none}
+.tp-div{font-size:14px;font-weight:700;color:var(--muted)}
 .shift-pair{display:flex;align-items:center;gap:5px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 
 /* ---------- Schedule editor (doctor form) ---------- */
-.sched-grid{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.sched-row{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--surface2);
-  border-radius:var(--r-s);border:1px solid var(--line);flex-wrap:wrap}
-.sched-row-off{opacity:.6}
-.sched-day-lbl{width:52px;font-size:12px;font-weight:600;flex-shrink:0}
-.sched-shifts-col{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0}
-.shift-pair{display:flex;align-items:center;gap:3px}
-.shift-pair input[type=time]{padding:3px 5px;border:1px solid var(--line);border-radius:6px;
-  background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;min-width:0;width:96px}
-.sched-sep{color:var(--muted);font-size:12px;flex-shrink:0}
-.sched-off-tag{font-size:11px;color:var(--muted);font-style:italic}
-.sdel{width:18px;height:18px;font-size:10px;padding:0;flex-shrink:0;color:var(--muted)}
-.sdel:hover{color:var(--red)}
+.sched-header{display:none}
+.sched-grid{display:flex;flex-direction:column;gap:0;margin-top:4px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.sched-row{display:flex;align-items:center;gap:0;background:var(--card);border-bottom:1px solid var(--line);min-height:40px}
+.sched-row:last-child{border-bottom:none}
+.sched-row-off{opacity:.5}
+.sched-day-lbl{width:60px;font-size:13px;font-weight:700;color:var(--text);text-align:center;flex-shrink:0;padding:0 4px}
+.sched-mid{flex:1;display:flex;flex-direction:column;gap:2px;padding:6px 4px;min-width:0}
+.sched-shift-line{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+.sched-sep{color:var(--muted);font-size:13px;flex-shrink:0;font-weight:400;margin:0 2px}
+.sched-off-tag{font-size:12px;color:var(--muted);font-style:italic}
+.sched-btns{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:0 6px}
+.sched-row-apply{display:flex;justify-content:flex-end;padding:2px 6px 4px}
+.sched-row-apply .sapply{font-size:11px;font-weight:600;color:var(--brand-d);background:var(--brand-soft);
+  border:1px solid var(--brand);border-radius:6px;padding:3px 10px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:4px}
+.sched-row-apply .sapply:hover{background:var(--brand);color:#fff}
+[data-theme="dark"] .sched-row-apply .sapply{color:var(--brand)}
+[data-theme="dark"] .sched-row-apply .sapply:hover{color:#fff}
+.sbtn{padding:4px 10px;font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:.15s;
+  border:1px solid var(--line);background:var(--surface);color:var(--text);white-space:nowrap}
+.sbtn:hover{border-color:var(--brand);background:var(--brand-soft)}
+.sbtn-add{border-style:dashed}
+.sbtn-del{color:var(--muted);padding:4px 6px}
+.sbtn-del:hover{border-color:var(--red);color:var(--red);background:rgba(244,67,54,.06)}
+.sbtn-off{font-size:12px}
 .btn-xs{padding:2px 7px;font-size:11px;border-radius:5px;line-height:1.5}
-.stoggle{flex-shrink:0;font-size:11px}
 
 /* mobile utility */
 .hide-mob{} /* visible on desktop */
@@ -642,12 +702,10 @@ body.modal-open{overflow:hidden}
   .spec-add-row input{font-size:16px}
 
   /* -- Time picker mobile -- */
-  .tp{gap:1px;padding:2px 4px;border-radius:6px}
+  .tp{gap:0;padding:2px 3px;border-radius:5px}
   .tp-s{font-size:13px;padding:0}
-  .tp-seg-lbl{font-size:9px}
-  .tp-div{font-size:12px;margin-top:9px}
-  .shift-pair{gap:2px}
-  .shift-pair input[type=time]{font-size:16px}
+  .tp-seg-lbl{display:none}
+  .tp-div{font-size:11px;margin-top:0}
 
   /* -- Leave rows mobile -- */
   .leave-active-row,.leave-upcoming-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
@@ -657,12 +715,22 @@ body.modal-open{overflow:hidden}
   .page-title{font-size:19px}
 
   /* -- Schedule editor mobile -- */
-  .sched-row{align-items:center;gap:5px;padding:6px 8px}
-  .sched-day-lbl{width:44px;font-size:12px}
-  .sched-shifts-col{gap:4px}
-  .shift-pair input[type=time]{width:100%;min-width:0}
-  .stoggle{font-size:10px;padding:2px 6px}
-  .sched-row .btn-xs{font-size:10px;padding:2px 6px}
+  .sched-grid{gap:3px}
+  .sched-row{flex-direction:row;align-items:stretch}
+  .sched-day{width:40px;padding:4px 2px;border-left:1px solid var(--line);border-bottom:none}
+  .sched-day-name{font-size:10px}
+  .sched-day-badge{display:none}
+  .sched-body{padding:4px 5px;gap:3px}
+  .sched-shifts-area{gap:2px}
+  .sched-shift-row{gap:2px;flex-wrap:nowrap}
+  .sched-shift-num{width:14px;height:14px;font-size:8px}
+  .sched-sep{font-size:10px}
+  .sched-actions{gap:2px}
+  .sched-act-btn{padding:2px 5px;font-size:9px}
+  .sched-act-btn.sdel-btn{padding:2px 4px;font-size:9px}
+  .sched-toggle{padding:2px 5px;font-size:9px}
+  .sched-off-tag{font-size:10px;gap:2px}
+  .sched-off-tag::before{font-size:10px}
 
   /* -- Calendar mobile -- */
   .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
@@ -728,7 +796,7 @@ const LocalDB = (() => {
     appId: "1:86720349255:web:9914fd1906ccd623349d62"
   };
 
-  let _memDB = null, _memSess = {auth:false,edit:false};
+  let _memDB = null, _memSess = {auth:false,edit:false,userId:null,name:null,permissions:[],branches:[]};
   const _fails = {};
   let _fsDB, _docRef, _auditRef, _initPromise, _lastWriteTs = 0;
 
@@ -816,13 +884,17 @@ const LocalDB = (() => {
     return id;
   }
 
-  function log(db, action, entity, entity_id, detail) {
-    db.audit.unshift({
+  function log(db, action, entity, entity_id, detail, extra) {
+    const s=getSession();
+    const entry={
       id: nextId(db,'audit'),
       ts: new Date().toISOString().slice(0,19),
-      user: "محرّر", action, entity, entity_id: entity_id||null, detail: detail||""
-    });
-    if (db.audit.length > 300) db.audit.length = 300;
+      user: (s.name || "زائر"), userId: s.userId||null,
+      action, entity, entity_id: entity_id||null, detail: detail||""
+    };
+    if(extra) Object.assign(entry,extra);
+    db.audit.unshift(entry);
+    if (db.audit.length > 500) db.audit.length = 500;
   }
 
   // ── Helpers ──────────────────────────────────────────────────
@@ -920,7 +992,26 @@ const LocalDB = (() => {
     const sess = getSession();
 
     const needAuth = () => { if (!sess.auth) throw Object.assign(new Error("auth"),{status:401}); };
-    const needEdit = () => { needAuth(); if (!sess.edit) throw Object.assign(new Error("وضع التعديل مقفل"),{status:403}); };
+    const _hasPerm = (s, perm) => { if(!s.auth) return false; const p=s.permissions||[]; return p.includes("*")||p.includes(perm); };
+    const needPerm = (perm) => { needAuth(); if(!_hasPerm(sess,perm)) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); };
+    const _hasBranch = (s, bid) => { const b=s.branches||[]; return b.includes("*")||b.includes(bid)||b.includes(String(bid)); };
+    const needBranch = (bid) => { if(!_hasBranch(sess,bid)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا الفرع"),{status:403}); };
+
+    // ensure users array exists (migration)
+    if (!db.settings.users || !db.settings.users.length) {
+      db.settings.users = [{
+        id:"super", name:"المدير الرئيسي",
+        pin: db.settings.admin_code||"12345",
+        role:"super_admin", active:true,
+        permissions:["*"], branches:["*"],
+        created: new Date().toISOString()
+      }];
+      save(db);
+    }
+    // patch users missing branches field
+    let _patched=false;
+    (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_patched=true;}});
+    if(_patched) save(db);
 
     // AUTH
     if (method==="POST" && path==="/login") {
@@ -928,50 +1019,78 @@ const LocalDB = (() => {
       if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
       const code = (body.code||"").trim();
       const ac = db.settings.access_code||"123";
-      const ec = db.settings.edit_code||"1212";
-      if (code===ec) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:true}); return getSession(); }
-      if (code===ac) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:false}); return getSession(); }
+      if (code===ac) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:false,userId:null,name:"زائر",permissions:[],branches:[]}); return getSession(); }
+      const usr = (db.settings.users||[]).find(u=>u.pin===code&&u.active);
+      if (usr) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:true,userId:usr.id,name:usr.name,permissions:usr.permissions||[],branches:usr.branches||["*"]}); return getSession(); }
       const nc=fl.count+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
       throw Object.assign(new Error("رمز الدخول غير صحيح"),{status:401});
     }
-    if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false}); return {ok:true}; }
-    if (method==="POST" && path==="/unlock") {
-      needAuth();
-      const fk="unlock"; const fl=_fails[fk]||{count:0,until:0};
-      if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
-      const code=(body.code||"").trim();
-      if (code===( db.settings.edit_code||"1212")) { _fails[fk]={count:0,until:0}; setSession({...sess,edit:true}); return getSession(); }
-      const nc=(fl.count||0)+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
-      throw Object.assign(new Error("رمز التعديل غير صحيح"),{status:403});
-    }
-    if (method==="POST" && path==="/lock") { needAuth(); setSession({...sess,edit:false}); return getSession(); }
+    if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[]}); return {ok:true}; }
     if (method==="GET"  && path==="/me") {
-      if (sess.edit) setSession({...sess, edit:false});
-      return {user: sess.auth ? {...sess, edit:false} : null};
+      if (sess.auth && (!sess.permissions || !sess.branches)) {
+        setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[]});
+        return {user:null};
+      }
+      return {user: sess.auth ? sess : null};
     }
-    if (method==="POST" && path==="/verify-admin") {
-      needAuth();
-      const fk="admin"; const fl=_fails[fk]||{count:0,until:0};
-      if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
-      const code=(body.code||"").trim();
-      if (code===(db.settings.admin_code||"12345")) {
-        _fails[fk]={count:0,until:0};
-        setSession({...sess,edit:true});
+
+    // USERS MANAGEMENT
+    if (method==="GET" && path==="/users") {
+      needPerm("users_manage");
+      return {users:(db.settings.users||[]).map(u=>({...u,pin:"••••"}))};
+    }
+    if (method==="POST" && path==="/users") {
+      needPerm("users_manage");
+      const name=(body.name||"").trim(); if(!name) throw new Error("اسم المستخدم مطلوب");
+      const pin=(body.pin||"").trim(); if(!pin) throw new Error("رمز الدخول مطلوب");
+      if((db.settings.users||[]).some(u=>u.pin===pin)) throw new Error("هذا الرمز مستخدم بالفعل");
+      if(pin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
+      const id="u"+Date.now();
+      const u={id,name,pin,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],created:new Date().toISOString()};
+      db.settings.users.push(u);
+      log(db,"إضافة مستخدم","user",id,name); save(db);
+      return {id};
+    }
+    const usrM=path.match(/^\/users\/([^/]+)$/);
+    if(usrM){
+      const uid=usrM[1];
+      if(method==="PUT"){
+        needPerm("users_manage");
+        const u=(db.settings.users||[]).find(x=>x.id===uid); if(!u) throw Object.assign(new Error("not found"),{status:404});
+        if(u.role==="super_admin"&&sess.userId!==u.id) throw new Error("لا يمكن تعديل المدير الرئيسي");
+        if(body.name) u.name=body.name.trim();
+        if(body.pin){
+          const newPin=body.pin.trim();
+          if((db.settings.users||[]).some(x=>x.id!==uid&&x.pin===newPin)) throw new Error("هذا الرمز مستخدم بالفعل");
+          if(newPin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
+          u.pin=newPin;
+        }
+        if(body.permissions!==undefined&&u.role!=="super_admin") u.permissions=body.permissions;
+        if(body.branches!==undefined&&u.role!=="super_admin") u.branches=body.branches;
+        if(body.active!==undefined&&u.role!=="super_admin") u.active=!!body.active;
+        if(sess.userId===uid) setSession({...sess,name:u.name,permissions:u.permissions,branches:u.branches||["*"]});
+        log(db,"تعديل مستخدم","user",uid,u.name); save(db);
         return {ok:true};
       }
-      const nc=(fl.count||0)+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
-      throw Object.assign(new Error("رمز الإدارة غير صحيح"),{status:403});
+      if(method==="DELETE"){
+        needPerm("users_manage");
+        const u=(db.settings.users||[]).find(x=>x.id===uid); if(!u) throw Object.assign(new Error("not found"),{status:404});
+        if(u.role==="super_admin") throw new Error("لا يمكن حذف المدير الرئيسي");
+        db.settings.users=db.settings.users.filter(x=>x.id!==uid);
+        log(db,"حذف مستخدم","user",uid,u.name); save(db);
+        return {ok:true};
+      }
     }
 
     // SETTINGS
     if (method==="GET" && path==="/settings") {
-      needAuth();
-      return {access_code:db.settings.access_code,edit_code:db.settings.edit_code,admin_code:db.settings.admin_code};
+      needPerm("settings_access");
+      return {access_code:db.settings.access_code||"123"};
     }
     if (method==="PUT" && path==="/settings") {
-      needAuth();
-      ["access_code","edit_code","admin_code"].forEach(k=>{ if(body[k]&&body[k].trim()) db.settings[k]=body[k].trim(); });
-      log(db,"تغيير رموز الأمان","settings");
+      needPerm("settings_access");
+      if(body.access_code&&body.access_code.trim()) db.settings.access_code=body.access_code.trim();
+      log(db,"تغيير رمز العرض","settings");
       save(db); return {ok:true};
     }
 
@@ -981,21 +1100,21 @@ const LocalDB = (() => {
       return {specialties:allSpecialties(db), extra:getExtra(db)};
     }
     if (method==="POST" && path==="/specialties") {
-      needEdit();
+      needPerm("specialty_manage");
       const name=(body.name||"").trim(); if(!name) throw new Error("اسم القسم مطلوب");
       const ex=getExtra(db); if(!ex.includes(name)){ ex.push(name); setExtra(db,ex); }
       log(db,"إضافة قسم","specialty",null,name); save(db);
       return {ok:true,specialties:allSpecialties(db),extra:getExtra(db)};
     }
     if (method==="DELETE" && path==="/specialties") {
-      needEdit();
+      needPerm("specialty_manage");
       const name=(body.name||"").trim();
       const ex=getExtra(db).filter(x=>x!==name); setExtra(db,ex);
       log(db,"حذف قسم","specialty",null,name); save(db);
       return {ok:true,specialties:allSpecialties(db),extra:getExtra(db)};
     }
     if (method==="PUT" && path==="/specialties") {
-      needEdit();
+      needPerm("specialty_manage");
       const o=(body.old||"").trim(), n=(body.new||"").trim();
       const ex=getExtra(db).map(x=>x===o?n:x); setExtra(db,ex);
       db.doctors.forEach(d=>{ if(d.specialty===o) d.specialty=n; });
@@ -1023,13 +1142,13 @@ const LocalDB = (() => {
         return {branch:b,doctors:docs.map(d=>withStatus(d,db)),specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
       }
       if (method==="PUT") {
-        needEdit();
+        needPerm("branch_manage");
         const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
         ["name","grp","info","hours","phone","landline","bank_account","iban","extra_info"].forEach(k=>{ if(k in body) b[k]=body[k]; });
         log(db,"تعديل فرع","branch",bid,b.name); save(db); return {ok:true};
       }
       if (method==="DELETE") {
-        needEdit();
+        needPerm("branch_manage");
         const n=db.doctors.filter(d=>d.branch_id===bid&&!d.archived).length;
         if(n) throw new Error(`لا يمكن حذف فرع يضم ${n} طبيب`);
         db.branches=db.branches.filter(x=>x.id!==bid);
@@ -1037,7 +1156,7 @@ const LocalDB = (() => {
       }
     }
     if (method==="POST" && path==="/branches") {
-      needEdit();
+      needPerm("branch_manage");
       const id=nextId(db,"branches");
       const b={id,name:body.name||"",grp:body.grp||"",info:body.info||"",hours:body.hours||"",phone:body.phone||"",landline:body.landline||"",bank_account:body.bank_account||"",iban:body.iban||"",extra_info:body.extra_info||""};
       db.branches.push(b); log(db,"إضافة فرع","branch",id,b.name); save(db); return {id};
@@ -1062,35 +1181,44 @@ const LocalDB = (() => {
         return {doctor:doc};
       }
       if (method==="PUT" && !docM[2]) {
-        needEdit();
+        needPerm("doctor_edit");
         const idx=db.doctors.findIndex(x=>x.id===did); if(idx<0) throw Object.assign(new Error("not found"),{status:404});
         const old=db.doctors[idx];
+        needBranch(old.branch_id);
         const updated={...old,...body,id:did};
         if(body.schedule) updated.schedule=body.schedule;
         if(body.dayoff) updated.dayoff=body.dayoff;
         updated.home_visit=body.home_visit?1:0;
         db.doctors[idx]=updated;
-        log(db,"تعديل طبيب","doctor",did,updated.name); save(db); return {ok:true};
+        const bn=(db.branches.find(x=>x.id===updated.branch_id)||{}).name||"";
+        log(db,"تعديل طبيب","doctor",did,updated.name,{branch:bn,branch_id:updated.branch_id}); save(db); return {ok:true};
       }
       if (method==="POST" && docM[2]==="/archive") {
-        needEdit();
+        needPerm("doctor_delete");
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
+        needBranch(d.branch_id);
         d.archived=body.unarchive?0:1;
-        log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,d.name); save(db); return {ok:true};
+        const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
+        log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
       if (method==="DELETE") {
-        needEdit();
+        needPerm("doctor_delete");
         const d=db.doctors.find(x=>x.id===did);
+        if(d) needBranch(d.branch_id);
         db.doctors=db.doctors.filter(x=>x.id!==did);
         db.leaves=db.leaves.filter(l=>l.doctor_id!==did);
-        log(db,"حذف طبيب","doctor",did,d?d.name:""); save(db); return {ok:true};
+        const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
+        log(db,"حذف طبيب","doctor",did,d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
       }
     }
     if (method==="POST" && path==="/doctors") {
-      needEdit();
+      needPerm("doctor_add");
+      needBranch(body.branch_id);
       const id=nextId(db,"doctors");
       const d={id,...body,home_visit:body.home_visit?1:0,archived:0,status:body.status||"active"};
-      db.doctors.push(d); log(db,"إضافة طبيب","doctor",id,d.name); save(db); return {id};
+      db.doctors.push(d);
+      const bn=(db.branches.find(x=>x.id===+body.branch_id)||{}).name||"";
+      log(db,"إضافة طبيب","doctor",id,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {id};
     }
 
     // LEAVES
@@ -1112,25 +1240,34 @@ const LocalDB = (() => {
       return {leaves:[...realLeaves,...syntheticLeaves].sort((a,b)=>b.start_date.localeCompare(a.start_date))};
     }
     if (method==="POST" && path==="/leaves") {
-      needEdit();
+      needPerm("leave_manage");
+      const d=db.doctors.find(x=>x.id===+body.doctor_id);
+      if(d) needBranch(d.branch_id);
       const id=nextId(db,"leaves");
       const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||""};
       db.leaves.push(lv);
-      const d=db.doctors.find(x=>x.id===lv.doctor_id);
-      log(db,"إضافة إجازة","leave",id,`${d?d.name:""} ${lv.start_date}→${lv.end_date}`); save(db); return {id};
+      const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
+      log(db,"إضافة إجازة","leave",id,`${d?d.name:""} ${lv.start_date}→${lv.end_date}`,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {id};
     }
     const lvM=path.match(/^\/leaves\/(\d+)$/);
     if(lvM&&method==="PUT"){
-      needEdit();
+      needPerm("leave_manage");
       const l=db.leaves.find(x=>x.id===+lvM[1]);
       if(!l) throw Object.assign(new Error("not found"),{status:404});
+      const d=db.doctors.find(x=>x.id===l.doctor_id);
+      if(d) needBranch(d.branch_id);
       ["start_date","end_date","type","reason"].forEach(k=>{ if(k in body) l[k]=body[k]; });
-      log(db,"تعديل إجازة","leave",+lvM[1],""); save(db); return {ok:true};
+      const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
+      log(db,"تعديل إجازة","leave",+lvM[1],d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
     }
     if(lvM&&method==="DELETE"){
-      needEdit();
-      db.leaves=db.leaves.filter(l=>l.id!==+lvM[1]);
-      log(db,"حذف إجازة","leave",+lvM[1],""); save(db); return {ok:true};
+      needPerm("leave_manage");
+      const l=db.leaves.find(x=>x.id===+lvM[1]);
+      if(l){const d=db.doctors.find(x=>x.id===l.doctor_id); if(d) needBranch(d.branch_id);}
+      db.leaves=db.leaves.filter(lx=>lx.id!==+lvM[1]);
+      const d=l?db.doctors.find(x=>x.id===l.doctor_id):null;
+      const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
+      log(db,"حذف إجازة","leave",+lvM[1],d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
     }
 
     // DASHBOARD
@@ -1336,7 +1473,7 @@ const LocalDB = (() => {
 
     // AUDIT
     if (method==="GET" && path==="/audit") {
-      needEdit();
+      needPerm("audit_view");
       return {audit:db.audit.slice(0,300)};
     }
 
@@ -1378,7 +1515,7 @@ const LocalDB = (() => {
   <script>
 /* ============ Adelcare SPA ============ */
 const App = (() => {
-  const state = { user: null, route: "dashboard", params: {}, sidebarOpen: false, adminUnlocked: false };
+  const state = { user: null, route: "dashboard", params: {}, sidebarOpen: false };
   const DAYS = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
   // week starts on Saturday (Saudi). Display order of JS getDay() indices:
   const WEEK_ORDER = [6,0,1,2,3,4,5];   // السبت، الأحد، ... الجمعة
@@ -1487,8 +1624,21 @@ const App = (() => {
       throw e;
     }
   }
-  // every editable action is gated by edit-mode (unlocked with the edit code)
-  const can = (a) => !!(state.user && state.user.edit);
+  const PERMS_META = [
+    {key:"schedule_edit",label:"تعديل جداول الدوام"},
+    {key:"doctor_add",label:"إضافة ممارس جديد"},
+    {key:"doctor_edit",label:"تعديل بيانات الممارسين"},
+    {key:"doctor_delete",label:"حذف / أرشفة الممارسين"},
+    {key:"leave_manage",label:"إدارة الإجازات"},
+    {key:"branch_manage",label:"إدارة الفروع"},
+    {key:"specialty_manage",label:"إدارة الأقسام"},
+    {key:"settings_access",label:"الوصول للإعدادات"},
+    {key:"users_manage",label:"إدارة المستخدمين"},
+    {key:"audit_view",label:"عرض سجل العمليات"},
+  ];
+  const hasPerm = (u, perm) => { if(!u||!u.auth) return false; const p=u.permissions||[]; return p.includes("*")||p.includes(perm); };
+  const can = (perm) => hasPerm(state.user, perm);
+  const canBranch = (bid) => { if(!state.user||!state.user.auth) return false; const b=state.user.branches||[]; return b.includes("*")||b.includes(bid)||b.includes(String(bid)); };
 
   // ---------- Toast ----------
   function toast(msg,type=""){
@@ -1621,28 +1771,28 @@ const App = (() => {
         :`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة</button>`}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
-      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requireEdit(()=>doctorForm(d));
-      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requireEdit(()=>leaveForm(d.id,d.name));
+      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id);
+      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requirePerm("leave_manage",()=>leaveForm(d.id,d.name),d.branch_id);
       // Active leave inline buttons
-      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requireEdit(()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}));
-      const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requireEdit(async()=>{
+      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id);
+      const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requirePerm("leave_manage",async()=>{
         if(!confirm("إلغاء الإجازة الحالية؟"))return;
         try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      });
+      },d.branch_id);
       // End manual leave (doctor.status="leave" with no leave record)
-      const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requireEdit(async()=>{
+      const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requirePerm("leave_manage",async()=>{
         if(!confirm("إلغاء الإجازة وإعادة الممارس للعمل؟"))return;
         try{await api("/doctors/"+d.id,{method:"PUT",body:{...d,status:"active"}});
           toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      });
+      },d.branch_id);
       // Upcoming leave inline buttons
       upcomingLeaves.forEach(ul=>{
         const eul=m.querySelector(`[data-edit-ul="${ul.id}"]`);
-        if(eul)eul.onclick=()=>requireEdit(()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}));
+        if(eul)eul.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}),d.branch_id);
         const dul=m.querySelector(`[data-del-ul="${ul.id}"]`);
-        if(dul)dul.onclick=()=>requireEdit(async()=>{
+        if(dul)dul.onclick=()=>requirePerm("leave_manage",async()=>{
           if(!confirm("إلغاء الإجازة القادمة؟"))return;
           try{await api("/leaves/"+ul.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();quickCard(id);}
           catch(e){toast("❌ "+e.message,"err");}
@@ -1690,67 +1840,23 @@ const App = (() => {
   }
   function closeModal(){
     const root=$("#modal-root"); const back=root.querySelector(".modal-back");
-    const finish=()=>{ root.innerHTML=""; document.body.classList.remove("modal-open");
-    };
-    // Re-lock edit mode after closing any modal outside admin/control panels
-    if(state.user && state.user.edit && state.route!=="control" && state.route!=="admin"){
-      api("/lock",{method:"POST"}).then(u=>{state.user=u; toast("🔒 تم قفل وضع التعديل","info");}).catch(()=>{});
-    }
+    const finish=()=>{ root.innerHTML=""; document.body.classList.remove("modal-open"); };
     if(back){ back.classList.add("closing"); setTimeout(finish,150); }
     else finish();
   }
 
-  // ---------- Edit-mode unlock (on demand) ----------
-  // Run fn now if already unlocked; otherwise ask for the edit code, then run it.
-  function requireEdit(fn){
-    if(state.adminUnlocked){ fn(); return; }
-    if(state.user && state.user.edit){ fn(); return; }
-    unlockPrompt(fn);
-  }
-  function unlockPrompt(onOk){
-    openModal({title:"🔒 أدخل رمز التعديل",
-      bodyHTML:`<div class="page-sub" style="margin-bottom:12px">للتعديل على البيانات أدخل رمز التعديل.</div>
-        <form id="uf"><input id="unlock-code" class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • •"></form>`,
-      footHTML:`<button class="btn btn-primary" id="do-unlock">متابعة</button><button class="btn btn-ghost" data-xu>إلغاء</button>`,
-      onMount:(m)=>{ const inp=m.querySelector("#unlock-code"); setTimeout(()=>inp.focus(),60);
-        m.querySelector("[data-xu]").onclick=closeModal;
-        const submit=async()=>{ const code=inp.value.trim(); if(!code)return;
-          try{ state.user=await api("/unlock",{method:"POST",body:{code}});
-            // clear this modal instantly, then run the pending action
-            $("#modal-root").innerHTML=""; document.body.classList.remove("modal-open");
-            if(typeof onOk==="function") onOk(); else render();
-          }catch(e){ toast(e.message); inp.value=""; inp.focus(); } };
-        m.querySelector("#do-unlock").onclick=submit;
-        m.querySelector("#uf").onsubmit=(e)=>{e.preventDefault();submit();};
-      }});
-  }
-
-  function adminUnlockPrompt(onOk){
-    if(state.adminUnlocked){if(typeof onOk==="function")onOk();return;}
-    openModal({title:"🔐 رمز الإدارة",
-      bodyHTML:`<div class="page-sub" style="margin-bottom:12px">هذا القسم محمي برمز الإدارة المنفصل.</div>
-        <form id="af"><input id="admin-code" class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • • •"></form>`,
-      footHTML:`<button class="btn btn-primary" id="do-admin">متابعة</button><button class="btn btn-ghost" data-xa>إلغاء</button>`,
-      onMount:(m)=>{ const inp=m.querySelector("#admin-code"); setTimeout(()=>inp.focus(),60);
-        m.querySelector("[data-xa]").onclick=closeModal;
-        const submit=async()=>{ const code=inp.value.trim(); if(!code)return;
-          try{ await api("/verify-admin",{method:"POST",body:{code}});
-            state.adminUnlocked=true;
-            $("#modal-root").innerHTML=""; document.body.classList.remove("modal-open");
-            if(typeof onOk==="function") onOk();
-          }catch(e){ toast("❌ "+e.message,"err"); inp.value=""; inp.focus(); } };
-        m.querySelector("#do-admin").onclick=submit;
-        m.querySelector("#af").onsubmit=(e)=>{e.preventDefault();submit();};
-      }});
+  // ---------- Permission-based action gating ----------
+  function requireEdit(fn){ requirePerm("doctor_edit",fn); }
+  function requirePerm(perm, fn, branchId){
+    if(!state.user) return;
+    if(!hasPerm(state.user, perm)){ toast("🔒 لا تملك صلاحية لهذا الإجراء","warn"); return; }
+    if(branchId!==undefined && !canBranch(branchId)){ toast("🔒 لا تملك صلاحية للتعديل على هذا الفرع","warn"); return; }
+    fn();
   }
 
   // ============================================================ ROUTER
   const routes={};
   function go(route,params={}){
-    if((state.route==="control"||state.route==="admin")&&route!==state.route){
-      state.adminUnlocked=false;
-      if(state.user&&state.user.edit) api("/lock",{method:"POST"}).then(u=>state.user=u).catch(()=>{});
-    }
     state.route=route; state.params=params; state.sidebarOpen=false;
     location.hash=route+(params.id?("/"+params.id):""); render(); }
   window.addEventListener("hashchange",()=>{
@@ -1777,7 +1883,10 @@ const App = (() => {
       const code=inp.value.trim();
       if(!code){toast("أدخل الرمز","warn");return;}
       try{ const u=await api("/login",{method:"POST",body:{code}});
-        state.user=u; toast("مرحباً "+(u.name||""),"ok"); go("dashboard");
+        state.user=u;
+        if(u.userId) toast("مرحباً "+u.name,"ok");
+        else toast("مرحباً — وضع القراءة فقط","info");
+        go("dashboard");
       }catch(err){ toast(err.message); inp.value=""; inp.focus(); }
     };
   }
@@ -1793,12 +1902,17 @@ const App = (() => {
   ];
 
   function shell(contentHTML){
+    const u=state.user||{};
+    const showSettings=can("settings_access")||can("users_manage");
     const navItems=NAV.map(n=>
       `<a class="nav-item ${state.route===n.id?'active':''}" data-nav="${n.id}">
         <span class="ico">${n.ico}</span>${n.label}
         ${n.id==="available"?'<span class="nav-badge" id="avail-badge">·</span>':""}</a>`).join("");
     const mnav=MNAV_ITEMS.map(n=>
       `<a class="${state.route===n.id?'active':''}" data-nav="${n.id}"><span class="ico">${n.ico}</span>${n.label}</a>`).join("");
+    const userTag=u.userId
+      ?`<div class="user-info"><span class="user-info-name">${esc(u.name)}</span><span class="user-info-role">${u.permissions&&u.permissions.includes("*")?"مدير رئيسي":"مستخدم"}</span></div>`
+      :`<div class="user-info"><span class="user-info-name">زائر</span><span class="user-info-role">قراءة فقط</span></div>`;
     $("#app").innerHTML=`<div class="app-shell">
       ${state.sidebarOpen?'<div class="scrim" data-scrim></div>':""}
       <aside class="sidebar ${state.sidebarOpen?'open':''}">
@@ -1806,6 +1920,7 @@ const App = (() => {
           <div><div class="brand-name">مجموعة عادل الطبية</div><div class="brand-sub">إدارة الممارسين والفروع</div></div></div>
         ${navItems}
         <div class="sidebar-foot">
+          ${userTag}
           <div class="nav-sep"></div>
           <button class="btn btn-ghost btn-sm" id="logout">تسجيل الخروج</button>
         </div>
@@ -1818,7 +1933,7 @@ const App = (() => {
             <input class="search-input" id="gsearch" placeholder="ابحث: اسم، تخصص، جنسية، فرع، شفت، حالة..." autocomplete="off">
           </div>
           ${buildTopbarDate()}
-          <button class="icon-btn${state.route==="admin"?" active-ctrl":""}" id="ctrl-btn" title="الإعدادات">⚙️</button>
+          ${showSettings?`<button class="icon-btn${state.route==="admin"?" active-ctrl":""}" id="ctrl-btn" title="الإعدادات">⚙️</button>`:""}
           <button class="icon-btn" id="theme-btn"><span id="theme-ico">${document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"}</span></button>
         </div>
         <div class="content" id="content">${contentHTML}</div>
@@ -1827,7 +1942,7 @@ const App = (() => {
     </div>`;
     $("#app").querySelectorAll("[data-nav]").forEach(a=>a.onclick=()=>go(a.dataset.nav));
     $("#logout").onclick=async()=>{await api("/logout",{method:"POST"});state.user=null;render();};
-    $("#ctrl-btn").onclick=()=>go("admin");
+    const ctrlBtn=$("#ctrl-btn"); if(ctrlBtn) ctrlBtn.onclick=()=>go("admin");
     $("#theme-btn").onclick=toggleTheme;
 
     const ham=$("#ham"); if(ham)ham.onclick=()=>{state.sidebarOpen=!state.sidebarOpen;render();};
@@ -2133,7 +2248,7 @@ const App = (() => {
     $("#content").innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div><div class="page-title">الممارسون</div><div class="page-sub">${doctors.length} ممارس</div></div>
-        <button class="icon-btn" id="go-manage" title="إدارة الممارسين" style="font-size:18px">⚙️</button>
+        ${(can("doctor_add")||can("doctor_edit")||can("doctor_delete")||can("leave_manage")||can("specialty_manage"))?'<button class="icon-btn" id="go-manage" title="إدارة الممارسين" style="font-size:18px">⚙️</button>':""}
       </div>
       <div class="toolbar" style="margin-top:16px">
         <input class="search-input" id="dsearch" style="max-width:300px;border-radius:var(--r-s);padding:9px 14px" placeholder="ابحث: اسم، تخصص، جنسية، فرع، درجة...">
@@ -2216,7 +2331,7 @@ const App = (() => {
     const dsInput=$("#dsearch");
     dsInput.addEventListener("input",()=>{clearTimeout(_dsearchTimer);_dsearchTimer=setTimeout(draw,80);});
     ["fspec","fbranch","fstatus"].forEach(id=>{$("#"+id).addEventListener("change",draw);});
-    $("#go-manage").onclick=()=>go("control");
+    const goM=$("#go-manage"); if(goM) goM.onclick=()=>go("control");
     draw();
   };
 
@@ -2262,7 +2377,10 @@ const App = (() => {
           <option value="leave" ${d.status==="leave"?"selected":""}>إجازة</option></select></div>
       </div>
       <div class="field">
-        <label>جدول الدوام الأسبوعي</label>
+        <div class="sched-header">
+          <span class="sched-header-title">🗓️ جدول الدوام الأسبوعي</span>
+          <button type="button" class="sched-apply-all" id="sched-apply-all-btn">📋 تطبيق على جميع الأيام</button>
+        </div>
         <div id="sched-grid" class="sched-grid"></div>
       </div>
       <div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
@@ -2299,23 +2417,34 @@ const App = (() => {
         toast("✅ تم تطبيق جدول الدوام على جميع الأيام بنجاح","ok");
       }
       function buildSchedUI(container,ss){
+        const dayAbbr=["أحد","إثن","ثلا","أرب","خمي","جمع","سبت"];
         container.innerHTML=ss.map((row,idx)=>`
           <div class="sched-row${row.off?" sched-row-off":""}" data-srow="${idx}">
-            <div class="sched-day-lbl">${DAYS[row.day]}</div>
-            <div class="sched-shifts-col">${row.off?'<span class="sched-off-tag">إجازة أسبوعية</span>':
-              row.shifts.map((sh,si)=>`<div class="shift-pair" data-si="${si}">
-                ${mkTP(sh.start,`s-${idx}-${si}`)}
-                <span class="sched-sep">–</span>
-                ${mkTP(sh.end,`e-${idx}-${si}`)}
-                ${row.shifts.length>1?`<button type="button" class="icon-btn sdel" data-del="${si}">✕</button>`:""}</div>`).join("")
-              +(!row.off&&row.shifts.length<2?`<button type="button" class="btn btn-ghost btn-xs sadd">＋ شفت ثاني</button>`:"")
-              +(!row.off?`<button type="button" class="btn btn-ghost btn-xs sapply" style="color:var(--brand);font-weight:600">📋 تطبيق على الكل</button>`:"")}</div>
-            <button type="button" class="btn btn-ghost btn-xs stoggle">${row.off?"تفعيل":"يوم إجازة"}</button>
+            <div class="sched-day">
+              <div>
+                <div class="sched-day-name">${DAYS[row.day]}</div>
+                <div class="sched-day-badge">${row.off?"إجازة":"دوام"}</div>
+              </div>
+              <button type="button" class="sched-toggle${row.off?" is-off":""} stoggle">${row.off?"✓ تفعيل":"إجازة"}</button>
+            </div>
+            <div class="sched-body">${row.off?'<span class="sched-off-tag">إجازة أسبوعية</span>':`
+              <div class="sched-shifts-area">${row.shifts.map((sh,si)=>`
+                <div class="sched-shift-row" data-si="${si}">
+                  ${row.shifts.length>1?`<span class="sched-shift-num">${si+1}</span>`:""}
+                  ${mkTP(sh.start,`s-${idx}-${si}`)}
+                  <span class="sched-sep">→</span>
+                  ${mkTP(sh.end,`e-${idx}-${si}`)}
+                  ${row.shifts.length>1?`<button type="button" class="sched-act-btn sdel-btn" data-del="${si}">✕</button>`:""}
+                </div>`).join("")}
+              </div>
+              <div class="sched-actions">
+                ${row.shifts.length<2?`<button type="button" class="sched-act-btn sadd-btn sadd">＋ شفت ثاني</button>`:""}
+              </div>`}
+            </div>
           </div>`).join("");
         container.querySelectorAll("[data-srow]").forEach(rowEl=>{
           const idx=+rowEl.dataset.srow,row=ss[idx];
           rowEl.querySelector(".stoggle").onclick=()=>{row.off=!row.off;buildSchedUI(container,ss);};
-          rowEl.querySelectorAll(".sapply").forEach(ab=>ab.onclick=()=>_applyAllDays(container,ss));
           if(!row.off){
             const addBtn=rowEl.querySelector(".sadd");
             if(addBtn)addBtn.onclick=()=>{row.shifts.push({start:"08:00",end:"16:00"});buildSchedUI(container,ss);};
@@ -2325,6 +2454,8 @@ const App = (() => {
       }
       const _schedGrid = m.querySelector("#sched-grid");
       buildSchedUI(_schedGrid, schedState);
+      const _applyAllBtn = m.querySelector("#sched-apply-all-btn");
+      if(_applyAllBtn) _applyAllBtn.onclick=()=>_applyAllDays(_schedGrid, schedState);
       m.querySelector("#save-doc").onclick=async()=>{
         const f=new FormData(m.querySelector("#docf"));
         const payload=Object.fromEntries(f.entries());
@@ -2539,19 +2670,27 @@ const App = (() => {
     };
 
     const bindEvents=()=>{
-      document.querySelectorAll("[data-edit-doc]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
-        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)doctorForm(d);
-      }));
-      document.querySelectorAll("[data-arch]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
+      document.querySelectorAll("[data-edit-doc]").forEach(btn=>btn.onclick=()=>{
+        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id);
+      });
+      document.querySelectorAll("[data-arch]").forEach(btn=>btn.onclick=()=>{
+        const d=doctors.find(x=>String(x.id)===btn.dataset.arch);
+        const bid=d?d.branch_id:undefined;
         const u=+btn.dataset.unarch;
-        await api("/doctors/"+btn.dataset.arch+"/archive",{method:"POST",body:{unarchive:u}});
-        toast(u?"✅ تم استرجاع الممارس بنجاح":"✅ تمت أرشفة الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
-      }));
-      document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
-        if(!confirm("حذف الممارس نهائياً؟ لا يمكن التراجع."))return;
-        await api("/doctors/"+btn.dataset.del,{method:"DELETE"});
-        toast("✅ تم حذف الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
-      }));
+        requirePerm("doctor_delete",async()=>{
+          await api("/doctors/"+btn.dataset.arch+"/archive",{method:"POST",body:{unarchive:u}});
+          toast(u?"✅ تم استرجاع الممارس بنجاح":"✅ تمت أرشفة الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
+        },bid);
+      });
+      document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>{
+        const d=doctors.find(x=>String(x.id)===btn.dataset.del);
+        const bid=d?d.branch_id:undefined;
+        requirePerm("doctor_delete",async()=>{
+          if(!confirm("حذف الممارس نهائياً؟ لا يمكن التراجع."))return;
+          await api("/doctors/"+btn.dataset.del,{method:"DELETE"});
+          toast("✅ تم حذف الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
+        },bid);
+      });
     };
 
     const sortedByScore=(list,q)=>
@@ -2662,15 +2801,19 @@ const App = (() => {
             }
           </td></tr>`).join("")}
         </tbody></table>`;
-      el.querySelectorAll("[data-el]").forEach(btn=>btn.onclick=()=>requireEdit(()=>{
+      el.querySelectorAll("[data-el]").forEach(btn=>btn.onclick=()=>{
         const lv=JSON.parse(btn.dataset.el);
-        leaveEditForm(lv,()=>{drawLeavesPanel();});
-      }));
-      el.querySelectorAll("[data-dlo]").forEach(btn=>btn.onclick=()=>requireEdit(async()=>{
-        if(!confirm("حذف الإجازة؟"))return;
-        try{await api("/leaves/"+btn.dataset.dlo,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");drawLeavesPanel();}
-        catch(e){toast("❌ "+e.message,"err");}
-      }));
+        requirePerm("leave_manage",()=>leaveEditForm(lv,()=>{drawLeavesPanel();}),lv.branch_id);
+      });
+      el.querySelectorAll("[data-dlo]").forEach(btn=>btn.onclick=()=>{
+        const lid=btn.dataset.dlo;
+        const lv=list.find(l=>String(l.id)===lid);
+        requirePerm("leave_manage",async()=>{
+          if(!confirm("حذف الإجازة؟"))return;
+          try{await api("/leaves/"+lid,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");drawLeavesPanel();}
+          catch(e){toast("❌ "+e.message,"err");}
+        },lv?lv.branch_id:undefined);
+      });
     }
 
     $("#ctrl-body").innerHTML=`
@@ -2718,53 +2861,55 @@ const App = (() => {
       drawList();
     });
 
-    const alBtn=$("#add-lv-panel"); if(alBtn)alBtn.onclick=()=>requireEdit(()=>leaveForm(null,null,()=>drawLeavesPanel()));
+    const alBtn=$("#add-lv-panel"); if(alBtn)alBtn.onclick=()=>requirePerm("leave_manage",()=>leaveForm(null,null,()=>drawLeavesPanel()));
   }
 
   // ============================================================ MANAGE (doctors + specialties, edit code)
   let mgrTab="doctors";
   routes.control=()=>{
-    requireEdit(async()=>{
-      shell(`<div class="loader"><div class="spin"></div></div>`);
-      const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🗓️ الإجازات"],["specialties","🩺 الأقسام"]];
-      $("#content").innerHTML=`
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
-          <div>
-            <div class="page-title">إدارة الممارسين</div>
-            <div class="page-sub">الممارسون · الإجازات · الأقسام</div>
-          </div>
-          <button class="btn btn-ghost btn-sm" id="ctrl-exit">← العودة للممارسين</button>
+    const hasAny=can("doctor_add")||can("doctor_edit")||can("doctor_delete")||can("leave_manage")||can("specialty_manage")||can("audit_view");
+    if(!hasAny){ toast("🔒 لا تملك صلاحية لهذا القسم","warn"); go("doctors"); return; }
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🗓️ الإجازات"],["specialties","🩺 الأقسام"]];
+    if(can("audit_view")) tabs.push(["audit","📋 سجل العمليات"]);
+    $("#content").innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+        <div>
+          <div class="page-title">إدارة الممارسين</div>
+          <div class="page-sub">الممارسون · الإجازات · الأقسام · سجل العمليات</div>
         </div>
-        <div class="tabs" id="ctrl-tabs" style="margin-bottom:16px">${tabs.map(([k,l])=>`<button class="tab ${mgrTab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
-        <div id="ctrl-body"><div class="loader"><div class="spin"></div></div></div>`;
-      $("#ctrl-exit").onclick=()=>go("doctors");
-      $("#ctrl-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{mgrTab=b.dataset.tab;routes.control();});
-      if(mgrTab==="specialties") drawSpecialtiesPanel();
-      else if(mgrTab==="leaves") drawLeavesPanel();
-      else drawDoctorsMgmtPanel();
-    });
+        <button class="btn btn-ghost btn-sm" id="ctrl-exit">← العودة للممارسين</button>
+      </div>
+      <div class="tabs" id="ctrl-tabs" style="margin-bottom:16px">${tabs.map(([k,l])=>`<button class="tab ${mgrTab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
+      <div id="ctrl-body"><div class="loader"><div class="spin"></div></div></div>`;
+    $("#ctrl-exit").onclick=()=>go("doctors");
+    $("#ctrl-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{mgrTab=b.dataset.tab;routes.control();});
+    if(mgrTab==="audit") drawAuditPanel();
+    else if(mgrTab==="specialties") drawSpecialtiesPanel();
+    else if(mgrTab==="leaves") drawLeavesPanel();
+    else drawDoctorsMgmtPanel();
   };
 
-  // ============================================================ ADMIN (branches + security, admin code)
+  // ============================================================ ADMIN (branches + security + users, permission-gated)
   let adminTab="branches";
   routes.admin=()=>{
-    adminUnlockPrompt(async()=>{
-      shell(`<div class="loader"><div class="spin"></div></div>`);
-      const tabs=[["branches","🏥 الفروع"],["stats","📊 الإحصائيات"],["security","🔐 الأمان"],["data","💾 البيانات"]];
-      $("#content").innerHTML=`
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div class="page-title">⚙️ الإعدادات</div>
-          <button class="btn btn-ghost btn-sm" id="admin-exit">← خروج</button>
-        </div>
-        <div class="tabs" id="admin-tabs">${tabs.map(([k,l])=>`<button class="tab ${adminTab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
-        <div id="ctrl-body"><div class="loader"><div class="spin"></div></div></div>`;
-      $("#admin-exit").onclick=()=>go("dashboard");
-      $("#admin-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{adminTab=b.dataset.tab;routes.admin();});
-      if(adminTab==="security") drawSecurityPanel();
-      else if(adminTab==="data") drawDataPanel();
-      else if(adminTab==="stats") drawStatsPanel();
-      else drawBranchesPanel();
-    });
+    if(!can("settings_access")&&!can("users_manage")){ toast("🔒 لا تملك صلاحية لهذا القسم","warn"); go("dashboard"); return; }
+    shell(`<div class="loader"><div class="spin"></div></div>`);
+    const tabs=[["branches","🏥 الفروع"],["users","👥 المستخدمين"],["stats","📊 الإحصائيات"],["security","🔐 الأمان"],["data","💾 البيانات"]];
+    $("#content").innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div class="page-title">⚙️ الإعدادات</div>
+        <button class="btn btn-ghost btn-sm" id="admin-exit">← خروج</button>
+      </div>
+      <div class="tabs" id="admin-tabs">${tabs.map(([k,l])=>`<button class="tab ${adminTab===k?"on":""}" data-tab="${k}">${l}</button>`).join("")}</div>
+      <div id="ctrl-body"><div class="loader"><div class="spin"></div></div></div>`;
+    $("#admin-exit").onclick=()=>go("dashboard");
+    $("#admin-tabs").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{adminTab=b.dataset.tab;routes.admin();});
+    if(adminTab==="users") drawUsersPanel();
+    else if(adminTab==="security") drawSecurityPanel();
+    else if(adminTab==="data") drawDataPanel();
+    else if(adminTab==="stats") drawStatsPanel();
+    else drawBranchesPanel();
   };
 
   async function drawStatsPanel(){
@@ -3027,9 +3172,9 @@ const App = (() => {
         <td>${b.doctor_count}</td>
         <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-eb='${esc(JSON.stringify(b))}'>تعديل</button>
         <button class="btn btn-ghost btn-sm" data-db="${b.id}">حذف</button></td></tr>`).join("")}</tbody></table>`;
-    $("#add-branch").onclick=()=>requireEdit(()=>branchForm(null));
-    $("#ctrl-body").querySelectorAll("[data-eb]").forEach(b=>b.onclick=()=>requireEdit(()=>branchForm(JSON.parse(b.dataset.eb))));
-    $("#ctrl-body").querySelectorAll("[data-db]").forEach(b=>b.onclick=()=>requireEdit(async()=>{
+    $("#add-branch").onclick=()=>requirePerm("branch_manage",()=>branchForm(null));
+    $("#ctrl-body").querySelectorAll("[data-eb]").forEach(b=>b.onclick=()=>requirePerm("branch_manage",()=>branchForm(JSON.parse(b.dataset.eb))));
+    $("#ctrl-body").querySelectorAll("[data-db]").forEach(b=>b.onclick=()=>requirePerm("branch_manage",async()=>{
       if(!confirm("حذف الفرع؟"))return;
       try{await api("/branches/"+b.dataset.db,{method:"DELETE"});toast("✅ تم حذف الفرع بنجاح","ok");drawBranchesPanel();}
       catch(e){toast("❌ "+e.message,"err");}}));
@@ -3064,27 +3209,225 @@ const App = (() => {
         };}});
   }
 
-  // ---- Security (codes) ----
+  // ---- Users management ----
+  async function drawUsersPanel(){
+    if(!can("users_manage")){ $("#ctrl-body").innerHTML=`<div class="empty-msg">🔒 لا تملك صلاحية لإدارة المستخدمين</div>`; return; }
+    const [{users},{branches:brList}]=await Promise.all([api("/users"),api("/branches")]);
+    const brMap={}; brList.forEach(b=>brMap[b.id]=b.name);
+    const permLabel=k=>(PERMS_META.find(p=>p.key===k)||{}).label||k;
+    const brLabel=(u)=>{
+      const b=u.branches||["*"];
+      if(b.includes("*")) return '<span class="perm-chip perm-all">جميع الفروع</span>';
+      return b.map(id=>`<span class="perm-chip branch-chip">${esc(brMap[id]||brMap[+id]||id)}</span>`).join("")||'<span class="perm-chip perm-none">بدون فروع</span>';
+    };
+
+    $("#ctrl-body").innerHTML=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-weight:700;font-size:14px">المستخدمين (${users.length})</div>
+        <button class="btn btn-primary btn-sm" id="add-user">＋ إضافة مستخدم</button>
+      </div>
+      <div class="user-grid">
+        ${users.map(u=>`
+          <div class="user-card ${!u.active?'user-inactive':''}">
+            <div class="user-card-head">
+              <div class="user-card-avatar">${esc(u.name.charAt(0))}</div>
+              <div class="user-card-info">
+                <div class="user-card-name">${esc(u.name)}${u.role==="super_admin"?'<span class="user-badge-super">مدير رئيسي</span>':""}</div>
+                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'} · رمز: ${u.pin}</div>
+              </div>
+            </div>
+            <div class="user-card-perms">
+              ${u.permissions.includes("*")?'<span class="perm-chip perm-all">جميع الصلاحيات</span>'
+                :u.permissions.map(p=>`<span class="perm-chip">${esc(permLabel(p))}</span>`).join("")||'<span class="perm-chip perm-none">بدون صلاحيات</span>'}
+            </div>
+            <div class="user-card-branches">${brLabel(u)}</div>
+            ${u.role!=="super_admin"?`<div class="user-card-actions">
+              <button class="btn btn-ghost btn-xs" data-edit-user='${JSON.stringify({id:u.id,name:u.name,permissions:u.permissions,branches:u.branches||["*"],active:u.active})}'>✎ تعديل</button>
+              <button class="btn btn-ghost btn-xs" data-pin-user="${u.id}" data-uname="${esc(u.name)}">🔑 تغيير الرمز</button>
+              <button class="btn btn-ghost btn-xs" data-toggle-user="${u.id}" data-active="${u.active?1:0}" data-uname="${esc(u.name)}">${u.active?"⏸ إيقاف":"▶ تفعيل"}</button>
+              <button class="btn btn-danger btn-xs" data-del-user="${u.id}" data-uname="${esc(u.name)}">✕ حذف</button>
+            </div>`:""}
+          </div>`).join("")}
+      </div>`;
+
+    $("#add-user").onclick=()=>userForm(null);
+
+    document.querySelectorAll("[data-edit-user]").forEach(btn=>btn.onclick=()=>{
+      userForm(JSON.parse(btn.dataset.editUser));
+    });
+
+    document.querySelectorAll("[data-pin-user]").forEach(btn=>btn.onclick=()=>{
+      const uid=btn.dataset.pinUser, uname=btn.dataset.uname;
+      openModal({title:"🔑 تغيير رمز الدخول — "+uname,
+        bodyHTML:`<div class="field"><label>الرمز الجديد</label><input id="new-pin" class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • •"></div>`,
+        footHTML:`<button class="btn btn-primary" id="do-pin">حفظ</button><button class="btn btn-ghost" data-xp>إلغاء</button>`,
+        onMount:(m)=>{
+          m.querySelector("[data-xp]").onclick=closeModal;
+          m.querySelector("#do-pin").onclick=async()=>{
+            const pin=m.querySelector("#new-pin").value.trim();
+            if(!pin){toast("أدخل الرمز الجديد","warn");return;}
+            try{await api("/users/"+uid,{method:"PUT",body:{pin}});toast("✅ تم تغيير الرمز","ok");closeModal();drawUsersPanel();}
+            catch(e){toast("❌ "+e.message,"err");}
+          };
+        }});
+    });
+
+    document.querySelectorAll("[data-toggle-user]").forEach(btn=>btn.onclick=async()=>{
+      const uid=btn.dataset.toggleUser, active=btn.dataset.active==="1", uname=btn.dataset.uname;
+      if(!confirm(active?`إيقاف حساب "${uname}"؟`:`تفعيل حساب "${uname}"؟`))return;
+      try{await api("/users/"+uid,{method:"PUT",body:{active:!active}});toast("✅ تم التحديث","ok");drawUsersPanel();}
+      catch(e){toast("❌ "+e.message,"err");}
+    });
+
+    document.querySelectorAll("[data-del-user]").forEach(btn=>btn.onclick=async()=>{
+      const uid=btn.dataset.delUser, uname=btn.dataset.uname;
+      if(!confirm(`حذف المستخدم "${uname}" نهائياً؟`))return;
+      try{await api("/users/"+uid,{method:"DELETE"});toast("✅ تم حذف المستخدم","ok");drawUsersPanel();}
+      catch(e){toast("❌ "+e.message,"err");}
+    });
+  }
+
+  async function userForm(existing){
+    const isEdit=!!existing;
+    const {branches:brList}=await api("/branches");
+    const existBranches=existing&&existing.branches?existing.branches:["*"];
+    const isAllBranches=existBranches.includes("*");
+    const permsHTML=PERMS_META.map(p=>`
+      <label class="perm-check"><input type="checkbox" name="perm" value="${p.key}" ${existing&&existing.permissions.includes(p.key)?"checked":""}> ${p.label}</label>
+    `).join("");
+    const branchesHTML=brList.map(b=>`
+      <label class="perm-check"><input type="checkbox" name="ubranch" value="${b.id}" ${isAllBranches||existBranches.includes(b.id)||existBranches.includes(String(b.id))?"checked":""}> ${esc(b.name)}</label>
+    `).join("");
+
+    const body=`<form id="userf">
+      <div class="field"><label>اسم المستخدم</label><input name="name" value="${isEdit?esc(existing.name):""}" required></div>
+      ${!isEdit?'<div class="field"><label>رمز الدخول (PIN)</label><input name="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="رمز فريد" required></div>':""}
+      <div class="field"><label>الصلاحيات</label>
+        <div class="perms-grid">${permsHTML}</div>
+        <div style="margin-top:6px"><label class="perm-check perm-select-all"><input type="checkbox" id="perm-all"> تحديد الكل</label></div>
+      </div>
+      <div class="field"><label>🏥 الفروع المسموح بالتعديل عليها</label>
+        <div style="margin-bottom:6px"><label class="perm-check perm-select-all"><input type="checkbox" id="branch-all" ${isAllBranches?"checked":""}> جميع الفروع</label></div>
+        <div class="perms-grid" id="branch-boxes">${branchesHTML}</div>
+      </div>
+    </form>`;
+
+    openModal({title:isEdit?"تعديل مستخدم — "+existing.name:"إضافة مستخدم جديد",bodyHTML:body,
+      footHTML:`<button class="btn btn-primary" id="save-user">حفظ</button><button class="btn btn-ghost" data-xu>إلغاء</button>`,
+      onMount:(m)=>{
+        m.querySelector("[data-xu]").onclick=closeModal;
+        const allCb=m.querySelector("#perm-all");
+        const boxes=m.querySelectorAll('input[name="perm"]');
+        allCb.onchange=()=>boxes.forEach(b=>b.checked=allCb.checked);
+
+        const brAllCb=m.querySelector("#branch-all");
+        const brBoxes=m.querySelectorAll('input[name="ubranch"]');
+        const brDiv=m.querySelector("#branch-boxes");
+        const syncBrVis=()=>{brDiv.style.opacity=brAllCb.checked?"0.4":"1";brBoxes.forEach(b=>b.disabled=brAllCb.checked);};
+        brAllCb.onchange=()=>{brBoxes.forEach(b=>b.checked=brAllCb.checked);syncBrVis();};
+        syncBrVis();
+
+        m.querySelector("#save-user").onclick=async()=>{
+          const fd=new FormData(m.querySelector("#userf"));
+          const name=fd.get("name")||"";
+          const pin=fd.get("pin")||"";
+          const permissions=[...m.querySelectorAll('input[name="perm"]:checked')].map(c=>c.value);
+          const branches=brAllCb.checked?["*"]:[...m.querySelectorAll('input[name="ubranch"]:checked')].map(c=>+c.value);
+          if(!name.trim()){toast("أدخل اسم المستخدم","warn");return;}
+          if(!isEdit&&!pin.trim()){toast("أدخل رمز الدخول","warn");return;}
+
+          try{
+            if(isEdit){
+              await api("/users/"+existing.id,{method:"PUT",body:{name:name.trim(),permissions,branches}});
+            } else {
+              await api("/users",{method:"POST",body:{name:name.trim(),pin:pin.trim(),permissions,branches}});
+            }
+            toast("✅ تم الحفظ","ok"); closeModal(); drawUsersPanel();
+          }catch(e){toast("❌ "+e.message,"err");}
+        };
+      }});
+  }
+
+  // ---- Audit Log ----
+  async function drawAuditPanel(){
+    if(!can("audit_view")){ $("#ctrl-body").innerHTML=`<div class="empty-msg">🔒 لا تملك صلاحية لعرض سجل العمليات</div>`; return; }
+    const {audit}=await api("/audit");
+    const {branches}=await api("/branches");
+    const brMap={}; branches.forEach(b=>brMap[b.id]=b.name);
+    const users=[...new Set(audit.map(a=>a.user))].sort();
+    const actions=[...new Set(audit.map(a=>a.action))].sort();
+    const auditBranches=[...new Set(audit.filter(a=>a.branch).map(a=>a.branch))].sort();
+    let fUser="",fAction="",fBranch="",fSearch="",fFrom="",fTo="";
+
+    function drawList(){
+      let list=[...audit];
+      if(fUser) list=list.filter(a=>a.user===fUser);
+      if(fAction) list=list.filter(a=>a.action===fAction);
+      if(fBranch) list=list.filter(a=>a.branch===fBranch);
+      if(fFrom) list=list.filter(a=>a.ts.slice(0,10)>=fFrom);
+      if(fTo) list=list.filter(a=>a.ts.slice(0,10)<=fTo);
+      if(fSearch){const q=fSearch.toLowerCase();list=list.filter(a=>(a.detail||"").toLowerCase().includes(q)||(a.user||"").toLowerCase().includes(q)||(a.action||"").toLowerCase().includes(q)||(a.branch||"").toLowerCase().includes(q));}
+      const el=$("#audit-list"); if(!el)return;
+      if(!list.length){el.innerHTML=`<div class="empty" style="padding:16px">لا نتائج</div>`;return;}
+      el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} عملية</div>
+        <div class="audit-cards">${list.map(a=>{
+          const dt=a.ts?a.ts.replace("T"," "):"";
+          return `<div class="audit-row">
+            <div class="audit-row-head">
+              <span class="audit-user">${esc(a.user||"—")}</span>
+              <span class="audit-action">${esc(a.action||"—")}</span>
+              ${a.branch?`<span class="audit-branch">🏥 ${esc(a.branch)}</span>`:""}
+            </div>
+            <div class="audit-row-detail">${esc(a.detail||"—")}</div>
+            <div class="audit-row-time">${esc(dt)}</div>
+          </div>`;
+        }).join("")}</div>`;
+    }
+
+    $("#ctrl-body").innerHTML=`
+      <div style="margin-bottom:12px">
+        <div class="audit-filters">
+          <input type="text" id="af-search" placeholder="بحث..." class="input" style="flex:2;min-width:140px" value="">
+          <select id="af-user" class="input"><option value="">كل المستخدمين</option>${users.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join("")}</select>
+          <select id="af-action" class="input"><option value="">كل العمليات</option>${actions.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join("")}</select>
+          <select id="af-branch" class="input"><option value="">كل الفروع</option>${auditBranches.map(b=>`<option value="${esc(b)}">${esc(b)}</option>`).join("")}</select>
+        </div>
+        <div class="audit-filters" style="margin-top:6px">
+          <label style="font-size:12px;color:var(--muted)">من</label>
+          <input type="date" id="af-from" class="input" value="">
+          <label style="font-size:12px;color:var(--muted)">إلى</label>
+          <input type="date" id="af-to" class="input" value="">
+        </div>
+      </div>
+      <div id="audit-list"><div class="loader"><div class="spin"></div></div></div>`;
+
+    const bind=(id,fn)=>{const el=$("#"+id);if(el)el.oninput=el.onchange=fn;};
+    bind("af-search",()=>{fSearch=$("#af-search").value;drawList();});
+    bind("af-user",()=>{fUser=$("#af-user").value;drawList();});
+    bind("af-action",()=>{fAction=$("#af-action").value;drawList();});
+    bind("af-branch",()=>{fBranch=$("#af-branch").value;drawList();});
+    bind("af-from",()=>{fFrom=$("#af-from").value;drawList();});
+    bind("af-to",()=>{fTo=$("#af-to").value;drawList();});
+    drawList();
+  }
+
+  // ---- Security (access code only) ----
   async function drawSecurityPanel(){
+    if(!can("settings_access")){ $("#ctrl-body").innerHTML=`<div class="empty-msg">🔒 لا تملك صلاحية لهذا القسم</div>`; return; }
     const s=await api("/settings");
     $("#ctrl-body").innerHTML=`
       <div class="cal" style="max-width:520px;margin-top:6px">
         <form id="secf">
-          <div class="field"><label>رمز الدخول (للعرض)</label>
+          <div class="field"><label>رمز العرض (للقراءة فقط)</label>
             <input name="access_code" type="password" inputmode="numeric" value="${esc(s.access_code)}" required>
-            <div class="page-sub" style="font-size:11px;margin-top:4px">يُدخله الموظف لفتح النظام والاطلاع فقط.</div></div>
-          <div class="field"><label>رمز التعديل</label>
-            <input name="edit_code" type="password" inputmode="numeric" value="${esc(s.edit_code)}" required>
-            <div class="page-sub" style="font-size:11px;margin-top:4px">يفتح وضع إضافة/تعديل الممارسين والأقسام.</div></div>
-          <div class="field"><label>رمز الإدارة</label>
-            <input name="admin_code" type="password" inputmode="numeric" value="${esc(s.admin_code)}" required>
-            <div class="page-sub" style="font-size:11px;margin-top:4px">مطلوب للوصول لتبويبَي الفروع والأمان. اجعله مختلفاً وأكثر سرية.</div></div>
-          <button class="btn btn-primary btn-block" id="save-sec" type="button">حفظ الرموز</button>
+            <div class="page-sub" style="font-size:11px;margin-top:4px">يُدخله أي شخص لفتح النظام بوضع القراءة فقط بدون هوية مستخدم.</div></div>
+          <button class="btn btn-primary btn-block" id="save-sec" type="button">حفظ</button>
         </form>
+        <div class="page-sub" style="margin-top:16px;font-size:12px">لإدارة رموز المستخدمين وصلاحياتهم، انتقل إلى تبويب <b>المستخدمين</b>.</div>
       </div>`;
     $("#save-sec").onclick=async()=>{
       const p=Object.fromEntries(new FormData($("#secf")).entries());
-      try{ await api("/settings",{method:"PUT",body:p}); toast("✅ تم حفظ الإعدادات بنجاح","ok"); }
+      try{ await api("/settings",{method:"PUT",body:p}); toast("✅ تم حفظ رمز العرض","ok"); }
       catch(e){toast("❌ "+e.message,"err");}
     };
   }
