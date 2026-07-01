@@ -791,6 +791,7 @@ body.modal-open{overflow:hidden}
   <div id="toast-root"></div>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="data.js"></script>
   <script>
 /* ============ Adelcare API — Firebase Firestore ============ */
@@ -837,6 +838,7 @@ const LocalDB = (() => {
 
   async function _doInit() {
     firebase.initializeApp(_FB_CFG);
+    await firebase.auth().signInAnonymously();
     _fsDB    = firebase.firestore();
     _docRef  = _fsDB.collection('adelcare').doc('main');
     _auditRef= _fsDB.collection('adelcare').doc('audit');
@@ -1079,7 +1081,10 @@ const LocalDB = (() => {
           if(newPin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
           u.pin=newPin;
         }
-        if(body.permissions!==undefined&&u.role!=="super_admin") u.permissions=body.permissions;
+        if(body.permissions!==undefined&&u.role!=="super_admin"){
+          // Prevent privilege escalation: only super_admin can grant wildcard permissions
+          u.permissions=_hasPerm(sess,"*")?body.permissions:body.permissions.filter(p=>p!=="*");
+        }
         if(body.branches!==undefined&&u.role!=="super_admin") u.branches=body.branches;
         if(body.specialties!==undefined&&u.role!=="super_admin") u.specialties=body.specialties;
         if(body.active!==undefined&&u.role!=="super_admin") u.active=!!body.active;
@@ -1538,7 +1543,7 @@ const LocalDB = (() => {
     save(db);
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db") return exportDB(); if(m==="POST"&&p==="/import-db"){importDB(b);return{ok:true};} return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } }, getSEED:()=>SEED };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_hasPerm(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_hasPerm(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } }, getSEED:()=>SEED };
 })();
 
   </script>
@@ -1643,7 +1648,7 @@ const App = (() => {
 
   const $ = (s, r=document) => r.querySelector(s);
   const el = (h) => { const d=document.createElement("div"); d.innerHTML=h.trim(); return d.firstElementChild; };
-  const esc = (s) => (s==null?"":String(s)).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const esc = (s) => (s==null?"":String(s)).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
   // ---------- API ----------
   async function api(path, opts={}) {
@@ -3276,6 +3281,10 @@ const App = (() => {
       return sp.map(s=>`<span class="perm-chip spec-chip">${esc(s)}</span>`).join("")||'<span class="perm-chip perm-none">بدون أقسام</span>';
     };
 
+    // Store PINs in a JS closure map — never expose them as DOM attributes
+    const _pinMap={};
+    users.forEach(u=>{_pinMap[u.id]=u.pin;});
+
     $("#ctrl-body").innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div style="font-weight:700;font-size:14px">المستخدمين (${users.length})</div>
@@ -3288,7 +3297,7 @@ const App = (() => {
               <div class="user-card-avatar">${esc(u.name.charAt(0))}</div>
               <div class="user-card-info">
                 <div class="user-card-name">${esc(u.name)}${u.role==="super_admin"?'<span class="user-badge-super">مدير رئيسي</span>':""}</div>
-                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'} · رمز: <span class="pin-masked" data-pin="${esc(u.pin)}">••••</span><button class="btn-pin-eye" data-toggle-pin title="إظهار/إخفاء الرمز">👁</button><button class="btn-pin-copy" data-copy-pin="${esc(u.pin)}" title="نسخ الرمز">📋</button></div>
+                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'} · رمز: <span class="pin-masked" data-pinid="${esc(u.id)}">••••</span><button class="btn-pin-eye" data-toggle-pin title="إظهار/إخفاء الرمز">👁</button><button class="btn-pin-copy" data-pinid="${esc(u.id)}" title="نسخ الرمز">📋</button></div>
               </div>
             </div>
             <div class="user-card-perms">
@@ -3298,7 +3307,7 @@ const App = (() => {
             <div class="user-card-branches">${brLabel(u)}</div>
             <div class="user-card-branches">${spLabel(u)}</div>
             ${u.role!=="super_admin"?`<div class="user-card-actions">
-              <button class="btn btn-ghost btn-xs" data-edit-user='${JSON.stringify({id:u.id,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"],active:u.active})}'>✎ تعديل</button>
+              <button class="btn btn-ghost btn-xs" data-edit-user="${esc(JSON.stringify({id:u.id,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"],active:u.active}))}">✎ تعديل</button>
               <button class="btn btn-ghost btn-xs" data-pin-user="${u.id}" data-uname="${esc(u.name)}">🔑 تغيير الرمز</button>
               <button class="btn btn-ghost btn-xs" data-toggle-user="${u.id}" data-active="${u.active?1:0}" data-uname="${esc(u.name)}">${u.active?"⏸ إيقاف":"▶ تفعيل"}</button>
               <button class="btn btn-danger btn-xs" data-del-user="${u.id}" data-uname="${esc(u.name)}">✕ حذف</button>
@@ -3312,13 +3321,14 @@ const App = (() => {
       btn.onclick=()=>{
         const span=btn.previousElementSibling;
         if(!span) return;
-        const real=span.dataset.pin;
+        const real=_pinMap[span.dataset.pinid]||"";
         span.textContent=span.textContent==="••••"?real:"••••";
       };
     });
     document.querySelectorAll("[data-copy-pin]").forEach(btn=>{
       btn.onclick=async()=>{
-        try{await navigator.clipboard.writeText(btn.dataset.copyPin);toast("✅ تم نسخ الرمز","ok");}
+        const pin=_pinMap[btn.dataset.pinid]||"";
+        try{await navigator.clipboard.writeText(pin);toast("✅ تم نسخ الرمز","ok");}
         catch(e){toast("❌ فشل النسخ","err");}
       };
     });
