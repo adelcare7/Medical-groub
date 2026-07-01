@@ -260,7 +260,7 @@ a{color:inherit;text-decoration:none}
 }
 
 /* ---------- Mini stat cards ---------- */
-.mini-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}
+.mini-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:6px}
 .mini-stat{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
   border-radius:12px;padding:10px 13px;box-shadow:var(--shadow);border-inline-start:4px solid var(--line)}
 .mini-stat .ms-ico{font-size:20px;line-height:1;flex-shrink:0}
@@ -346,6 +346,10 @@ a{color:inherit;text-decoration:none}
 .btn-xs{padding:4px 10px;font-size:12px;border-radius:7px}
 .mini-stat.s-leave{border-inline-start-color:var(--leave)} .mini-stat.s-leave .ms-v{color:var(--leave)}
 .mini-stat.s-leave.active{background:var(--leave-soft)}
+.mini-stat.s-purple{border-inline-start-color:#7c3aed} .mini-stat.s-purple .ms-v{color:#7c3aed}
+.mini-stat.s-purple.active{background:#f3e8ff}
+[data-theme="dark"] .mini-stat.s-purple .ms-v{color:#a78bfa}
+[data-theme="dark"] .mini-stat.s-purple.active{background:#2e1065}
 .avatar{width:44px;height:44px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;
   font-weight:700;font-size:16px;color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-d));
   object-fit:cover;overflow:hidden}
@@ -618,6 +622,7 @@ body.modal-open{overflow:hidden}
 /* mobile bottom nav */
 .mobile-nav{display:none}
 .hamburger{display:none}
+.topbar-logout{display:none}
 
 /* ============ MOBILE LAYOUT (≤860px) ============ */
 @media(max-width:860px){
@@ -640,8 +645,8 @@ body.modal-open{overflow:hidden}
   /* Larger touch targets */
   .icon-btn{width:44px;height:44px}
 
-  /* -- Bottom navigation (4 tabs) -- */
-  .mobile-nav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;bottom:0;inset-inline:0;
+  /* -- Bottom navigation -- */
+  .mobile-nav{display:grid;grid-template-columns:repeat(2,1fr);position:fixed;bottom:0;inset-inline:0;
     background:var(--surface);border-top:1px solid var(--line);z-index:45;
     padding:4px 2px calc(4px + env(safe-area-inset-bottom))}
   .mobile-nav a{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 4px;
@@ -649,8 +654,8 @@ body.modal-open{overflow:hidden}
   .mobile-nav a.active{color:var(--brand-d);background:var(--brand-soft)}
   [data-theme="dark"] .mobile-nav a.active{color:var(--brand)}
   .mobile-nav a .ico{font-size:20px;line-height:1.2}
-  .mnav-logout{color:var(--red)!important}
-  .mnav-logout:active{background:var(--red-soft)!important}
+  /* -- Topbar logout (mobile only) -- */
+  .topbar-logout{display:grid}
 
   /* -- Stats cards -- */
   .stats{grid-template-columns:repeat(2,1fr);gap:10px}
@@ -711,8 +716,11 @@ body.modal-open{overflow:hidden}
   /* -- Spec add input mobile -- */
   .spec-add-row input{font-size:16px}
 
-  /* -- Time picker mobile -- */
-  .tp-s{font-size:16px}
+  /* -- Time picker mobile: boxed segments, touch-friendly -- */
+  .tp{gap:3px}
+  .tp-s{font-size:16px;min-height:38px;padding:0 4px;border-radius:8px;
+    background:var(--surface);border:1px solid var(--line)}
+  .tp-div{font-size:15px}
 
   /* -- Leave rows mobile -- */
   .leave-active-row,.leave-upcoming-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
@@ -721,10 +729,20 @@ body.modal-open{overflow:hidden}
   /* -- Page title mobile -- */
   .page-title{font-size:19px}
 
-  /* -- Schedule editor mobile -- */
-  .sched-day-lbl{width:48px;font-size:12px}
-  .sched-btns{gap:4px}
-  .sbtn{padding:3px 8px;font-size:11px}
+  /* -- Schedule editor mobile: day+buttons on top, shifts full-width below -- */
+  .sched-day-block{padding:6px 0}
+  .sched-row{flex-wrap:wrap;row-gap:8px;padding:4px 0;min-height:0}
+  .sched-day-lbl{width:auto;min-width:52px;font-size:13.5px}
+  .sched-btns{margin-inline-start:auto;gap:6px}
+  .sched-mid{order:3;flex-basis:100%;gap:8px}
+  .sbtn{padding:8px 12px;font-size:12.5px;min-height:38px;border-radius:8px}
+  .sbtn-del{min-width:38px;padding:8px;font-size:13px}
+  .sched-shift-line{background:var(--bg);border:1px solid var(--line);border-radius:10px;
+    padding:6px 10px;gap:8px;justify-content:center}
+  .sched-sep{font-size:15px}
+  .sched-off-tag{font-size:12.5px;padding:2px 0}
+  .sched-apply-row{padding:2px 0 4px}
+  .sapply{padding:8px 12px;font-size:12px;min-height:36px;border-radius:8px}
 
   /* -- Calendar mobile -- */
   .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
@@ -1024,7 +1042,7 @@ const LocalDB = (() => {
     }
     if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]}); return {ok:true}; }
     if (method==="GET"  && path==="/me") {
-      if (sess.auth && (!sess.permissions || !sess.branches)) {
+      if (sess.auth && (!sess.permissions || !sess.branches || !sess.specialties)) {
         setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]});
         return {user:null};
       }
@@ -1966,15 +1984,16 @@ const App = (() => {
           ${buildTopbarDate()}
           ${showSettings?`<button class="icon-btn${state.route==="admin"?" active-ctrl":""}" id="ctrl-btn" title="الإعدادات">⚙️</button>`:""}
           <button class="icon-btn" id="theme-btn"><span id="theme-ico">${document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"}</span></button>
+          <button class="icon-btn topbar-logout" id="top-logout" title="تسجيل الخروج">🚪</button>
         </div>
         <div class="content" id="content">${contentHTML}</div>
       </div>
-      <nav class="mobile-nav">${mnav}<a data-logout class="mnav-logout"><span class="ico">🚪</span>خروج</a></nav>
+      <nav class="mobile-nav">${mnav}</nav>
     </div>`;
     $("#app").querySelectorAll("[data-nav]").forEach(a=>a.onclick=()=>go(a.dataset.nav));
     const doLogout=async()=>{await api("/logout",{method:"POST"});state.user=null;render();};
     $("#logout").onclick=doLogout;
-    const mLogout=$("#app").querySelector("[data-logout]"); if(mLogout)mLogout.onclick=doLogout;
+    const tLogout=$("#top-logout"); if(tLogout)tLogout.onclick=doLogout;
     const ctrlBtn=$("#ctrl-btn"); if(ctrlBtn) ctrlBtn.onclick=()=>go("admin");
     $("#theme-btn").onclick=toggleTheme;
 
@@ -2126,17 +2145,19 @@ const App = (() => {
       // stat cards only for today view
       let statCardsHTML="";
       if(isToday){
-        let present=0,leave=0,morning=0,evening=0;
+        let present=0,leave=0,morning=0,evening=0,inVisit=0;
         branchDocs.forEach(d=>{const s=d.live.state;
+          if(s==="in_visit")inVisit++;
           if(s==="present")present++;
           if(s==="leave"){leave++;return;}
           const fs=firstStart(d); if(fs!=null){if(fs<14*60)morning++;else evening++;}});
-        const statLabels={present:"المتواجدون الآن",morning:"الشفت الصباحي",evening:"الشفت المسائي",leave:"الممارسون في إجازة"};
+        const statLabels={present:"المتواجدون الآن",morning:"الشفت الصباحي",evening:"الشفت المسائي",leave:"الممارسون في إجازة",in_visit:"في زيارة الآن"};
         statCardsHTML=`<div class="mini-stats">${[
           {k:"present",v:present,l:"متواجد الآن",c:"green",b:"🟢"},
           {k:"morning",v:morning,l:"الشفت الصباحي",c:"amber",b:"🌅"},
           {k:"evening",v:evening,l:"الشفت المسائي",c:"brand",b:"🌙"},
           {k:"leave",v:leave,l:"في إجازة",c:"leave",b:"🔴"},
+          {k:"in_visit",v:inVisit,l:"في زيارة الآن",c:"purple",b:"🏠"},
         ].map(x=>`<button class="mini-stat s-${x.c} ${dashStat===x.k?"active":""}" data-stat="${x.k}">
           <span class="ms-ico">${x.b}</span><div><div class="ms-v">${x.v}</div><div class="ms-l">${x.l}</div></div></button>`).join("")}</div>
           ${dashStat?`<button class="chip-clear" id="clear-stat">✕ ${statLabels[dashStat]} (إلغاء)</button>`:""}`;
@@ -2147,6 +2168,7 @@ const App = (() => {
         if(!isToday||!dashStat) return true;
         if(dashStat==="present") return d.live.state==="present";
         if(dashStat==="leave")   return d.live.state==="leave";
+        if(dashStat==="in_visit")return d.live.state==="in_visit";
         const fs=firstStart(d);
         if(dashStat==="morning") return fs!=null&&fs<14*60;
         if(dashStat==="evening") return fs!=null&&fs>=14*60;
