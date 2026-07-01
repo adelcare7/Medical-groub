@@ -110,6 +110,9 @@ a{color:inherit;text-decoration:none}
 .perm-chip.perm-all{background:var(--amber-soft);color:var(--amber)}
 .perm-chip.perm-none{background:var(--bg2);color:var(--muted)}
 .user-card-actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn-pin-eye,.btn-pin-copy{background:none;border:none;cursor:pointer;font-size:13px;padding:1px 3px;opacity:.6;vertical-align:middle}
+.btn-pin-eye:hover,.btn-pin-copy:hover{opacity:1}
+.pin-masked{font-family:monospace;letter-spacing:1px;vertical-align:middle}
 .perms-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
 .perm-check{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:4px 0}
 .perm-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--brand)}
@@ -374,6 +377,13 @@ a{color:inherit;text-decoration:none}
 .sp-finished{background:var(--red-soft);color:var(--red)}
 .sp-leave{background:var(--leave-soft);color:var(--leave);font-weight:700}
 .sp-off{background:var(--black-soft);color:var(--black)}
+.sp-in-visit{background:#f3e8ff;color:#7c3aed;font-weight:700}
+[data-theme="dark"] .sp-in-visit{background:#2e1065;color:#a78bfa}
+.st-in-visit{border-inline-start-color:#7c3aed}
+.btn-visit-on{background:#f3e8ff;color:#7c3aed;border:1px solid #7c3aed}
+.btn-visit-on:hover{background:#7c3aed;color:#fff}
+[data-theme="dark"] .btn-visit-on{background:#2e1065;color:#a78bfa;border-color:#a78bfa}
+[data-theme="dark"] .btn-visit-on:hover{background:#7c3aed;color:#fff}
 .hv-tag{font-size:10.5px;background:var(--amber-soft);color:var(--amber);padding:1px 7px;border-radius:6px;font-weight:600}
 
 /* ---- Specialties grid (management panel) ---- */
@@ -568,39 +578,37 @@ body.modal-open{overflow:hidden}
 @keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(12px)}}
 .active-ctrl{background:var(--brand-soft,rgba(0,180,150,.12));color:var(--brand)!important}
 .tp{display:inline-flex;align-items:center;gap:0;direction:ltr}
-.tp-seg{display:flex;flex-direction:column;align-items:center}
+.tp-seg{display:flex;align-items:center}
 .tp-seg-lbl{display:none}
-.tp-s{background:transparent;border:none;outline:none;font-size:14px;color:var(--text);padding:0;cursor:pointer;text-align:center;font-weight:600;-webkit-appearance:none}
+.tp-s{background:transparent;border:none;outline:none;font-size:14px;color:var(--text);padding:0 1px;cursor:pointer;text-align:center;font-weight:600}
 .tp-div{font-size:14px;font-weight:700;color:var(--muted)}
-.shift-pair{display:flex;align-items:center;gap:5px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 
 /* ---------- Schedule editor (doctor form) ---------- */
-.sched-header{display:none}
-.sched-grid{display:flex;flex-direction:column;gap:0;margin-top:4px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.sched-row{display:flex;align-items:center;gap:0;background:var(--card);border-bottom:1px solid var(--line);min-height:40px}
-.sched-row:last-child{border-bottom:none}
+.sched-grid{display:flex;flex-direction:column;gap:0;margin-top:6px}
+.sched-day-block{border-bottom:1px solid var(--line);padding-bottom:4px;margin-bottom:2px}
+.sched-day-block:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.sched-row{display:flex;align-items:center;gap:6px;padding:6px 0;min-height:38px}
 .sched-row-off{opacity:.5}
-.sched-day-lbl{width:60px;font-size:13px;font-weight:700;color:var(--text);text-align:center;flex-shrink:0;padding:0 4px}
-.sched-mid{flex:1;display:flex;flex-direction:column;gap:2px;padding:6px 4px;min-width:0}
+.sched-day-lbl{width:56px;font-size:13px;font-weight:700;color:var(--text);text-align:right;flex-shrink:0}
+.sched-mid{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .sched-shift-line{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
-.sched-sep{color:var(--muted);font-size:13px;flex-shrink:0;font-weight:400;margin:0 2px}
+.sched-sep{color:var(--muted);font-size:13px;flex-shrink:0;font-weight:400;margin:0 1px}
 .sched-off-tag{font-size:12px;color:var(--muted);font-style:italic}
-.sched-btns{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:0 6px}
-.sched-row-apply{display:flex;justify-content:flex-end;padding:2px 6px 4px}
-.sched-row-apply .sapply{font-size:11px;font-weight:600;color:var(--brand-d);background:var(--brand-soft);
-  border:1px solid var(--brand);border-radius:6px;padding:3px 10px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:4px}
-.sched-row-apply .sapply:hover{background:var(--brand);color:#fff}
-[data-theme="dark"] .sched-row-apply .sapply{color:var(--brand)}
-[data-theme="dark"] .sched-row-apply .sapply:hover{color:#fff}
+.sched-btns{display:flex;align-items:center;gap:5px;flex-shrink:0}
 .sbtn{padding:4px 10px;font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:.15s;
   border:1px solid var(--line);background:var(--surface);color:var(--text);white-space:nowrap}
 .sbtn:hover{border-color:var(--brand);background:var(--brand-soft)}
 .sbtn-add{border-style:dashed}
-.sbtn-del{color:var(--muted);padding:4px 6px}
+.sbtn-del{color:var(--muted);padding:3px 6px;font-size:11px}
 .sbtn-del:hover{border-color:var(--red);color:var(--red);background:rgba(244,67,54,.06)}
-.sbtn-off{font-size:12px}
+.sched-apply-row{display:flex;justify-content:flex-end;padding:0 0 2px}
+.sapply{font-size:11px;font-weight:600;color:var(--brand-d);background:var(--brand-soft);
+  border:1px solid var(--brand);border-radius:6px;padding:3px 10px;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:4px}
+.sapply:hover{background:var(--brand);color:#fff}
+[data-theme="dark"] .sapply{color:var(--brand)}
+[data-theme="dark"] .sapply:hover{color:#fff}
 .btn-xs{padding:2px 7px;font-size:11px;border-radius:5px;line-height:1.5}
 
 /* mobile utility */
@@ -633,7 +641,7 @@ body.modal-open{overflow:hidden}
   .icon-btn{width:44px;height:44px}
 
   /* -- Bottom navigation (4 tabs) -- */
-  .mobile-nav{display:grid;grid-template-columns:repeat(2,1fr);position:fixed;bottom:0;inset-inline:0;
+  .mobile-nav{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;bottom:0;inset-inline:0;
     background:var(--surface);border-top:1px solid var(--line);z-index:45;
     padding:4px 2px calc(4px + env(safe-area-inset-bottom))}
   .mobile-nav a{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 4px;
@@ -641,6 +649,8 @@ body.modal-open{overflow:hidden}
   .mobile-nav a.active{color:var(--brand-d);background:var(--brand-soft)}
   [data-theme="dark"] .mobile-nav a.active{color:var(--brand)}
   .mobile-nav a .ico{font-size:20px;line-height:1.2}
+  .mnav-logout{color:var(--red)!important}
+  .mnav-logout:active{background:var(--red-soft)!important}
 
   /* -- Stats cards -- */
   .stats{grid-template-columns:repeat(2,1fr);gap:10px}
@@ -702,10 +712,7 @@ body.modal-open{overflow:hidden}
   .spec-add-row input{font-size:16px}
 
   /* -- Time picker mobile -- */
-  .tp{gap:0;padding:2px 3px;border-radius:5px}
-  .tp-s{font-size:13px;padding:0}
-  .tp-seg-lbl{display:none}
-  .tp-div{font-size:11px;margin-top:0}
+  .tp-s{font-size:16px}
 
   /* -- Leave rows mobile -- */
   .leave-active-row,.leave-upcoming-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
@@ -715,22 +722,9 @@ body.modal-open{overflow:hidden}
   .page-title{font-size:19px}
 
   /* -- Schedule editor mobile -- */
-  .sched-grid{gap:3px}
-  .sched-row{flex-direction:row;align-items:stretch}
-  .sched-day{width:40px;padding:4px 2px;border-left:1px solid var(--line);border-bottom:none}
-  .sched-day-name{font-size:10px}
-  .sched-day-badge{display:none}
-  .sched-body{padding:4px 5px;gap:3px}
-  .sched-shifts-area{gap:2px}
-  .sched-shift-row{gap:2px;flex-wrap:nowrap}
-  .sched-shift-num{width:14px;height:14px;font-size:8px}
-  .sched-sep{font-size:10px}
-  .sched-actions{gap:2px}
-  .sched-act-btn{padding:2px 5px;font-size:9px}
-  .sched-act-btn.sdel-btn{padding:2px 4px;font-size:9px}
-  .sched-toggle{padding:2px 5px;font-size:9px}
-  .sched-off-tag{font-size:10px;gap:2px}
-  .sched-off-tag::before{font-size:10px}
+  .sched-day-lbl{width:48px;font-size:12px}
+  .sched-btns{gap:4px}
+  .sbtn{padding:3px 8px;font-size:11px}
 
   /* -- Calendar mobile -- */
   .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
@@ -796,7 +790,7 @@ const LocalDB = (() => {
     appId: "1:86720349255:web:9914fd1906ccd623349d62"
   };
 
-  let _memDB = null, _memSess = {auth:false,edit:false,userId:null,name:null,permissions:[],branches:[]};
+  let _memDB = null, _memSess = {auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]};
   const _fails = {};
   let _fsDB, _docRef, _auditRef, _initPromise, _lastWriteTs = 0;
 
@@ -919,6 +913,7 @@ const LocalDB = (() => {
 
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
+    if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple"};
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
     if (lv || doc.status === "leave") {
       const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
@@ -996,6 +991,8 @@ const LocalDB = (() => {
     const needPerm = (perm) => { needAuth(); if(!_hasPerm(sess,perm)) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); };
     const _hasBranch = (s, bid) => { const b=s.branches||[]; return b.includes("*")||b.includes(bid)||b.includes(String(bid)); };
     const needBranch = (bid) => { if(!_hasBranch(sess,bid)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا الفرع"),{status:403}); };
+    const _hasSpecialty = (s, spec) => { if(!spec) return true; const sp=s.specialties||[]; return sp.includes("*")||sp.includes(spec); };
+    const needSpecialty = (spec) => { if(!_hasSpecialty(sess,spec)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا القسم"),{status:403}); };
 
     // ensure users array exists (migration)
     if (!db.settings.users || !db.settings.users.length) {
@@ -1003,14 +1000,14 @@ const LocalDB = (() => {
         id:"super", name:"المدير الرئيسي",
         pin: db.settings.admin_code||"12345",
         role:"super_admin", active:true,
-        permissions:["*"], branches:["*"],
+        permissions:["*"], branches:["*"], specialties:["*"],
         created: new Date().toISOString()
       }];
       save(db);
     }
-    // patch users missing branches field
+    // patch users missing branches/specialties field
     let _patched=false;
-    (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_patched=true;}});
+    (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_patched=true;}if(!u.specialties){u.specialties=["*"];_patched=true;}});
     if(_patched) save(db);
 
     // AUTH
@@ -1019,16 +1016,16 @@ const LocalDB = (() => {
       if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
       const code = (body.code||"").trim();
       const ac = db.settings.access_code||"123";
-      if (code===ac) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:false,userId:null,name:"زائر",permissions:[],branches:[]}); return getSession(); }
+      if (code===ac) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:false,userId:null,name:"زائر",permissions:[],branches:[],specialties:[]}); return getSession(); }
       const usr = (db.settings.users||[]).find(u=>u.pin===code&&u.active);
-      if (usr) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:true,userId:usr.id,name:usr.name,permissions:usr.permissions||[],branches:usr.branches||["*"]}); return getSession(); }
+      if (usr) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:true,userId:usr.id,name:usr.name,permissions:usr.permissions||[],branches:usr.branches||["*"],specialties:usr.specialties||["*"]}); return getSession(); }
       const nc=fl.count+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
       throw Object.assign(new Error("رمز الدخول غير صحيح"),{status:401});
     }
-    if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[]}); return {ok:true}; }
+    if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]}); return {ok:true}; }
     if (method==="GET"  && path==="/me") {
       if (sess.auth && (!sess.permissions || !sess.branches)) {
-        setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[]});
+        setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]});
         return {user:null};
       }
       return {user: sess.auth ? sess : null};
@@ -1037,7 +1034,7 @@ const LocalDB = (() => {
     // USERS MANAGEMENT
     if (method==="GET" && path==="/users") {
       needPerm("users_manage");
-      return {users:(db.settings.users||[]).map(u=>({...u,pin:"••••"}))};
+      return {users:(db.settings.users||[]).map(u=>({...u}))};
     }
     if (method==="POST" && path==="/users") {
       needPerm("users_manage");
@@ -1046,7 +1043,7 @@ const LocalDB = (() => {
       if((db.settings.users||[]).some(u=>u.pin===pin)) throw new Error("هذا الرمز مستخدم بالفعل");
       if(pin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
       const id="u"+Date.now();
-      const u={id,name,pin,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],created:new Date().toISOString()};
+      const u={id,name,pin,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],specialties:body.specialties||["*"],created:new Date().toISOString()};
       db.settings.users.push(u);
       log(db,"إضافة مستخدم","user",id,name); save(db);
       return {id};
@@ -1067,8 +1064,9 @@ const LocalDB = (() => {
         }
         if(body.permissions!==undefined&&u.role!=="super_admin") u.permissions=body.permissions;
         if(body.branches!==undefined&&u.role!=="super_admin") u.branches=body.branches;
+        if(body.specialties!==undefined&&u.role!=="super_admin") u.specialties=body.specialties;
         if(body.active!==undefined&&u.role!=="super_admin") u.active=!!body.active;
-        if(sess.userId===uid) setSession({...sess,name:u.name,permissions:u.permissions,branches:u.branches||["*"]});
+        if(sess.userId===uid) setSession({...sess,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"]});
         log(db,"تعديل مستخدم","user",uid,u.name); save(db);
         return {ok:true};
       }
@@ -1185,6 +1183,7 @@ const LocalDB = (() => {
         const idx=db.doctors.findIndex(x=>x.id===did); if(idx<0) throw Object.assign(new Error("not found"),{status:404});
         const old=db.doctors[idx];
         needBranch(old.branch_id);
+        needSpecialty(old.specialty);
         const updated={...old,...body,id:did};
         if(body.schedule) updated.schedule=body.schedule;
         if(body.dayoff) updated.dayoff=body.dayoff;
@@ -1197,6 +1196,7 @@ const LocalDB = (() => {
         needPerm("doctor_delete");
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
         needBranch(d.branch_id);
+        needSpecialty(d.specialty);
         d.archived=body.unarchive?0:1;
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
         log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
@@ -1204,7 +1204,7 @@ const LocalDB = (() => {
       if (method==="DELETE") {
         needPerm("doctor_delete");
         const d=db.doctors.find(x=>x.id===did);
-        if(d) needBranch(d.branch_id);
+        if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
         db.doctors=db.doctors.filter(x=>x.id!==did);
         db.leaves=db.leaves.filter(l=>l.doctor_id!==did);
         const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
@@ -1214,11 +1214,24 @@ const LocalDB = (() => {
     if (method==="POST" && path==="/doctors") {
       needPerm("doctor_add");
       needBranch(body.branch_id);
+      needSpecialty(body.specialty);
       const id=nextId(db,"doctors");
       const d={id,...body,home_visit:body.home_visit?1:0,archived:0,status:body.status||"active"};
       db.doctors.push(d);
       const bn=(db.branches.find(x=>x.id===+body.branch_id)||{}).name||"";
       log(db,"إضافة طبيب","doctor",id,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {id};
+    }
+    const visitM=path.match(/^\/doctors\/(\d+)\/visit$/);
+    if(visitM && method==="POST"){
+      needPerm("doctor_edit");
+      const vid=+visitM[1];
+      const d=db.doctors.find(x=>x.id===vid); if(!d) throw Object.assign(new Error("not found"),{status:404});
+      needBranch(d.branch_id);
+      needSpecialty(d.specialty);
+      d.in_visit=!!body.in_visit;
+      const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
+      log(db,d.in_visit?"تفعيل زيارة":"إلغاء زيارة","doctor",vid,d.name,{branch:bn,branch_id:d.branch_id}); save(db);
+      return {ok:true,in_visit:d.in_visit};
     }
 
     // LEAVES
@@ -1242,7 +1255,7 @@ const LocalDB = (() => {
     if (method==="POST" && path==="/leaves") {
       needPerm("leave_manage");
       const d=db.doctors.find(x=>x.id===+body.doctor_id);
-      if(d) needBranch(d.branch_id);
+      if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
       const id=nextId(db,"leaves");
       const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||""};
       db.leaves.push(lv);
@@ -1255,7 +1268,7 @@ const LocalDB = (() => {
       const l=db.leaves.find(x=>x.id===+lvM[1]);
       if(!l) throw Object.assign(new Error("not found"),{status:404});
       const d=db.doctors.find(x=>x.id===l.doctor_id);
-      if(d) needBranch(d.branch_id);
+      if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
       ["start_date","end_date","type","reason"].forEach(k=>{ if(k in body) l[k]=body[k]; });
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
       log(db,"تعديل إجازة","leave",+lvM[1],d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
@@ -1263,7 +1276,7 @@ const LocalDB = (() => {
     if(lvM&&method==="DELETE"){
       needPerm("leave_manage");
       const l=db.leaves.find(x=>x.id===+lvM[1]);
-      if(l){const d=db.doctors.find(x=>x.id===l.doctor_id); if(d) needBranch(d.branch_id);}
+      if(l){const d=db.doctors.find(x=>x.id===l.doctor_id); if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }}
       db.leaves=db.leaves.filter(lx=>lx.id!==+lvM[1]);
       const d=l?db.doctors.find(x=>x.id===l.doctor_id):null;
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
@@ -1515,7 +1528,7 @@ const LocalDB = (() => {
   <script>
 /* ============ Adelcare SPA ============ */
 const App = (() => {
-  const state = { user: null, route: "dashboard", params: {}, sidebarOpen: false };
+  const state = { user: null, route: "dashboard", params: {}, sidebarOpen: false, doctorsSearch: "", globalSearch: "", dashScroll: 0 };
   const DAYS = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
   // week starts on Saturday (Saudi). Display order of JS getDay() indices:
   const WEEK_ORDER = [6,0,1,2,3,4,5];   // السبت، الأحد، ... الجمعة
@@ -1524,7 +1537,7 @@ const App = (() => {
     "أنف وأذن وحنجرة","عيون","مسالك بولية","جراحة","أسنان","علاج طبيعي","المختبر","الأشعة"];
   const deptRank = (s)=>{ const i=DEPT_ORDER.indexOf(s); return i<0?999:i; };
   // availability priority: present -> upcoming(soonest) -> finished -> off -> leave
-  const STATE_PRIORITY = {present:0, upcoming:1, finished:2, off:3, leave:4, archived:5};
+  const STATE_PRIORITY = {in_visit:0, present:1, upcoming:2, finished:3, off:4, leave:5, archived:6};
   function availSort(a,b){
     const pa=STATE_PRIORITY[a.live.state]??9, pb=STATE_PRIORITY[b.live.state]??9;
     if(pa!==pb) return pa-pb;
@@ -1639,6 +1652,7 @@ const App = (() => {
   const hasPerm = (u, perm) => { if(!u||!u.auth) return false; const p=u.permissions||[]; return p.includes("*")||p.includes(perm); };
   const can = (perm) => hasPerm(state.user, perm);
   const canBranch = (bid) => { if(!state.user||!state.user.auth) return false; const b=state.user.branches||[]; return b.includes("*")||b.includes(bid)||b.includes(String(bid)); };
+  const canSpecialty = (spec) => { if(!spec||!state.user||!state.user.auth) return true; const sp=state.user.specialties||[]; return sp.includes("*")||sp.includes(spec); };
 
   // ---------- Toast ----------
   function toast(msg,type=""){
@@ -1660,7 +1674,7 @@ const App = (() => {
   const initials = (n)=> (n||"؟").replace(/^د\.?\s*/,"").trim().slice(0,2);
   const avatar = (d)=> d.photo ? `<div class="avatar"><img src="${esc(d.photo)}"></div>`
       : `<div class="avatar">${esc(initials(d.name))}</div>`;
-  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off"};
+  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit"};
   function statusPill(live){ const s=live.state;
     return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
 
@@ -1754,12 +1768,13 @@ const App = (() => {
         </div>
       </div>`).join("");
 
+    const visitToggle=can("doctor_edit")&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
     const body=`
       <div class="qd-head">
         <div class="avatar qd-avatar">${d.photo?`<img src="${esc(d.photo)}">`:esc(initials(d.name))}</div>
         <div>
           <div class="qd-name">${esc(d.name)}</div>
-          <div style="margin-top:6px">${statusPill(live)}</div>
+          <div style="margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${statusPill(live)}${visitToggle}</div>
         </div>
       </div>
       ${leaveSection}${upcomingSection}
@@ -1771,32 +1786,37 @@ const App = (() => {
         :`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة</button>`}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
-      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id);
-      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requirePerm("leave_manage",()=>leaveForm(d.id,d.name),d.branch_id);
+      const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=async()=>{
+        try{await api("/doctors/"+d.id+"/visit",{method:"POST",body:{in_visit:!d.in_visit}});
+          toast(d.in_visit?"✅ تم إلغاء الزيارة":"✅ تم تفعيل حالة الزيارة","ok");closeModal();go(state.route);}
+        catch(e){toast("❌ "+e.message,"err");}
+      };
+      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id,d.specialty);
+      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requirePerm("leave_manage",()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
       // Active leave inline buttons
-      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id);
+      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
       const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requirePerm("leave_manage",async()=>{
         if(!confirm("إلغاء الإجازة الحالية؟"))return;
         try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      },d.branch_id);
+      },d.branch_id,d.specialty);
       // End manual leave (doctor.status="leave" with no leave record)
       const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requirePerm("leave_manage",async()=>{
         if(!confirm("إلغاء الإجازة وإعادة الممارس للعمل؟"))return;
         try{await api("/doctors/"+d.id,{method:"PUT",body:{...d,status:"active"}});
           toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      },d.branch_id);
+      },d.branch_id,d.specialty);
       // Upcoming leave inline buttons
       upcomingLeaves.forEach(ul=>{
         const eul=m.querySelector(`[data-edit-ul="${ul.id}"]`);
-        if(eul)eul.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}),d.branch_id);
+        if(eul)eul.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
         const dul=m.querySelector(`[data-del-ul="${ul.id}"]`);
         if(dul)dul.onclick=()=>requirePerm("leave_manage",async()=>{
           if(!confirm("إلغاء الإجازة القادمة؟"))return;
           try{await api("/leaves/"+ul.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();quickCard(id);}
           catch(e){toast("❌ "+e.message,"err");}
-        });
+        },d.branch_id,d.specialty);
       });
     }});
   }
@@ -1840,25 +1860,36 @@ const App = (() => {
   }
   function closeModal(){
     const root=$("#modal-root"); const back=root.querySelector(".modal-back");
-    const finish=()=>{ root.innerHTML=""; document.body.classList.remove("modal-open"); };
+    const finish=()=>{
+      root.innerHTML=""; document.body.classList.remove("modal-open");
+      if(state.globalSearch){
+        const inp=$("#gsearch"), dd=_searchDD;
+        if(inp&&dd&&dd.innerHTML){ positionDD(inp,dd); dd.style.display="block"; }
+      }
+    };
     if(back){ back.classList.add("closing"); setTimeout(finish,150); }
     else finish();
   }
 
   // ---------- Permission-based action gating ----------
   function requireEdit(fn){ requirePerm("doctor_edit",fn); }
-  function requirePerm(perm, fn, branchId){
+  function requirePerm(perm, fn, branchId, specialty){
     if(!state.user) return;
     if(!hasPerm(state.user, perm)){ toast("🔒 لا تملك صلاحية لهذا الإجراء","warn"); return; }
     if(branchId!==undefined && !canBranch(branchId)){ toast("🔒 لا تملك صلاحية للتعديل على هذا الفرع","warn"); return; }
+    if(specialty!==undefined && !canSpecialty(specialty)){ toast("🔒 لا تملك صلاحية للتعديل على هذا القسم","warn"); return; }
     fn();
   }
 
   // ============================================================ ROUTER
   const routes={};
-  function go(route,params={}){
+  async function go(route,params={}){
+    const sameRoute=state.route===route;
+    if(sameRoute) state.dashScroll=window.scrollY||0;
     state.route=route; state.params=params; state.sidebarOpen=false;
-    location.hash=route+(params.id?("/"+params.id):""); render(); }
+    location.hash=route+(params.id?("/"+params.id):"");
+    await render();
+    if(sameRoute&&state.dashScroll) requestAnimationFrame(()=>window.scrollTo(0,state.dashScroll)); }
   window.addEventListener("hashchange",()=>{
     const [r,id]=location.hash.replace(/^#/,"").split("/");
     if(r&&routes[r]&&(r!==state.route||id!=state.params.id)){state.route=r;state.params=id?{id}:{};render();}
@@ -1938,10 +1969,12 @@ const App = (() => {
         </div>
         <div class="content" id="content">${contentHTML}</div>
       </div>
-      <nav class="mobile-nav">${mnav}</nav>
+      <nav class="mobile-nav">${mnav}<a data-logout class="mnav-logout"><span class="ico">🚪</span>خروج</a></nav>
     </div>`;
     $("#app").querySelectorAll("[data-nav]").forEach(a=>a.onclick=()=>go(a.dataset.nav));
-    $("#logout").onclick=async()=>{await api("/logout",{method:"POST"});state.user=null;render();};
+    const doLogout=async()=>{await api("/logout",{method:"POST"});state.user=null;render();};
+    $("#logout").onclick=doLogout;
+    const mLogout=$("#app").querySelector("[data-logout]"); if(mLogout)mLogout.onclick=doLogout;
     const ctrlBtn=$("#ctrl-btn"); if(ctrlBtn) ctrlBtn.onclick=()=>go("admin");
     $("#theme-btn").onclick=toggleTheme;
 
@@ -2001,10 +2034,19 @@ const App = (() => {
     };
     document.addEventListener("click",_searchClick);
 
-    inp.addEventListener("input",()=>{clearTimeout(searchT);searchT=setTimeout(doSearch,80);});
+    inp.addEventListener("input",()=>{state.globalSearch=inp.value;clearTimeout(searchT);searchT=setTimeout(doSearch,80);});
+    inp.addEventListener("focus",()=>{
+      if(inp.value.trim()&&dd.innerHTML&&dd.style.display==="none"){ positionDD(inp,dd); dd.style.display="block"; }
+    });
+
+    if(state.globalSearch){
+      inp.value=state.globalSearch;
+      setTimeout(()=>{ doSearch().then(()=>{ if(document.activeElement!==inp) dd.style.display="none"; }); },50);
+    }
 
     async function doSearch(){
       const q=inp.value.trim();
+      state.globalSearch=q;
       if(!q){dd.style.display="none";return;}
       // Populate content first, then position + show — so errors in API don't hide the dropdown
       let html=`<div class="empty" style="padding:24px">لا نتائج</div>`;
@@ -2016,10 +2058,8 @@ const App = (() => {
       positionDD(inp,dd);
       dd.style.display="block";
       bindCards(dd);
-      // Close dropdown & clear input when a search result is selected
       dd.querySelectorAll("[data-doc]").forEach(c=>c.addEventListener("click",()=>{
         dd.style.display="none";
-        inp.value="";
       },{capture:true}));
     }
   }
@@ -2329,7 +2369,8 @@ const App = (() => {
     };
     // Debounced live search (80ms) + instant filter changes
     const dsInput=$("#dsearch");
-    dsInput.addEventListener("input",()=>{clearTimeout(_dsearchTimer);_dsearchTimer=setTimeout(draw,80);});
+    if(state.doctorsSearch){ dsInput.value=state.doctorsSearch; }
+    dsInput.addEventListener("input",()=>{state.doctorsSearch=dsInput.value;clearTimeout(_dsearchTimer);_dsearchTimer=setTimeout(draw,80);});
     ["fspec","fbranch","fstatus"].forEach(id=>{$("#"+id).addEventListener("change",draw);});
     const goM=$("#go-manage"); if(goM) goM.onclick=()=>go("control");
     draw();
@@ -2377,10 +2418,7 @@ const App = (() => {
           <option value="leave" ${d.status==="leave"?"selected":""}>إجازة</option></select></div>
       </div>
       <div class="field">
-        <div class="sched-header">
-          <span class="sched-header-title">🗓️ جدول الدوام الأسبوعي</span>
-          <button type="button" class="sched-apply-all" id="sched-apply-all-btn">📋 تطبيق على جميع الأيام</button>
-        </div>
+        <label>جدول الدوام الأسبوعي</label>
         <div id="sched-grid" class="sched-grid"></div>
       </div>
       <div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
@@ -2417,34 +2455,27 @@ const App = (() => {
         toast("✅ تم تطبيق جدول الدوام على جميع الأيام بنجاح","ok");
       }
       function buildSchedUI(container,ss){
-        const dayAbbr=["أحد","إثن","ثلا","أرب","خمي","جمع","سبت"];
         container.innerHTML=ss.map((row,idx)=>`
-          <div class="sched-row${row.off?" sched-row-off":""}" data-srow="${idx}">
-            <div class="sched-day">
-              <div>
-                <div class="sched-day-name">${DAYS[row.day]}</div>
-                <div class="sched-day-badge">${row.off?"إجازة":"دوام"}</div>
-              </div>
-              <button type="button" class="sched-toggle${row.off?" is-off":""} stoggle">${row.off?"✓ تفعيل":"إجازة"}</button>
-            </div>
-            <div class="sched-body">${row.off?'<span class="sched-off-tag">إجازة أسبوعية</span>':`
-              <div class="sched-shifts-area">${row.shifts.map((sh,si)=>`
-                <div class="sched-shift-row" data-si="${si}">
-                  ${row.shifts.length>1?`<span class="sched-shift-num">${si+1}</span>`:""}
+          <div class="sched-day-block" data-srow="${idx}">
+            <div class="sched-row${row.off?" sched-row-off":""}">
+              <div class="sched-day-lbl">${DAYS[row.day]}</div>
+              <div class="sched-mid">${row.off?'<span class="sched-off-tag">إجازة أسبوعية</span>':
+                row.shifts.map((sh,si)=>`<div class="sched-shift-line" data-si="${si}">
                   ${mkTP(sh.start,`s-${idx}-${si}`)}
-                  <span class="sched-sep">→</span>
+                  <span class="sched-sep">–</span>
                   ${mkTP(sh.end,`e-${idx}-${si}`)}
-                  ${row.shifts.length>1?`<button type="button" class="sched-act-btn sdel-btn" data-del="${si}">✕</button>`:""}
-                </div>`).join("")}
+                  ${row.shifts.length>1?`<button type="button" class="sbtn sbtn-del" data-del="${si}">✕</button>`:""}
+                </div>`).join("")}</div>
+              <div class="sched-btns">
+                ${!row.off&&row.shifts.length<2?`<button type="button" class="sbtn sbtn-add sadd">＋ شفت ثاني</button>`:""}
+                <button type="button" class="sbtn stoggle">${row.off?"تفعيل":"يوم إجازة"}</button>
               </div>
-              <div class="sched-actions">
-                ${row.shifts.length<2?`<button type="button" class="sched-act-btn sadd-btn sadd">＋ شفت ثاني</button>`:""}
-              </div>`}
             </div>
-          </div>`).join("");
+            ${!row.off?`<div class="sched-apply-row"><button type="button" class="sapply">📋 تطبيق على الكل</button></div>`:""}</div>`).join("");
         container.querySelectorAll("[data-srow]").forEach(rowEl=>{
           const idx=+rowEl.dataset.srow,row=ss[idx];
           rowEl.querySelector(".stoggle").onclick=()=>{row.off=!row.off;buildSchedUI(container,ss);};
+          rowEl.querySelectorAll(".sapply").forEach(b=>b.onclick=()=>_applyAllDays(container,ss));
           if(!row.off){
             const addBtn=rowEl.querySelector(".sadd");
             if(addBtn)addBtn.onclick=()=>{row.shifts.push({start:"08:00",end:"16:00"});buildSchedUI(container,ss);};
@@ -2454,8 +2485,6 @@ const App = (() => {
       }
       const _schedGrid = m.querySelector("#sched-grid");
       buildSchedUI(_schedGrid, schedState);
-      const _applyAllBtn = m.querySelector("#sched-apply-all-btn");
-      if(_applyAllBtn) _applyAllBtn.onclick=()=>_applyAllDays(_schedGrid, schedState);
       m.querySelector("#save-doc").onclick=async()=>{
         const f=new FormData(m.querySelector("#docf"));
         const payload=Object.fromEntries(f.entries());
@@ -2671,25 +2700,27 @@ const App = (() => {
 
     const bindEvents=()=>{
       document.querySelectorAll("[data-edit-doc]").forEach(btn=>btn.onclick=()=>{
-        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id);
+        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id,d.specialty);
       });
       document.querySelectorAll("[data-arch]").forEach(btn=>btn.onclick=()=>{
         const d=doctors.find(x=>String(x.id)===btn.dataset.arch);
         const bid=d?d.branch_id:undefined;
+        const spec=d?d.specialty:undefined;
         const u=+btn.dataset.unarch;
         requirePerm("doctor_delete",async()=>{
           await api("/doctors/"+btn.dataset.arch+"/archive",{method:"POST",body:{unarchive:u}});
           toast(u?"✅ تم استرجاع الممارس بنجاح":"✅ تمت أرشفة الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
-        },bid);
+        },bid,spec);
       });
       document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>{
         const d=doctors.find(x=>String(x.id)===btn.dataset.del);
         const bid=d?d.branch_id:undefined;
+        const spec=d?d.specialty:undefined;
         requirePerm("doctor_delete",async()=>{
           if(!confirm("حذف الممارس نهائياً؟ لا يمكن التراجع."))return;
           await api("/doctors/"+btn.dataset.del,{method:"DELETE"});
           toast("✅ تم حذف الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
-        },bid);
+        },bid,spec);
       });
     };
 
@@ -2803,7 +2834,7 @@ const App = (() => {
         </tbody></table>`;
       el.querySelectorAll("[data-el]").forEach(btn=>btn.onclick=()=>{
         const lv=JSON.parse(btn.dataset.el);
-        requirePerm("leave_manage",()=>leaveEditForm(lv,()=>{drawLeavesPanel();}),lv.branch_id);
+        requirePerm("leave_manage",()=>leaveEditForm(lv,()=>{drawLeavesPanel();}),lv.branch_id,lv.specialty);
       });
       el.querySelectorAll("[data-dlo]").forEach(btn=>btn.onclick=()=>{
         const lid=btn.dataset.dlo;
@@ -2812,7 +2843,7 @@ const App = (() => {
           if(!confirm("حذف الإجازة؟"))return;
           try{await api("/leaves/"+lid,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");drawLeavesPanel();}
           catch(e){toast("❌ "+e.message,"err");}
-        },lv?lv.branch_id:undefined);
+        },lv?lv.branch_id:undefined,lv?lv.specialty:undefined);
       });
     }
 
@@ -3212,13 +3243,18 @@ const App = (() => {
   // ---- Users management ----
   async function drawUsersPanel(){
     if(!can("users_manage")){ $("#ctrl-body").innerHTML=`<div class="empty-msg">🔒 لا تملك صلاحية لإدارة المستخدمين</div>`; return; }
-    const [{users},{branches:brList}]=await Promise.all([api("/users"),api("/branches")]);
+    const [{users},{branches:brList},{specialties:specList}]=await Promise.all([api("/users"),api("/branches"),api("/specialties")]);
     const brMap={}; brList.forEach(b=>brMap[b.id]=b.name);
     const permLabel=k=>(PERMS_META.find(p=>p.key===k)||{}).label||k;
     const brLabel=(u)=>{
       const b=u.branches||["*"];
       if(b.includes("*")) return '<span class="perm-chip perm-all">جميع الفروع</span>';
       return b.map(id=>`<span class="perm-chip branch-chip">${esc(brMap[id]||brMap[+id]||id)}</span>`).join("")||'<span class="perm-chip perm-none">بدون فروع</span>';
+    };
+    const spLabel=(u)=>{
+      const sp=u.specialties||["*"];
+      if(sp.includes("*")) return '<span class="perm-chip perm-all">جميع الأقسام</span>';
+      return sp.map(s=>`<span class="perm-chip spec-chip">${esc(s)}</span>`).join("")||'<span class="perm-chip perm-none">بدون أقسام</span>';
     };
 
     $("#ctrl-body").innerHTML=`
@@ -3233,7 +3269,7 @@ const App = (() => {
               <div class="user-card-avatar">${esc(u.name.charAt(0))}</div>
               <div class="user-card-info">
                 <div class="user-card-name">${esc(u.name)}${u.role==="super_admin"?'<span class="user-badge-super">مدير رئيسي</span>':""}</div>
-                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'} · رمز: ${u.pin}</div>
+                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'} · رمز: <span class="pin-masked" data-pin="${esc(u.pin)}">••••</span><button class="btn-pin-eye" data-toggle-pin title="إظهار/إخفاء الرمز">👁</button><button class="btn-pin-copy" data-copy-pin="${esc(u.pin)}" title="نسخ الرمز">📋</button></div>
               </div>
             </div>
             <div class="user-card-perms">
@@ -3241,8 +3277,9 @@ const App = (() => {
                 :u.permissions.map(p=>`<span class="perm-chip">${esc(permLabel(p))}</span>`).join("")||'<span class="perm-chip perm-none">بدون صلاحيات</span>'}
             </div>
             <div class="user-card-branches">${brLabel(u)}</div>
+            <div class="user-card-branches">${spLabel(u)}</div>
             ${u.role!=="super_admin"?`<div class="user-card-actions">
-              <button class="btn btn-ghost btn-xs" data-edit-user='${JSON.stringify({id:u.id,name:u.name,permissions:u.permissions,branches:u.branches||["*"],active:u.active})}'>✎ تعديل</button>
+              <button class="btn btn-ghost btn-xs" data-edit-user='${JSON.stringify({id:u.id,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"],active:u.active})}'>✎ تعديل</button>
               <button class="btn btn-ghost btn-xs" data-pin-user="${u.id}" data-uname="${esc(u.name)}">🔑 تغيير الرمز</button>
               <button class="btn btn-ghost btn-xs" data-toggle-user="${u.id}" data-active="${u.active?1:0}" data-uname="${esc(u.name)}">${u.active?"⏸ إيقاف":"▶ تفعيل"}</button>
               <button class="btn btn-danger btn-xs" data-del-user="${u.id}" data-uname="${esc(u.name)}">✕ حذف</button>
@@ -3251,6 +3288,21 @@ const App = (() => {
       </div>`;
 
     $("#add-user").onclick=()=>userForm(null);
+
+    document.querySelectorAll("[data-toggle-pin]").forEach(btn=>{
+      btn.onclick=()=>{
+        const span=btn.previousElementSibling;
+        if(!span) return;
+        const real=span.dataset.pin;
+        span.textContent=span.textContent==="••••"?real:"••••";
+      };
+    });
+    document.querySelectorAll("[data-copy-pin]").forEach(btn=>{
+      btn.onclick=async()=>{
+        try{await navigator.clipboard.writeText(btn.dataset.copyPin);toast("✅ تم نسخ الرمز","ok");}
+        catch(e){toast("❌ فشل النسخ","err");}
+      };
+    });
 
     document.querySelectorAll("[data-edit-user]").forEach(btn=>btn.onclick=()=>{
       userForm(JSON.parse(btn.dataset.editUser));
@@ -3289,14 +3341,19 @@ const App = (() => {
 
   async function userForm(existing){
     const isEdit=!!existing;
-    const {branches:brList}=await api("/branches");
+    const [{branches:brList},{specialties:specList}]=await Promise.all([api("/branches"),api("/specialties")]);
     const existBranches=existing&&existing.branches?existing.branches:["*"];
     const isAllBranches=existBranches.includes("*");
+    const existSpecs=existing&&existing.specialties?existing.specialties:["*"];
+    const isAllSpecs=existSpecs.includes("*");
     const permsHTML=PERMS_META.map(p=>`
       <label class="perm-check"><input type="checkbox" name="perm" value="${p.key}" ${existing&&existing.permissions.includes(p.key)?"checked":""}> ${p.label}</label>
     `).join("");
     const branchesHTML=brList.map(b=>`
       <label class="perm-check"><input type="checkbox" name="ubranch" value="${b.id}" ${isAllBranches||existBranches.includes(b.id)||existBranches.includes(String(b.id))?"checked":""}> ${esc(b.name)}</label>
+    `).join("");
+    const specsHTML=specList.map(s=>`
+      <label class="perm-check"><input type="checkbox" name="uspec" value="${esc(s)}" ${isAllSpecs||existSpecs.includes(s)?"checked":""}> ${esc(s)}</label>
     `).join("");
 
     const body=`<form id="userf">
@@ -3309,6 +3366,10 @@ const App = (() => {
       <div class="field"><label>🏥 الفروع المسموح بالتعديل عليها</label>
         <div style="margin-bottom:6px"><label class="perm-check perm-select-all"><input type="checkbox" id="branch-all" ${isAllBranches?"checked":""}> جميع الفروع</label></div>
         <div class="perms-grid" id="branch-boxes">${branchesHTML}</div>
+      </div>
+      <div class="field"><label>🩺 الأقسام المسموح بالتعديل عليها</label>
+        <div style="margin-bottom:6px"><label class="perm-check perm-select-all"><input type="checkbox" id="spec-all" ${isAllSpecs?"checked":""}> جميع الأقسام</label></div>
+        <div class="perms-grid" id="spec-boxes">${specsHTML}</div>
       </div>
     </form>`;
 
@@ -3327,20 +3388,28 @@ const App = (() => {
         brAllCb.onchange=()=>{brBoxes.forEach(b=>b.checked=brAllCb.checked);syncBrVis();};
         syncBrVis();
 
+        const spAllCb=m.querySelector("#spec-all");
+        const spBoxes=m.querySelectorAll('input[name="uspec"]');
+        const spDiv=m.querySelector("#spec-boxes");
+        const syncSpVis=()=>{spDiv.style.opacity=spAllCb.checked?"0.4":"1";spBoxes.forEach(b=>b.disabled=spAllCb.checked);};
+        spAllCb.onchange=()=>{spBoxes.forEach(b=>b.checked=spAllCb.checked);syncSpVis();};
+        syncSpVis();
+
         m.querySelector("#save-user").onclick=async()=>{
           const fd=new FormData(m.querySelector("#userf"));
           const name=fd.get("name")||"";
           const pin=fd.get("pin")||"";
           const permissions=[...m.querySelectorAll('input[name="perm"]:checked')].map(c=>c.value);
           const branches=brAllCb.checked?["*"]:[...m.querySelectorAll('input[name="ubranch"]:checked')].map(c=>+c.value);
+          const specialties=spAllCb.checked?["*"]:[...m.querySelectorAll('input[name="uspec"]:checked')].map(c=>c.value);
           if(!name.trim()){toast("أدخل اسم المستخدم","warn");return;}
           if(!isEdit&&!pin.trim()){toast("أدخل رمز الدخول","warn");return;}
 
           try{
             if(isEdit){
-              await api("/users/"+existing.id,{method:"PUT",body:{name:name.trim(),permissions,branches}});
+              await api("/users/"+existing.id,{method:"PUT",body:{name:name.trim(),permissions,branches,specialties}});
             } else {
-              await api("/users",{method:"POST",body:{name:name.trim(),pin:pin.trim(),permissions,branches}});
+              await api("/users",{method:"POST",body:{name:name.trim(),pin:pin.trim(),permissions,branches,specialties}});
             }
             toast("✅ تم الحفظ","ok"); closeModal(); drawUsersPanel();
           }catch(e){toast("❌ "+e.message,"err");}
@@ -3510,10 +3579,10 @@ const App = (() => {
   }
 
   // ============================================================ RENDER
-  function render(){
+  async function render(){
     if(!state.user){ renderLogin(); return; }
     const fn=routes[state.route]||routes.dashboard;
-    fn();
+    await fn();
   }
 
   async function boot(){
