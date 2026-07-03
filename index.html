@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0ea5a4">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
 <!-- Favicon -->
 <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -1553,7 +1555,7 @@ const LocalDB = (() => {
     save(db);
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_hasPerm(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_hasPerm(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} return call(m,p,b); }, reset: async()=>{ const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } }, getSEED:()=>SEED };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_hasPerm(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_hasPerm(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_hasPerm(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; if(_docRef){ const {audit,...main}=fresh; await Promise.all([_docRef.set({data:JSON.stringify(main)}),_auditRef.set({data:JSON.stringify(audit)})]); } } };
 })();
 
   </script>
