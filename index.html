@@ -507,6 +507,7 @@ body.modal-open{overflow:hidden}
 
 /* ---------- Toolbar / filters ---------- */
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.toolbar-search{flex:1;max-width:320px;min-width:160px}
 .select-mini{padding:8px 12px;border-radius:var(--r-s);border:1px solid var(--line);
   background:var(--surface);box-shadow:var(--shadow)}
 
@@ -568,7 +569,7 @@ body.modal-open{overflow:hidden}
   animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 #toast-root{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
-  z-index:200;display:flex;flex-direction:column-reverse;align-items:center;gap:8px;pointer-events:none}
+  z-index:20000;display:flex;flex-direction:column-reverse;align-items:center;gap:8px;pointer-events:none}
 .toast{padding:11px 20px;border-radius:30px;box-shadow:var(--shadow-l);
   font-weight:600;font-size:14px;animation:toastIn .25s ease-out;
   display:flex;align-items:center;gap:6px;background:var(--text);color:var(--bg);
@@ -585,6 +586,7 @@ body.modal-open{overflow:hidden}
 .tp-seg{display:flex;align-items:center}
 .tp-seg-lbl{display:none}
 .tp-s{background:transparent;border:none;outline:none;font-size:14px;color:var(--text);padding:0 1px;cursor:pointer;text-align:center;font-weight:600}
+.tp-v{display:none}
 .tp-div{font-size:14px;font-weight:700;color:var(--muted)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -598,6 +600,8 @@ body.modal-open{overflow:hidden}
 .sched-mid{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .sched-shift-line{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
 .sched-sep{color:var(--muted);font-size:13px;flex-shrink:0;font-weight:400;margin:0 1px}
+.shift-row{display:flex;align-items:center;gap:4px}
+.shift-lbl{display:none;font-size:11px;color:var(--muted);font-weight:600;min-width:26px;text-align:right}
 .sched-off-tag{font-size:12px;color:var(--muted);font-style:italic}
 .sched-btns{display:flex;align-items:center;gap:5px;flex-shrink:0}
 .sbtn{padding:4px 10px;font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:.15s;
@@ -638,6 +642,9 @@ body.modal-open{overflow:hidden}
   .search-wrap{max-width:none;flex:1}
   /* font-size ≥16px prevents iOS auto-zoom on focus */
   .search-input{padding:10px 40px;font-size:16px;height:44px}
+  /* Doctors page toolbar: search full-width on top, selects share row below */
+  .toolbar-search{max-width:100%;flex:1 1 100%}
+  .toolbar .select-mini{flex:1 1 0;min-width:0}
   .grid2{grid-template-columns:1fr}
   /* Remove 300ms tap delay on interactive elements */
   button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
@@ -715,11 +722,12 @@ body.modal-open{overflow:hidden}
   /* -- Spec add input mobile -- */
   .spec-add-row input{font-size:16px}
 
-  /* -- Time picker mobile: boxed segments, touch-friendly -- */
-  .tp{gap:3px}
-  .tp-s{font-size:16px;min-height:38px;padding:0 4px;border-radius:8px;
-    background:var(--surface);border:1px solid var(--line)}
-  .tp-div{font-size:15px}
+  /* -- Time picker mobile: compact cards -- */
+  .tp{gap:3px;flex-wrap:nowrap}
+  .tp-seg{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 6px;gap:3px;flex-shrink:0}
+  .tp-s{font-size:15px;min-height:28px;padding:0;border-radius:0;background:transparent;border:none;width:auto;max-width:36px}
+  .tp-div{font-size:13px;flex-shrink:0}
+  .tp-v{display:inline-block;font-size:14px;font-weight:700;min-width:18px;text-align:center;color:var(--text);pointer-events:none}
 
   /* -- Leave rows mobile -- */
   .leave-active-row,.leave-upcoming-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 14px}
@@ -728,20 +736,22 @@ body.modal-open{overflow:hidden}
   /* -- Page title mobile -- */
   .page-title{font-size:19px}
 
-  /* -- Schedule editor mobile: day+buttons on top, shifts full-width below -- */
-  .sched-day-block{padding:4px 10px}
-  .sched-row{flex-wrap:wrap;row-gap:8px;padding:4px 0;min-height:0}
-  .sched-day-lbl{width:auto;min-width:52px;font-size:13.5px}
-  .sched-btns{margin-inline-start:auto;gap:6px}
-  .sched-mid{order:3;flex-basis:100%;gap:8px}
-  .sbtn{padding:8px 12px;font-size:12.5px;min-height:38px;border-radius:8px}
-  .sbtn-del{min-width:38px;padding:8px;font-size:13px}
-  .sched-shift-line{background:var(--bg);border:1px solid var(--line);border-radius:10px;
-    padding:6px 10px;gap:8px;justify-content:center}
-  .sched-sep{font-size:15px}
-  .sched-off-tag{font-size:12.5px;padding:2px 0}
-  .sched-apply-row{padding:2px 0 4px}
-  .sapply{padding:8px 12px;font-size:12px;min-height:36px;border-radius:8px}
+  /* -- Schedule editor mobile -- */
+  .sched-grid{gap:4px}
+  .sched-day-block{padding:5px 8px}
+  .sched-row{flex-wrap:wrap;row-gap:4px;padding:2px 0;min-height:0}
+  .sched-day-lbl{width:auto;min-width:44px;font-size:13px}
+  .sched-btns{margin-inline-start:auto;gap:4px}
+  .sched-mid{order:3;flex-basis:100%;gap:4px}
+  .sbtn{padding:5px 8px;font-size:12px;min-height:28px;border-radius:6px}
+  .sbtn-del{min-width:28px;padding:4px 6px;font-size:12px}
+  .sched-shift-line{flex-direction:column;align-items:flex-start;gap:4px;padding:4px 0}
+  .sched-sep{display:none}
+  .shift-lbl{display:inline-block}
+  .shift-row{gap:5px}
+  .sched-off-tag{font-size:12px;padding:1px 0}
+  .sched-apply-row{padding:2px 0 2px;justify-content:flex-start}
+  .sapply{padding:4px 8px;font-size:11.5px;min-height:26px;border-radius:6px}
 
   /* -- Calendar mobile -- */
   .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
@@ -2315,7 +2325,7 @@ const App = (() => {
         ${(can("doctor_add")||can("doctor_edit")||can("doctor_delete")||can("leave_manage")||can("specialty_manage"))?'<button class="icon-btn" id="go-manage" title="إدارة الممارسين" style="font-size:18px">⚙️</button>':""}
       </div>
       <div class="toolbar" style="margin-top:16px">
-        <input class="search-input" id="dsearch" style="max-width:300px;border-radius:var(--r-s);padding:9px 14px" placeholder="ابحث: اسم، تخصص، جنسية، فرع، درجة...">
+        <input class="search-input toolbar-search" id="dsearch" style="border-radius:var(--r-s);padding:9px 14px" placeholder="ابحث: اسم، تخصص، جنسية، فرع، درجة...">
         <select class="select-mini" id="fspec"><option value="">كل التخصصات</option>${specs.map(s=>`<option>${esc(s)}</option>`).join("")}</select>
         <select class="select-mini" id="fbranch"><option value="">كل الفروع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
         <select class="select-mini" id="fstatus"><option value="">كل الحالات</option>
@@ -2415,7 +2425,7 @@ const App = (() => {
     const mkTP=(val,id)=>{const{h,m,ap}=hhmm2ampm(val);
       const hrs=Array.from({length:12},(_,i)=>i+1).map(x=>`<option${x===h?" selected":""}>${x}</option>`).join("");
       const mins=[0,5,10,15,20,25,30,35,40,45,50,55].map(x=>`<option value="${x}"${x===m?" selected":""}>${String(x).padStart(2,"0")}</option>`).join("");
-      return`<span class="tp" data-tp="${id}"><span class="tp-seg"><span class="tp-seg-lbl">س</span><select class="tp-h tp-s">${hrs}</select></span><span class="tp-div">:</span><span class="tp-seg"><span class="tp-seg-lbl">د</span><select class="tp-m tp-s">${mins}</select></span><span class="tp-seg"><span class="tp-seg-lbl">ص/م</span><select class="tp-ap tp-s"><option value="am"${ap==="am"?" selected":""}>ص</option><option value="pm"${ap==="pm"?" selected":""}>م</option></select></span></span>`;};
+      return`<span class="tp" data-tp="${id}"><span class="tp-seg"><span class="tp-seg-lbl">س</span><span class="tp-v tp-vh">${h}</span><select class="tp-h tp-s">${hrs}</select></span><span class="tp-div">:</span><span class="tp-seg"><span class="tp-seg-lbl">د</span><span class="tp-v tp-vm">${String(m).padStart(2,"0")}</span><select class="tp-m tp-s">${mins}</select></span><span class="tp-seg"><span class="tp-seg-lbl">ص/م</span><span class="tp-v tp-vap">${ap==="am"?"ص":"م"}</span><select class="tp-ap tp-s"><option value="am"${ap==="am"?" selected":""}>ص</option><option value="pm"${ap==="pm"?" selected":""}>م</option></select></span></span>`;};
     const readTP=(el)=>{const h=+el.querySelector(".tp-h").value,m=+el.querySelector(".tp-m").value,ap=el.querySelector(".tp-ap").value;return ampm2hhmm(h,m,ap);};
     const schedState=WEEK_ORDER.map(day=>{
       const ex=sc[day]||sc[String(day)];
@@ -2485,10 +2495,9 @@ const App = (() => {
               <div class="sched-day-lbl">${DAYS[row.day]}</div>
               <div class="sched-mid">${row.off?'<span class="sched-off-tag">إجازة أسبوعية</span>':
                 row.shifts.map((sh,si)=>`<div class="sched-shift-line" data-si="${si}">
-                  ${mkTP(sh.start,`s-${idx}-${si}`)}
+                  <div class="shift-row"><span class="shift-lbl">بداية</span>${mkTP(sh.start,`s-${idx}-${si}`)}</div>
                   <span class="sched-sep">–</span>
-                  ${mkTP(sh.end,`e-${idx}-${si}`)}
-                  ${row.shifts.length>1?`<button type="button" class="sbtn sbtn-del" data-del="${si}">✕</button>`:""}
+                  <div class="shift-row"><span class="shift-lbl">نهاية</span>${mkTP(sh.end,`e-${idx}-${si}`)}${row.shifts.length>1?`<button type="button" class="sbtn sbtn-del" data-del="${si}">✕</button>`:""}</div>
                 </div>`).join("")}</div>
               <div class="sched-btns">
                 ${!row.off&&row.shifts.length<2?`<button type="button" class="sbtn sbtn-add sadd">＋ شفت ثاني</button>`:""}
@@ -2496,6 +2505,15 @@ const App = (() => {
               </div>
             </div>
             ${!row.off?`<div class="sched-apply-row"><button type="button" class="sapply">📋 تطبيق على الكل</button></div>`:""}</div>`).join("");
+        // Force iOS Safari to visually display the selected option in each <select>
+        container.querySelectorAll(".tp-s").forEach(sel=>{const v=sel.value;sel.value="";sel.value=v;});
+        // Wire up value-display spans and keep them in sync with selects
+        container.querySelectorAll(".tp[data-tp]").forEach(tp=>{
+          const hSel=tp.querySelector(".tp-h"),mSel=tp.querySelector(".tp-m"),apSel=tp.querySelector(".tp-ap");
+          const vH=tp.querySelector(".tp-vh"),vM=tp.querySelector(".tp-vm"),vAP=tp.querySelector(".tp-vap");
+          const upd=()=>{if(vH)vH.textContent=hSel.value;if(vM)vM.textContent=String(+mSel.value).padStart(2,"0");if(vAP)vAP.textContent=apSel.value==="am"?"ص":"م";};
+          hSel.addEventListener("change",upd);mSel.addEventListener("change",upd);apSel.addEventListener("change",upd);
+        });
         container.querySelectorAll("[data-srow]").forEach(rowEl=>{
           const idx=+rowEl.dataset.srow,row=ss[idx];
           rowEl.querySelector(".stoggle").onclick=()=>{row.off=!row.off;buildSchedUI(container,ss);};
