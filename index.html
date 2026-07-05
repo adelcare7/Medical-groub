@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -731,10 +730,11 @@ body.modal-open{overflow:hidden}
 
   /* -- Content area -- */
   .content{padding:14px 12px 100px}
-  .topbar{padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));gap:8px}
-  .search-wrap{max-width:none;flex:1}
+  .topbar{padding:10px 10px;padding-top:calc(10px + env(safe-area-inset-top));gap:5px}
+  .search-wrap{max-width:none;flex:1;min-width:0}
   /* font-size ≥16px prevents iOS auto-zoom on focus */
-  .search-input{padding:10px 40px;font-size:16px;height:44px}
+  .search-input{padding:10px 36px;font-size:16px;height:40px}
+  .icon-btn{width:36px;height:36px;font-size:15px;border-radius:9px}
   /* Doctors page toolbar: search full-width on top, selects share row below */
   .toolbar-search{max-width:100%;flex:1 1 100%}
   .toolbar .select-mini{flex:1 1 0;min-width:0}
@@ -1736,7 +1736,7 @@ const App = (() => {
     _notifs.unshift({id,type,msg,sub,time:_timeLabel(),read:false});
     if(_notifs.length>50) _notifs=_notifs.slice(0,50);
     _renderBell(true);
-    if(Notification.permission==="granted"){
+    if(typeof Notification!=="undefined"&&Notification.permission==="granted"){
       try{ new Notification("عادل الطبية — "+msg,{body:sub,icon:"/favicon.ico",dir:"rtl"}); }catch(e){}
     }
   }
@@ -1820,7 +1820,7 @@ const App = (() => {
     if(_notifInterval) clearInterval(_notifInterval);
     checkNotifications();
     _notifInterval=setInterval(checkNotifications,60000);
-    if(Notification.permission==="default"){
+    if(typeof Notification!=="undefined"&&Notification.permission==="default"){
       setTimeout(()=>Notification.requestPermission(),3000);
     }
   }
@@ -2880,9 +2880,6 @@ const App = (() => {
         <div class="field"><label>سنوات الخبرة *</label><input name="experience" value="${esc(d.experience||"")}" required></div>
         <div class="field"><label>المؤهل</label><input name="qualification" value="${esc(d.qualification||"")}"></div>
         <div class="field"><label>رابط الصورة</label><input name="photo" value="${esc(d.photo||"")}" placeholder="https://..."></div>
-        <div class="field"><label>الحالة</label><select name="status">
-          <option value="active" ${(d.status||"active")==="active"?"selected":""}>على رأس العمل</option>
-          <option value="leave" ${d.status==="leave"?"selected":""}>إجازة</option></select></div>
       </div>
       <div class="field">
         <label>جدول الدوام الأسبوعي</label>
