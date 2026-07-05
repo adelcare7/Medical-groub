@@ -438,6 +438,10 @@ a{color:inherit;text-decoration:none}
 .sp-finished{background:var(--red-soft);color:var(--red)}
 .sp-leave{background:var(--leave-soft);color:var(--leave);font-weight:700}
 .sp-off{background:var(--black-soft);color:var(--black)}
+.sp-secondment{background:#cffafe;color:#0e7490;font-weight:700}
+[data-theme="dark"] .sp-secondment{background:#164e63;color:#67e8f9}
+.dcard.st-secondment{border-inline-start-color:#06b6d4;background:color-mix(in srgb,#cffafe 40%,var(--surface))}
+[data-theme="dark"] .dcard.st-secondment{background:color-mix(in srgb,#164e63 40%,var(--surface))}
 .sp-terminated{background:#ede9fe;color:#6d28d9;font-weight:700}
 [data-theme="dark"] .sp-terminated{background:#2e1065;color:#c4b5fd}
 .sp-in-visit{background:#f3e8ff;color:#7c3aed;font-weight:700}
@@ -1068,6 +1072,10 @@ const LocalDB = (() => {
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
     if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple"};
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
+    if (lv && lv.type === "ندب" && lv.secondment_branch_id) {
+      return {state:"secondment", label:"منتدب", color:"secondment", leaveType:"ندب",
+        detail:`منتدب حتى ${lv.end_date}`, secondmentBranchId: lv.secondment_branch_id, leave: lv};
+    }
     if (lv || doc.status === "leave") {
       const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
       const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
@@ -1282,10 +1290,15 @@ const LocalDB = (() => {
     if (method==="GET" && path==="/branches") {
       needAuth();
       const {day,nowMin,dateStr}=nowInfo();
+      const secondedAwayIds=new Set(db.leaves.filter(l=>l.type==="ندب"&&l.secondment_branch_id&&l.start_date<=dateStr&&l.end_date>=dateStr).map(l=>l.doctor_id));
       return {branches: db.branches.map(b=>{
-        const docs=db.doctors.filter(d=>d.branch_id==b.id&&!d.archived&&!d.terminated);
-        const present=docs.filter(d=>computeStatus(d,nowMin,day,dateStr,db.leaves).state==="present").length;
-        return {...b,doctor_count:docs.length,present,specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
+        const baseDocs=db.doctors.filter(d=>d.branch_id==b.id&&!d.archived&&!d.terminated&&!secondedAwayIds.has(d.id));
+        const seconded=db.doctors.filter(d=>d.branch_id!=b.id&&!d.archived&&!d.terminated&&
+          db.leaves.some(l=>l.doctor_id==d.id&&l.type==="ندب"&&l.secondment_branch_id==b.id&&l.start_date<=dateStr&&l.end_date>=dateStr));
+        const docs=[...baseDocs,...seconded];
+        const present=docs.filter(d=>{ const st=computeStatus(d,nowMin,day,dateStr,db.leaves); return st.state==="present"; }).length;
+        const secCnt=seconded.length;
+        return {...b,doctor_count:docs.length,seconded_count:secCnt,present,specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
       })};
     }
     const brM = path.match(/^\/branches\/(\d+)$/);
@@ -1294,8 +1307,13 @@ const LocalDB = (() => {
       if (method==="GET") {
         needAuth();
         const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
-        const docs=db.doctors.filter(d=>d.branch_id===bid&&!d.archived&&!d.terminated).sort((a,b)=>a.name.localeCompare(b.name));
-        return {branch:b,doctors:docs.map(d=>withStatus(d,db)),specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
+        const {dateStr:dStr}=nowInfo();
+        const secAwayIds=new Set(db.leaves.filter(l=>l.type==="ندب"&&l.secondment_branch_id&&l.start_date<=dStr&&l.end_date>=dStr).map(l=>l.doctor_id));
+        const baseDocs=db.doctors.filter(d=>d.branch_id===bid&&!d.archived&&!d.terminated&&!secAwayIds.has(d.id));
+        const seconded=db.doctors.filter(d=>d.branch_id!==bid&&!d.archived&&!d.terminated&&
+          db.leaves.some(l=>l.doctor_id==d.id&&l.type==="ندب"&&l.secondment_branch_id==bid&&l.start_date<=dStr&&l.end_date>=dStr));
+        const allDocs=[...baseDocs,...seconded].sort((a,b2)=>a.name.localeCompare(b2.name));
+        return {branch:b,doctors:allDocs.map(d=>({...withStatus(d,db),branch_name:(db.branches.find(x=>x.id===d.branch_id)||{}).name||""})),specialties:[...new Set(allDocs.map(d=>d.specialty))].sort()};
       }
       if (method==="PUT") {
         needPerm("branch_manage");
@@ -1412,7 +1430,8 @@ const LocalDB = (() => {
       const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
       const realLeaves=db.leaves.map(l=>{
         const doc=dmap[l.doctor_id]||{};
-        return {...l,doctor_name:doc.name||"",branch_id:doc.branch_id||null,branch_name:bmap[doc.branch_id]||"",specialty:doc.specialty||""};
+        return {...l,doctor_name:doc.name||"",branch_id:doc.branch_id||null,branch_name:bmap[doc.branch_id]||"",specialty:doc.specialty||"",
+          secondment_branch_name:l.secondment_branch_id?bmap[l.secondment_branch_id]||"":""};
       });
       // Include doctors manually set to leave status with no active leave record
       const docIdsWithActiveLeave=new Set(db.leaves.filter(l=>l.start_date<=today&&l.end_date>=today).map(l=>l.doctor_id));
@@ -1427,7 +1446,8 @@ const LocalDB = (() => {
       const d=db.doctors.find(x=>x.id===+body.doctor_id);
       if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
       const id=nextId(db,"leaves");
-      const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||""};
+      const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||"",
+        secondment_branch_id:(body.type==="ندب"&&body.secondment_branch_id)?+body.secondment_branch_id:null};
       db.leaves.push(lv);
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
       log(db,"إضافة إجازة","leave",id,`${d?d.name:""} ${lv.start_date}→${lv.end_date}`,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {id};
@@ -1440,6 +1460,7 @@ const LocalDB = (() => {
       const d=db.doctors.find(x=>x.id===l.doctor_id);
       if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
       ["start_date","end_date","type","reason"].forEach(k=>{ if(k in body) l[k]=body[k]; });
+      l.secondment_branch_id=(l.type==="ندب"&&body.secondment_branch_id)?+body.secondment_branch_id:null;
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
       log(db,"تعديل إجازة","leave",+lvM[1],d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
     }
@@ -1833,7 +1854,7 @@ const App = (() => {
     "أنف وأذن وحنجرة","عيون","مسالك بولية","جراحة","أسنان","علاج طبيعي","المختبر","الأشعة"];
   const deptRank = (s)=>{ const i=DEPT_ORDER.indexOf(s); return i<0?999:i; };
   // availability priority: present -> upcoming(soonest) -> finished -> off -> leave
-  const STATE_PRIORITY = {in_visit:0, present:1, upcoming:2, finished:3, off:4, leave:5, terminated:6, archived:7};
+  const STATE_PRIORITY = {in_visit:0, present:1, upcoming:2, finished:3, off:4, secondment:5, leave:5, terminated:6, archived:7};
   function availSort(a,b){
     const pa=STATE_PRIORITY[a.live.state]??9, pb=STATE_PRIORITY[b.live.state]??9;
     if(pa!==pb) return pa-pb;
@@ -1970,7 +1991,7 @@ const App = (() => {
   const initials = (n)=> (n||"؟").replace(/^د\.?\s*/,"").trim().slice(0,2);
   const avatar = (d)=> d.photo ? `<div class="avatar"><img src="${esc(d.photo)}"></div>`
       : `<div class="avatar">${esc(initials(d.name))}</div>`;
-  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit",terminated:"terminated"};
+  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit",terminated:"terminated",secondment:"secondment"};
   function statusPill(live){ const s=live.state;
     return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
 
@@ -1985,11 +2006,17 @@ const App = (() => {
     const live=d.live||{state:"off",label:""};
     const isLeave=live.state==="leave";
     const isTerminated=live.state==="terminated";
+    const isSecondment=live.state==="secondment";
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
     const shift=(isLeave||isTerminated)?"":todayShift(d);
     const infoRow=isTerminated
       ?`<div class="dcard-shift" style="color:#7c3aed">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
+      :isSecondment
+        ?(shift
+          ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
+          :"")
+        +`<div class="dcard-shift" style="color:#0e7490;font-size:12px;margin-top:2px">🔀 منتدب${live.leave&&live.leave.secondment_branch_name?` · ${esc(live.leave.secondment_branch_name)}`:""}</div>`
       :shift
         ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
         :isLeave
@@ -2016,13 +2043,14 @@ const App = (() => {
     const {doctor:d}=await api("/doctors/"+id);
     const live=d.live||{};
     const isOnLeave=live.state==="leave";
+    const isSecondmentCard=live.state==="secondment";
     const sc=d.schedule||{};
     const sched = WEEK_ORDER.map(i=>[i,sc[i]||sc[String(i)]]).filter(([i,v])=>v&&v.length)
       .map(([i,v])=>`<div><b>${DAYS[i]}:</b> ${v.map(([s,e])=>fmtRange(s,e)).join(" ، ")}</div>`).join("")||"—";
     const offs=(d.dayoff||[]).slice().sort((a,b)=>WEEK_ORDER.indexOf(a)-WEEK_ORDER.indexOf(b)).map(i=>DAYS[i]).join("، ")||"—";
 
     // Active leave from live status
-    const activeLv=isOnLeave ? (live.leave || (d.leaves||[]).find(l=>{const n=new Date();const p=x=>String(x).padStart(2,'0');const t=`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;return l.start_date<=t&&l.end_date>=t;})) : null;
+    const activeLv=(isOnLeave||isSecondmentCard) ? (live.leave || (d.leaves||[]).find(l=>{const n=new Date();const p=x=>String(x).padStart(2,'0');const t=`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;return l.start_date<=t&&l.end_date>=t;})) : null;
     // Upcoming (future) leaves
     const today=(()=>{const n=new Date(),p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
     const upcomingLeaves=(d.leaves||[]).filter(l=>l.start_date>today).sort((a,b)=>a.start_date.localeCompare(b.start_date));
@@ -2042,15 +2070,15 @@ const App = (() => {
     if(can("doctor.edit") && d.notes_admin) rows.push(["ملاحظات إدارية", esc(d.notes_admin)]);
 
     const hasLeaveRecord=!!activeLv;
-    const leaveSection=isOnLeave?`
-      <div class="leave-active-row">
+    const leaveSection=(isOnLeave||isSecondmentCard)?`
+      <div class="leave-active-row" style="${isSecondmentCard?"border-color:#06b6d4;background:color-mix(in srgb,#cffafe 30%,var(--surface))":""}">
         <div>
-          <div class="la-info">🔴 ${esc(activeLv?activeLv.type:live.leaveType||"إجازة")}</div>
-          ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
+          <div class="la-info">${isSecondmentCard?"🔀":"🔴"} ${esc(activeLv?activeLv.type:live.leaveType||(isSecondmentCard?"ندب":"إجازة"))}</div>
+          ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.secondment_branch_name?` · إلى ${esc(activeLv.secondment_branch_name)}`:""}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
         </div>
         ${hasLeaveRecord?`<div class="la-actions">
           <button class="btn btn-xs btn-ghost" data-edit-leave="${activeLv.id}">تعديل</button>
-          <button class="btn btn-xs btn-danger" data-del-leave="${activeLv.id}">إلغاء</button>
+          <button class="btn btn-xs btn-danger" data-del-leave="${activeLv.id}">${isSecondmentCard?"إلغاء الندب":"إلغاء"}</button>
         </div>`:""}
       </div>`:"";
 
@@ -2081,7 +2109,8 @@ const App = (() => {
     const foot=`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>
       ${isOnLeave&&!hasLeaveRecord
         ?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`
-        :`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة</button>`}`;
+        :(!isOnLeave&&!isSecondmentCard)?`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة / ندب</button>`
+        :""}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
       const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=async()=>{
@@ -2423,7 +2452,8 @@ const App = (() => {
     const dayIdx=new Date().getDay();
     const firstStart=(d)=>{const sh=(d.schedule&&(d.schedule[dayIdx]||d.schedule[String(dayIdx)]))||[];
       return sh.length?Math.min(...sh.map(x=>x[0])):null;};
-    const presentInBranch=(bid)=>doctors.filter(d=>d.branch_id===bid&&d.live.state==="present").length;
+    const effBranch=(d)=>d.live.state==="secondment"?d.live.secondmentBranchId:d.branch_id;
+    const presentInBranch=(bid)=>doctors.filter(d=>effBranch(d)==bid&&d.live.state==="present").length;
     const allSpecs=[...new Set(doctors.map(d=>d.specialty))].filter(Boolean).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
 
     const totalPresent=doctors.filter(d=>d.live.state==="present").length;
@@ -2449,7 +2479,8 @@ const App = (() => {
       const body=$("#dash-body"); body.classList.add("fade");
       const isToday=dashDay===-1;
       const viewDay=isToday?dayIdx:dashDay;
-      const branchDocs=doctors.filter(d=>!dashBranch||String(d.branch_id)===String(dashBranch));
+      const effectiveBranch=(d)=>d.live.state==="secondment"?String(d.live.secondmentBranchId):String(d.branch_id);
+      const branchDocs=doctors.filter(d=>!dashBranch||effectiveBranch(d)===String(dashBranch));
 
       // stat cards only for today view
       let statCardsHTML="";
@@ -2707,9 +2738,10 @@ const App = (() => {
   async function renderBranch(id){
     shell(`<div class="loader"><div class="spin"></div></div>`);
     const {branch,doctors}=await api("/branches/"+id);
-    const counts={present:0,upcoming:0,leave:0};
+    const counts={present:0,upcoming:0,leave:0,seconded:0};
     doctors.forEach(d=>{const s=d.live.state;
       if(s==="present")counts.present++; else if(s==="upcoming")counts.upcoming++;
+      else if(s==="secondment")counts.seconded++;
       else if(s==="leave"||s==="off")counts.leave++;});
     // group by department (specialty) and order: طب عام، باطنة، ...
     const bySpec={}; doctors.forEach(d=>{(bySpec[d.specialty]=bySpec[d.specialty]||[]).push(d);});
@@ -2723,6 +2755,7 @@ const App = (() => {
         <button class="bchip present-toggle" id="t-present"><span class="dot" style="background:var(--green)"></span> موجودون الآن <span class="bchip-n">${counts.present}</span></button>
         <span class="bchip ghost"><span class="dot" style="background:var(--amber)"></span> يبدأ لاحقاً ${counts.upcoming}</span>
         <span class="bchip ghost"><span class="dot" style="background:var(--black)"></span> إجازة/خارج ${counts.leave}</span>
+        ${counts.seconded?`<span class="bchip ghost" style="color:#0e7490">🔀 منتدب ${counts.seconded}</span>`:""}
         <span class="bchip ghost">🩺 الإجمالي ${doctors.length}</span>
       </div>
       <div class="toolbar"><input class="search-input" id="bsearch" style="max-width:340px;border-radius:var(--r-s);padding:9px 14px" placeholder="بحث داخل الفرع..."></div>
@@ -2750,11 +2783,14 @@ const App = (() => {
   // ============================================================ DOCTORS
   routes.doctors=async()=>{
     shell(`<div class="loader"><div class="spin"></div></div>`);
-    const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
-    const specs=[...new Set(doctors.map(d=>d.specialty))].filter(Boolean).sort();
+    const [{doctors},{branches}]=await Promise.all([api("/doctors?terminated=1"),api("/branches")]);
+    const activeCnt=doctors.filter(d=>!d.terminated).length;
+    const termedCnt=doctors.filter(d=>d.terminated).length;
+    const specs=[...new Set(doctors.filter(d=>!d.terminated).map(d=>d.specialty))].filter(Boolean).sort();
+    const subLabel=`${activeCnt} ممارس${termedCnt>0?` · ${termedCnt} منتهي العقد`:""}`;
     $("#content").innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div><div class="page-title">الممارسون</div><div class="page-sub">${doctors.length} ممارس</div></div>
+        <div><div class="page-title">الممارسون</div><div class="page-sub">${subLabel}</div></div>
         ${(can("doctor_add")||can("doctor_edit")||can("doctor_delete")||can("leave_manage")||can("specialty_manage"))?'<button class="icon-btn" id="go-manage" title="إدارة الممارسين" style="font-size:18px">⚙️</button>':""}
       </div>
       <div class="toolbar" style="margin-top:16px">
@@ -2763,7 +2799,8 @@ const App = (() => {
         <select class="select-mini" id="fbranch"><option value="">كل الفروع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
         <select class="select-mini" id="fstatus"><option value="">كل الحالات</option>
           <option value="present">موجود الآن</option><option value="upcoming">يبدأ لاحقاً</option>
-          <option value="finished">انتهى دوامه</option><option value="leave">إجازة</option></select>
+          <option value="finished">انتهى دوامه</option><option value="leave">إجازة</option>
+          <option value="terminated">منتهي العقد</option></select>
       </div>
       <div class="status-grid" id="doc-list"></div>`;
     const bname={}; branches.forEach(b=>bname[b.id]=b.name);
@@ -2828,7 +2865,7 @@ const App = (() => {
           .sort((a,b)=>b.s-a.s||(a.d.name||"").localeCompare(b.d.name||""))
           .map(x=>x.d);
       } else {
-        arr=filtered;
+        arr=filtered.slice().sort(availSort);
       }
       const list=$("#doc-list");
       list.innerHTML=arr.length?arr.map(doctorCard).join(""):`<div class="empty">لا نتائج</div>`;
@@ -3072,7 +3109,7 @@ const App = (() => {
   const LEAVE_TYPES=["إجازة سنوية","إجازة طارئة","إجازة مرضية","ندب","أخرى","إنهاء عقد"];
 
   async function leaveForm(docId,docName,onDone){
-    const {doctors}=await api("/doctors");
+    const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
     const _n=new Date(),_p=x=>String(x).padStart(2,'0');
     const _today=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
     const _tom=new Date(_n); _tom.setDate(_tom.getDate()+1);
@@ -3084,16 +3121,27 @@ const App = (() => {
         <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" value="${_today}" required></div>
         <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" value="${_tomorrow}" required></div>
       </div>
-      <div class="field"><label>النوع</label><select name="type">
+      <div class="field"><label>النوع</label><select name="type" id="lv-type">
         ${LEAVE_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div>
+      <div class="field" id="lv-branch-field" style="display:none">
+        <label>الفرع المنتدب إليه *</label>
+        <select name="secondment_branch_id" id="lv-branch-sel">
+          <option value="">اختر الفرع...</option>
+          ${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}
+        </select>
+      </div>
       <div class="field"><label>ملاحظات</label><input name="reason"></div>
     </form>`;
     openModal({title:"إضافة إجازة"+(docName?" — "+docName:""),bodyHTML:body,
       footHTML:`<button class="btn btn-primary" id="save-lv">حفظ</button><button class="btn btn-ghost" data-x3>إلغاء</button>`,
       onMount:(m)=>{ m.querySelector("[data-x3]").onclick=closeModal;
+        // show/hide branch selector based on type
+        const typeEl=m.querySelector("#lv-type"), branchField=m.querySelector("#lv-branch-field");
+        typeEl.addEventListener("change",()=>{ branchField.style.display=typeEl.value==="ندب"?"":"none"; });
         m.querySelector("#save-lv").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf")); const p=Object.fromEntries(f.entries());
           p.doctor_id=+p.doctor_id;
+          if(p.type==="ندب"&&!p.secondment_branch_id){toast("اختر الفرع المنتدب إليه","warn");return;}
           // إنهاء عقد — يحدّث حالة الممارس مباشرة بدل إنشاء إجازة
           if(p.type==="إنهاء عقد"){
             const dName=(doctors.find(d=>d.id===p.doctor_id)||{}).name||"الممارس";
@@ -3118,21 +3166,32 @@ const App = (() => {
   }
 
   async function leaveEditForm(lv,onDone){
+    const {branches}=await api("/branches");
     const body=`<form id="lvf-edit">
       <div class="grid2">
         <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" value="${esc(lv.start_date)}" required></div>
         <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" value="${esc(lv.end_date)}" required></div>
       </div>
-      <div class="field"><label>النوع</label><select name="type">
+      <div class="field"><label>النوع</label><select name="type" id="lve-type">
         ${LEAVE_TYPES.map(t=>`<option ${(lv.type||"")==t?"selected":""}>${t}</option>`).join("")}</select></div>
+      <div class="field" id="lve-branch-field" style="display:${lv.type==="ندب"?"":"none"}">
+        <label>الفرع المنتدب إليه *</label>
+        <select name="secondment_branch_id" id="lve-branch-sel">
+          <option value="">اختر الفرع...</option>
+          ${branches.map(b=>`<option value="${b.id}" ${lv.secondment_branch_id==b.id?"selected":""}>${esc(b.name)}</option>`).join("")}
+        </select>
+      </div>
       <div class="field"><label>ملاحظات</label><input name="reason" value="${esc(lv.reason||"")}"></div>
     </form>`;
     openModal({title:"تعديل إجازة"+(lv.doctor_name?" — "+lv.doctor_name:""),bodyHTML:body,
       footHTML:`<button class="btn btn-primary" id="save-lv-edit">حفظ</button><button class="btn btn-ghost" data-xe>إلغاء</button>`,
       onMount:(m)=>{ m.querySelector("[data-xe]").onclick=closeModal;
+        const typeEl=m.querySelector("#lve-type"), branchField=m.querySelector("#lve-branch-field");
+        typeEl.addEventListener("change",()=>{ branchField.style.display=typeEl.value==="ندب"?"":"none"; });
         m.querySelector("#save-lv-edit").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf-edit")); const p=Object.fromEntries(f.entries());
           if(!p.start_date||!p.end_date){toast("أدخل التواريخ","warn");return;}
+          if(p.type==="ندب"&&!p.secondment_branch_id){toast("اختر الفرع المنتدب إليه","warn");return;}
           if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
           try{
             await api("/leaves/"+lv.id,{method:"PUT",body:p});
@@ -3430,13 +3489,71 @@ const App = (() => {
     const alBtn=$("#add-lv-panel"); if(alBtn)alBtn.onclick=()=>requirePerm("leave_manage",()=>leaveForm(null,null,()=>drawLeavesPanel()));
   }
 
+  async function drawTerminatedPanel(){
+    const [{doctors},{branches}]=await Promise.all([api("/doctors?terminated=1"),api("/branches")]);
+    const bname={}; branches.forEach(b=>bname[b.id]=b.name);
+    const termed=doctors.filter(d=>d.terminated).map(d=>({...d,branch_name:bname[d.branch_id]||""}));
+    const el=$("#ctrl-body"); if(!el) return;
+
+    let q="";
+    const render=()=>{
+      const list=q
+        ? termed.filter(d=>d.name.toLowerCase().includes(q.toLowerCase())||
+            (d.specialty||"").includes(q)||(bname[d.branch_id]||"").includes(q))
+        : termed;
+      el.innerHTML=`
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <input id="term-search" class="search-input" style="flex:1;min-width:180px;border-radius:var(--r-s);padding:8px 14px"
+            placeholder="ابحث باسم أو تخصص أو فرع..." value="${esc(q)}">
+          <span style="color:var(--muted);font-size:13px;white-space:nowrap">${list.length} ممارس</span>
+        </div>
+        ${list.length?list.map(d=>`
+          <div class="dcard-mgmt" style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+            background:color-mix(in srgb,#ede9fe 40%,var(--surface));
+            border:1px solid var(--line);border-inline-start:3px solid #7c3aed;
+            border-radius:var(--r);margin-bottom:8px">
+            ${avatar(d)}
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:14px">${esc(d.name)}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px">
+                ${d.specialty?`<span class="sp-tag">${esc(d.specialty)}</span> `:""}
+                ${esc(bname[d.branch_id]||"")}
+                ${d.terminated_date?` · <span style="color:#7c3aed;font-size:11px">⛔ منذ ${esc(d.terminated_date)}</span>`:""}
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+              ${can("doctor_edit")?`<button class="btn btn-ghost btn-sm" data-edit-term="${d.id}">تعديل</button>`:""}
+              ${can("doctor_edit")?`<button class="btn btn-sm" style="background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd" data-unterm="${d.id}">↩ إعادة تفعيل</button>`:""}
+            </div>
+          </div>`).join("")
+        :`<div class="empty">لا يوجد ممارسون منتهي العقد</div>`}`;
+
+      $("#term-search")?.addEventListener("input",e=>{q=e.target.value;render();});
+      el.querySelectorAll("[data-edit-term]").forEach(btn=>{
+        const id=+btn.dataset.editTerm;
+        const d=termed.find(x=>x.id===id); if(!d)return;
+        btn.onclick=()=>requirePerm("doctor_edit",()=>openDoctorForm(d,()=>drawTerminatedPanel()),d.branch_id,d.specialty);
+      });
+      el.querySelectorAll("[data-unterm]").forEach(btn=>{
+        const id=+btn.dataset.unterm;
+        btn.onclick=async()=>{
+          if(!confirm("إعادة تفعيل هذا الممارس؟")) return;
+          try{await api("/doctors/"+id+"/terminate",{method:"POST",body:{unterm:1}});
+            toast("✅ تم إعادة تفعيل الممارس","ok"); drawTerminatedPanel();}
+          catch(e){toast("❌ "+e.message,"err");}
+        };
+      });
+    };
+    render();
+  }
+
   // ============================================================ MANAGE (doctors + specialties, edit code)
   let mgrTab="doctors";
   routes.control=()=>{
     const hasAny=can("doctor_add")||can("doctor_edit")||can("doctor_delete")||can("leave_manage")||can("specialty_manage")||can("audit_view");
     if(!hasAny){ toast("🔒 لا تملك صلاحية لهذا القسم","warn"); go("doctors"); return; }
     shell(`<div class="loader"><div class="spin"></div></div>`);
-    const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🗓️ الإجازات"],["specialties","🩺 الأقسام"]];
+    const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🗓️ الإجازات"],["terminated","⛔ منتهو العقد"],["specialties","🩺 الأقسام"]];
     if(can("audit_view")) tabs.push(["audit","📋 سجل العمليات"]);
     $("#content").innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
@@ -3453,6 +3570,7 @@ const App = (() => {
     if(mgrTab==="audit") drawAuditPanel();
     else if(mgrTab==="specialties") drawSpecialtiesPanel();
     else if(mgrTab==="leaves") drawLeavesPanel();
+    else if(mgrTab==="terminated") drawTerminatedPanel();
     else drawDoctorsMgmtPanel();
   };
 
