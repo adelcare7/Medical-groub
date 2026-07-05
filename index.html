@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -1073,15 +1072,13 @@ const LocalDB = (() => {
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
     if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple"};
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
-    if (lv && lv.type === "ندب" && lv.secondment_branch_id) {
-      return {state:"secondment", label:"منتدب", color:"secondment", leaveType:"ندب",
-        detail:`منتدب حتى ${lv.end_date}`, secondmentBranchId: lv.secondment_branch_id, leave: lv};
-    }
-    if (lv || doc.status === "leave") {
+    const isSecondment = !!(lv && lv.type === "ندب" && lv.secondment_branch_id);
+    if (!isSecondment && (lv || doc.status === "leave")) {
       const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
       const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
       return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
     }
+    const sec = isSecondment ? {isSecondment:true, secondmentBranchId:lv.secondment_branch_id, leave:lv} : {};
     const sc = doc.schedule || {};
     // normalise shift: if end < start treat as overnight (end += 1440)
     const norm = ([s,e]) => e < s ? [s, e+1440] : [s, e];
@@ -1091,29 +1088,24 @@ const LocalDB = (() => {
     // still inside a shift that started today (before midnight portion)
     for (const [s,e] of todays) {
       if (s <= nowMin && nowMin < Math.min(e, 1440))
-        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,shift_end:e};
+        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,shift_end:e,...sec};
     }
     // inside overnight tail from yesterday's shift
     for (const [s,e] of yest) {
       if (e > 1440 && nowMin < e-1440)
-        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e-1440)}`,shift_end:e-1440};
+        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e-1440)}`,shift_end:e-1440,...sec};
     }
     // upcoming shift today
     const starts = todays.filter(([s])=>s>nowMin).map(([s])=>s);
     if (starts.length) {
       const nx = Math.min(...starts);
-      return {state:"upcoming",label:"يبدأ لاحقاً",color:"amber",detail:`يبدأ ${fmtMin(nx)}`,next_start:nx};
+      return {state:"upcoming",label:"يبدأ لاحقاً",color:"amber",detail:`يبدأ ${fmtMin(nx)}`,next_start:nx,...sec};
     }
-    // had a shift today but it's done, or still has an overnight tail running past midnight
+    // had a shift today but it's done
     if (todays.length) {
-      const overnightRunning = todays.some(([s,e])=>e>1440);
-      if (overnightRunning) {
-        // after midnight: still inside overnight tail — covered above; reaching here means past the end
-        return {state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم"};
-      }
-      return {state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم"};
+      return {state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم",...sec};
     }
-    return {state:"off",label:"إجازة أسبوعية",color:"black",detail:"يوم إجازة"};
+    return {state:"off",label:"إجازة أسبوعية",color:"black",detail:"يوم إجازة",...sec};
   }
 
   function nowInfo() {
@@ -2007,7 +1999,7 @@ const App = (() => {
     const live=d.live||{state:"off",label:""};
     const isLeave=live.state==="leave";
     const isTerminated=live.state==="terminated";
-    const isSecondment=live.state==="secondment";
+    const isSecondment=!!live.isSecondment;
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
     const shift=(isLeave||isTerminated)?"":todayShift(d);
@@ -2024,7 +2016,7 @@ const App = (() => {
           ?`<div class="dcard-shift dcard-leave-info"><span>🔴 ${esc(live.leaveType||"إجازة")}${live.leave&&live.leave.end_date?` · حتى ${esc(fmtDate(live.leave.end_date))}`:""}  </span></div>`
           :"";
     const branchRow=d.branch_name?`<div class="dcard-meta" style="margin-top:3px"><span>🏥 ${esc(d.branch_name)}</span></div>`:"";
-    return `<div class="dcard st-${STATE_CLS[live.state]}" data-doc="${d.id}">
+    return `<div class="dcard st-${isSecondment?"secondment":(STATE_CLS[live.state]||"off")}" data-doc="${d.id}">
       ${avatar(d)}
       <div class="dcard-body">
         <div class="dcard-top">
@@ -2044,7 +2036,7 @@ const App = (() => {
     const {doctor:d}=await api("/doctors/"+id);
     const live=d.live||{};
     const isOnLeave=live.state==="leave";
-    const isSecondmentCard=live.state==="secondment";
+    const isSecondmentCard=!!live.isSecondment;
     const sc=d.schedule||{};
     const sched = WEEK_ORDER.map(i=>[i,sc[i]||sc[String(i)]]).filter(([i,v])=>v&&v.length)
       .map(([i,v])=>`<div><b>${DAYS[i]}:</b> ${v.map(([s,e])=>fmtRange(s,e)).join(" ، ")}</div>`).join("")||"—";
@@ -2453,7 +2445,7 @@ const App = (() => {
     const dayIdx=new Date().getDay();
     const firstStart=(d)=>{const sh=(d.schedule&&(d.schedule[dayIdx]||d.schedule[String(dayIdx)]))||[];
       return sh.length?Math.min(...sh.map(x=>x[0])):null;};
-    const effBranch=(d)=>d.live.state==="secondment"?d.live.secondmentBranchId:d.branch_id;
+    const effBranch=(d)=>d.live.isSecondment?d.live.secondmentBranchId:d.branch_id;
     const presentInBranch=(bid)=>doctors.filter(d=>effBranch(d)==bid&&d.live.state==="present").length;
     const allSpecs=[...new Set(doctors.map(d=>d.specialty))].filter(Boolean).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
 
@@ -2480,7 +2472,7 @@ const App = (() => {
       const body=$("#dash-body"); body.classList.add("fade");
       const isToday=dashDay===-1;
       const viewDay=isToday?dayIdx:dashDay;
-      const effectiveBranch=(d)=>d.live.state==="secondment"?String(d.live.secondmentBranchId):String(d.branch_id);
+      const effectiveBranch=(d)=>d.live.isSecondment?String(d.live.secondmentBranchId):String(d.branch_id);
       const branchDocs=doctors.filter(d=>!dashBranch||effectiveBranch(d)===String(dashBranch));
 
       // stat cards only for today view
@@ -2742,7 +2734,7 @@ const App = (() => {
     const counts={present:0,upcoming:0,leave:0,seconded:0};
     doctors.forEach(d=>{const s=d.live.state;
       if(s==="present")counts.present++; else if(s==="upcoming")counts.upcoming++;
-      else if(s==="secondment")counts.seconded++;
+      else if(d.live.isSecondment)counts.seconded++;
       else if(s==="leave"||s==="off")counts.leave++;});
     // group by department (specialty) and order: طب عام، باطنة، ...
     const bySpec={}; doctors.forEach(d=>{(bySpec[d.specialty]=bySpec[d.specialty]||[]).push(d);});
