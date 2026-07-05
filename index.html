@@ -180,6 +180,59 @@ a{color:inherit;text-decoration:none}
   background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);transition:.12s}
 .icon-btn:hover{border-color:var(--brand);color:var(--brand-d)}
 
+/* ---------- Notifications ---------- */
+.notif-wrap{position:relative}
+.notif-btn{position:relative}
+.notif-badge{position:absolute;top:-5px;inset-inline-end:-5px;background:#e53e3e;color:#fff;
+  font-size:10px;font-weight:700;min-width:17px;height:17px;border-radius:20px;
+  display:flex;align-items:center;justify-content:center;padding:0 4px;pointer-events:none;
+  border:2px solid var(--surface);animation:badgePop .25s cubic-bezier(.36,.07,.19,.97)}
+@keyframes badgePop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+.notif-btn.ringing svg{animation:bellRing .6s ease}
+@keyframes bellRing{
+  0%{transform:rotate(0)}
+  15%{transform:rotate(18deg)}
+  30%{transform:rotate(-16deg)}
+  45%{transform:rotate(12deg)}
+  60%{transform:rotate(-10deg)}
+  75%{transform:rotate(5deg)}
+  90%{transform:rotate(-3deg)}
+  100%{transform:rotate(0)}
+}
+.notif-panel{position:fixed;top:56px;inset-inline-end:8px;width:340px;max-width:calc(100vw - 16px);
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 8px 32px rgba(0,0,0,.14);z-index:3000;overflow:hidden;
+  animation:slideDown .15s ease}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.notif-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;
+  border-bottom:1px solid var(--line)}
+.notif-head-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
+.notif-clear{font-size:12px;color:var(--muted);cursor:pointer;background:none;border:none;padding:2px 6px;border-radius:6px;transition:.12s}
+.notif-clear:hover{background:var(--surface2);color:var(--brand)}
+.notif-list{max-height:380px;overflow-y:auto}
+.notif-empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.notif-empty svg{opacity:.3;width:40px;height:40px}
+.notif-footer{padding:8px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center}
+.notif-item{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);cursor:default;transition:.12s}
+.notif-item:last-child{border-bottom:none}
+.notif-item.unread{background:var(--brand-soft)}
+.notif-item:hover{background:var(--surface2)}
+.notif-ico{flex-shrink:0;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center}
+.notif-ico svg{width:18px;height:18px}
+.notif-ico.arrived{background:#d1fae5;color:#065f46}
+.notif-ico.departed{background:#f1f5f9;color:#475569}
+.notif-ico.leave{background:#fef3c7;color:#92400e}
+.notif-ico.leave-end{background:#fee2e2;color:#991b1b}
+[data-theme="dark"] .notif-ico.arrived{background:#064e3b;color:#6ee7b7}
+[data-theme="dark"] .notif-ico.departed{background:#1e293b;color:#94a3b8}
+[data-theme="dark"] .notif-ico.leave{background:#451a03;color:#fcd34d}
+[data-theme="dark"] .notif-ico.leave-end{background:#450a0a;color:#fca5a5}
+.notif-body{flex:1;min-width:0}
+.notif-msg{font-size:13px;line-height:1.4;margin-bottom:3px;font-weight:500}
+.notif-sub{font-size:11.5px;color:var(--muted);margin-bottom:2px}
+.notif-time{font-size:11px;color:var(--muted);opacity:.75}
+
 /* ---------- Topbar date widget ---------- */
 .topbar-date{
   display:flex;flex-direction:column;align-items:flex-end;gap:1px;
@@ -217,8 +270,8 @@ a{color:inherit;text-decoration:none}
   flex-direction:column!important;
   align-items:flex-start!important;
   justify-content:flex-start!important;
-  flex:0 0 152px!important;
-  width:152px!important;
+  flex:0 0 172px!important;
+  width:172px!important;
   height:86px!important;
   box-sizing:border-box!important;
   padding:9px 11px!important;
@@ -258,7 +311,7 @@ a{color:inherit;text-decoration:none}
 /* branch bar: all items top-aligned */
 .branch-bar{align-items:flex-start}
 @media(max-width:600px){
-  .bchip-branch{flex:0 0 138px!important;width:138px!important;height:82px!important;padding:8px 10px!important}
+  .bchip-branch{flex:0 0 154px!important;width:154px!important;height:82px!important;padding:8px 10px!important}
 }
 
 /* ---------- Mini stat cards ---------- */
@@ -446,6 +499,39 @@ a{color:inherit;text-decoration:none}
   padding:18px;box-shadow:var(--shadow);transition:.15s;cursor:pointer}
 .branch-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-l)}
 .branch-card .bc-top{display:flex;justify-content:space-between;align-items:flex-start}
+.bc-icons{display:flex;align-items:center;gap:8px}
+.bc-info-btn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1.5px solid var(--brand);border-radius:50%;cursor:pointer;transition:.15s;color:var(--brand);flex-shrink:0;padding:0}
+.bc-info-btn:hover{background:var(--brand);color:#fff}
+.bc-info-btn svg{width:15px;height:15px;display:block}
+.bchip-info{width:18px;height:18px;padding:0;min-height:0;margin-inline-end:3px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0}
+/* branch details — view mode */
+.binfo-view{}
+.binfo-fields{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:4px 14px;margin-bottom:14px}
+.binfo-row{display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.binfo-row:last-child{border-bottom:none}
+.bir-lbl{flex:0 0 130px;font-size:12px;color:var(--muted);font-weight:600}
+.bir-val{flex:1;font-size:13.5px;line-height:1.5;word-break:break-all}
+.bsec-v{margin-bottom:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.bsec-head-v{background:var(--brand);color:#fff;font-weight:700;font-size:13px;padding:8px 14px;letter-spacing:.3px}
+.bsec-items-v{padding:0 14px}
+.bsec-item-v{padding:9px 0;border-bottom:1px solid var(--line)}
+.bsec-item-v:last-child{border-bottom:none}
+.biv-name{font-weight:600;font-size:13px;line-height:1.4}
+.biv-desc{font-size:12.5px;color:var(--muted);margin-top:4px;line-height:1.6}
+/* branch details — edit mode */
+.bsec-sep{display:flex;align-items:center;gap:10px;margin:18px 0 12px;color:var(--muted);font-size:12.5px;font-weight:700}
+.bsec-sep::before,.bsec-sep::after{content:"";flex:1;height:1px;background:var(--line)}
+.bsec{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.bsec-head{display:flex;gap:6px;align-items:center;margin-bottom:8px;background:var(--brand);margin:-10px -12px 10px;padding:8px 12px;border-radius:9px 9px 0 0}
+.bsec-title{flex:1;font-weight:700;font-size:14px;background:transparent;border-color:rgba(255,255,255,.3);color:#fff}
+.bsec-title::placeholder{color:rgba(255,255,255,.6)}
+.bsec-head .sbtn-del{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff}
+.bsec-head .sbtn-del:hover{background:rgba(255,255,255,.3)}
+.bsec-item{display:flex;gap:6px;align-items:flex-start;margin-bottom:6px}
+.bsec-item .bi-name{flex:1;min-width:0;font-size:13px;resize:vertical}
+.bi-pair{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.bi-pair .bi-name{border:none;border-bottom:1px solid var(--line);border-radius:0;font-weight:600;font-size:13px;background:var(--surface);padding:6px 8px;resize:none}
+.bi-pair .bi-desc{border:none;border-radius:0;font-size:12.5px;color:var(--muted);background:var(--surface2);padding:6px 8px;resize:vertical;min-height:40px}
 .branch-card h3{font-size:17px;font-weight:700}
 .branch-card .grp{font-size:12px;color:var(--brand-d);font-weight:600}
 [data-theme="dark"] .branch-card .grp{color:var(--brand)}
@@ -681,7 +767,7 @@ body.modal-open{overflow:hidden}
   .mini-stat .ms-v{font-size:20px}
 
   /* -- Branch bar mobile -- */
-  .bchip-branch{flex:0 0 138px!important;width:138px!important;height:80px!important;padding:8px 10px!important}
+  .bchip-branch{flex:0 0 154px!important;width:154px!important;height:80px!important;padding:8px 10px!important}
   .bchip{padding:8px 14px;font-size:13px}
 
   /* -- Modals: full-screen bottom sheet on mobile -- */
@@ -772,7 +858,7 @@ body.modal-open{overflow:hidden}
   .mini-stat .ms-ico{display:none}
   .mini-stat{gap:8px;padding:9px 11px}
   .topbar-date{display:none}
-  .bchip-branch{flex:0 0 125px!important;width:125px!important;height:76px!important}
+  .bchip-branch{flex:0 0 140px!important;width:140px!important;height:76px!important}
   .modal{max-height:90vh;max-height:90dvh}
   .search-input{font-size:16px;padding:9px 36px;height:44px}
   .page-title{font-size:17px}
@@ -821,17 +907,32 @@ const LocalDB = (() => {
   };
 
   let _memDB = null, _memSess = {auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]};
-  const _fails = {};
+  const SESS_TTL = 8 * 60 * 60 * 1000; // 8-hour session expiry
+  const FAIL_KEY = "adelcare_fails";
+  // Restore persisted lockout on boot
+  const _fails = (()=>{ try{return JSON.parse(localStorage.getItem(FAIL_KEY)||"{}");}catch(e){return {};} })();
   let _fsDB, _docRef, _auditRef, _initPromise, _lastWriteTs = 0;
 
   function load() { return _memDB; }
 
   function getSession() {
-    try { const s=localStorage.getItem(SESS); return (s && JSON.parse(s)) || _memSess; } catch(e) { return _memSess; }
+    try {
+      const s=localStorage.getItem(SESS);
+      if(!s) return _memSess;
+      const parsed=JSON.parse(s);
+      // Expire stale sessions
+      if(parsed.auth && parsed.exp && Date.now() > parsed.exp){
+        const blank={auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]};
+        _memSess=blank; localStorage.removeItem(SESS); return blank;
+      }
+      return parsed;
+    } catch(e) { return _memSess; }
   }
   function setSession(s) {
-    _memSess = s;
-    try { localStorage.setItem(SESS, JSON.stringify(s)); } catch(e) {}
+    // Attach expiry only for authenticated sessions
+    const withExp = s.auth ? {...s, exp: Date.now()+SESS_TTL} : s;
+    _memSess = withExp;
+    try { localStorage.setItem(SESS, JSON.stringify(withExp)); } catch(e) {}
   }
 
   function save(db) {
@@ -843,7 +944,10 @@ const LocalDB = (() => {
       _auditRef.set({ data: JSON.stringify(audit || []) }).catch(e => console.error('[Adelcare] Firestore audit:', e));
     }
     try{
-      localStorage.setItem('adelcare_backup', JSON.stringify(db));
+      // Strip PINs from local backup to avoid sensitive data in plaintext browser storage
+      const safeDb=JSON.parse(JSON.stringify(db));
+      if(safeDb.settings&&safeDb.settings.users) safeDb.settings.users=safeDb.settings.users.map(({pin:_,...u})=>u);
+      localStorage.setItem('adelcare_backup', JSON.stringify(safeDb));
       localStorage.setItem('adelcare_backup_ts', new Date().toISOString());
     }catch(e){}
   }
@@ -1047,10 +1151,11 @@ const LocalDB = (() => {
       if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
       const code = (body.code||"").trim();
       const ac = db.settings.access_code||"123";
-      if (code===ac) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:false,userId:null,name:"زائر",permissions:[],branches:[],specialties:[]}); return getSession(); }
+      if (code===ac) { _fails[fk]={count:0,until:0}; try{localStorage.setItem(FAIL_KEY,JSON.stringify(_fails));}catch(e){} setSession({auth:true,edit:false,userId:null,name:"زائر",permissions:[],branches:[],specialties:[]}); return getSession(); }
       const usr = (db.settings.users||[]).find(u=>u.pin===code&&u.active);
-      if (usr) { _fails[fk]={count:0,until:0}; setSession({auth:true,edit:true,userId:usr.id,name:usr.name,permissions:usr.permissions||[],branches:usr.branches||["*"],specialties:usr.specialties||["*"]}); return getSession(); }
-      const nc=fl.count+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+30000:0};
+      if (usr) { _fails[fk]={count:0,until:0}; try{localStorage.setItem(FAIL_KEY,JSON.stringify(_fails));}catch(e){} setSession({auth:true,edit:true,userId:usr.id,name:usr.name,permissions:usr.permissions||[],branches:usr.branches||["*"],specialties:usr.specialties||["*"]}); return getSession(); }
+      const nc=fl.count+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+60000:0};
+      try{localStorage.setItem(FAIL_KEY,JSON.stringify(_fails));}catch(e){}
       throw Object.assign(new Error("رمز الدخول غير صحيح"),{status:401});
     }
     if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]}); return {ok:true}; }
@@ -1065,6 +1170,7 @@ const LocalDB = (() => {
     // USERS MANAGEMENT
     if (method==="GET" && path==="/users") {
       needPerm("users_manage");
+      // PINs are included for users_manage — they need them to help staff recover access
       return {users:(db.settings.users||[]).map(u=>({...u}))};
     }
     if (method==="POST" && path==="/users") {
@@ -1176,7 +1282,7 @@ const LocalDB = (() => {
       if (method==="PUT") {
         needPerm("branch_manage");
         const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
-        ["name","grp","info","hours","phone","landline","bank_account","iban","extra_info"].forEach(k=>{ if(k in body) b[k]=body[k]; });
+        ["name","grp","info","hours","phone","landline","bank_account","iban","extra_info","details"].forEach(k=>{ if(k in body) b[k]=body[k]; });
         log(db,"تعديل فرع","branch",bid,b.name); save(db); return {ok:true};
       }
       if (method==="DELETE") {
@@ -1563,6 +1669,154 @@ const LocalDB = (() => {
 /* ============ Adelcare SPA ============ */
 const App = (() => {
   const state = { user: null, route: "dashboard", params: {}, sidebarOpen: false, doctorsSearch: "", globalSearch: "", dashScroll: 0 };
+
+  /* ── Notification system ── */
+  let _notifs = [];          // {id,type,msg,sub,time,read}
+  let _notifOpen = false;
+  let _prevPresent = null;   // Set of doctor ids known to be present
+  let _notifSeen = new Set();// ids of already-triggered one-time notifs
+  let _notifInterval = null;
+  let _notifDateKey = "";    // tracks date to reset daily notifs
+
+  function _todayStr(){const n=new Date(),p=x=>String(x).padStart(2,'0');return`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;}
+  function _tomorrowStr(){const n=new Date();n.setDate(n.getDate()+1);const p=x=>String(x).padStart(2,'0');return`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;}
+  function _timeLabel(){const n=new Date();const p=x=>String(x).padStart(2,'0');return`${p(n.getHours())}:${p(n.getMinutes())}`;}
+
+  const _NOTIF_ICONS={
+    arrived:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="9 11 12 14 15 11" transform="translate(0 2)"/></svg>`,
+    departed:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><line x1="9" y1="17" x2="15" y2="17"/></svg>`,
+    leave:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    "leave-end":`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>`
+  };
+
+  function _relTime(timeStr){
+    if(!timeStr) return "";
+    const [h,m]=timeStr.split(":").map(Number);
+    const now=new Date(), nowMin=now.getHours()*60+now.getMinutes();
+    const tMin=h*60+m, diff=nowMin-tMin;
+    if(diff<1) return "الآن";
+    if(diff<60) return `منذ ${diff} د`;
+    const hr=Math.floor(diff/60);
+    return hr===1?"منذ ساعة":`منذ ${hr} س`;
+  }
+
+  function _pushNotif(id,type,msg,sub){
+    if(_notifSeen.has(id)) return;
+    _notifSeen.add(id);
+    _notifs.unshift({id,type,msg,sub,time:_timeLabel(),read:false});
+    if(_notifs.length>50) _notifs=_notifs.slice(0,50);
+    _renderBell(true);
+    if(Notification.permission==="granted"){
+      try{ new Notification("عادل الطبية — "+msg,{body:sub,icon:"/favicon.ico",dir:"rtl"}); }catch(e){}
+    }
+  }
+
+  function _renderBell(ring=false){
+    const wrap=document.getElementById("notif-wrap"); if(!wrap) return;
+    const btn=wrap.querySelector(".notif-btn");
+    const unread=_notifs.filter(n=>!n.read).length;
+    const badge=wrap.querySelector(".notif-badge");
+    if(badge) badge.textContent=unread>0?unread:"", badge.style.display=unread>0?"flex":"none";
+    if(ring&&btn){
+      btn.classList.remove("ringing");
+      void btn.offsetWidth; // reflow to restart animation
+      btn.classList.add("ringing");
+      setTimeout(()=>btn.classList.remove("ringing"),700);
+    }
+    if(_notifOpen) _renderPanel();
+  }
+
+  function _renderPanel(){
+    let panel=document.getElementById("notif-panel");
+    if(!panel){
+      panel=document.createElement("div");
+      panel.id="notif-panel"; panel.className="notif-panel";
+      document.body.appendChild(panel);
+    }
+    const unread=_notifs.filter(n=>!n.read).length;
+    const itemsHTML=_notifs.length?_notifs.map(n=>`
+      <div class="notif-item${n.read?"":" unread"}">
+        <div class="notif-ico ${n.type}">${_NOTIF_ICONS[n.type]||""}</div>
+        <div class="notif-body">
+          <div class="notif-msg">${n.msg}</div>
+          ${n.sub?`<div class="notif-sub">${n.sub}</div>`:""}
+          <div class="notif-time">${_relTime(n.time)} · ${n.time}</div>
+        </div>
+      </div>`).join(""):`<div class="notif-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="12" y1="2" x2="12" y2="1"/></svg>
+        <span>لا توجد إشعارات</span>
+      </div>`;
+    panel.innerHTML=`<div class="notif-head">
+      <span class="notif-head-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        الإشعارات
+        ${unread>0?`<span class="notif-badge" style="position:static;margin-inline-start:2px">${unread}</span>`:""}
+      </span>
+      ${_notifs.length?`<button class="notif-clear" id="notif-clr">مسح الكل</button>`:""}
+    </div>
+    <div class="notif-list">${itemsHTML}</div>
+    ${_notifs.length?`<div class="notif-footer">آخر تحديث: ${_timeLabel()}</div>`:""}`;
+    panel.querySelector("#notif-clr")?.addEventListener("click",()=>{_notifs=[];_notifSeen=new Set();_notifOpen=false;panel.remove();_renderBell();});
+    _notifs.forEach(n=>n.read=true);
+    setTimeout(_renderBell,50);
+  }
+
+  function _closePanel(){
+    _notifOpen=false;
+    const p=document.getElementById("notif-panel"); if(p) p.remove();
+  }
+
+  async function checkNotifications(){
+    const dk=_todayStr();
+    if(dk!==_notifDateKey){ _notifDateKey=dk; _notifSeen=new Set([]); }
+    try{
+      const [{doctors},{branches},leavesRes] = await Promise.all([
+        api("/doctors"),
+        api("/branches"),
+        api("/leaves")
+      ]);
+      const bmap={}; branches.forEach(b=>bmap[b.id]=b.name);
+      const today=_todayStr(), tomorrow=_tomorrowStr();
+      const nowPresent=new Set(doctors.filter(d=>d.live&&d.live.state==="present").map(d=>d.id));
+
+      // ── Doctor arrived / departed ──
+      if(_prevPresent!==null){
+        for(const d of doctors){
+          const isNowPresent=d.live&&d.live.state==="present";
+          const wasPresent=_prevPresent.has(d.id);
+          if(isNowPresent&&!wasPresent){
+            _pushNotif(`arrived-${d.id}-${today}-${_timeLabel()}`,
+              "arrived",`د. ${d.name} حضر الآن`,bmap[d.branch_id]||"");
+          } else if(!isNowPresent&&wasPresent&&d.live&&d.live.state!=="upcoming"){
+            _pushNotif(`departed-${d.id}-${today}-${_timeLabel()}`,
+              "departed",`د. ${d.name} غادر`,bmap[d.branch_id]||"");
+          }
+        }
+      }
+      _prevPresent=nowPresent;
+
+      // ── Leaves ending today / tomorrow ──
+      const leaves=leavesRes.leaves||[];
+      leaves.filter(l=>!l.synthetic&&l.end_date===today).forEach(l=>{
+        _pushNotif(`leave-end-${l.id}-${today}`,"leave-end",
+          `إجازة ${l.doctor_name} تنتهي اليوم`,l.branch_name||"");
+      });
+      leaves.filter(l=>!l.synthetic&&l.end_date===tomorrow).forEach(l=>{
+        _pushNotif(`leave-tmrw-${l.id}-${today}`,"leave",
+          `إجازة ${l.doctor_name} تنتهي غداً`,l.branch_name||"");
+      });
+    }catch(e){}
+  }
+
+  function startNotifPolling(){
+    if(_notifInterval) clearInterval(_notifInterval);
+    checkNotifications();
+    _notifInterval=setInterval(checkNotifications,60000);
+    if(Notification.permission==="default"){
+      setTimeout(()=>Notification.requestPermission(),3000);
+    }
+  }
+
   const DAYS = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
   // week starts on Saturday (Saudi). Display order of JS getDay() indices:
   const WEEK_ORDER = [6,0,1,2,3,4,5];   // السبت، الأحد، ... الجمعة
@@ -1951,6 +2205,7 @@ const App = (() => {
         state.user=u;
         if(u.userId) toast("مرحباً "+u.name,"ok");
         else toast("مرحباً — وضع القراءة فقط","info");
+        startNotifPolling();
         go("dashboard");
       }catch(err){ toast(err.message); inp.value=""; inp.focus(); }
     };
@@ -1998,6 +2253,12 @@ const App = (() => {
             <input class="search-input" id="gsearch" placeholder="ابحث: اسم، تخصص، جنسية، فرع، شفت، حالة..." autocomplete="off">
           </div>
           ${buildTopbarDate()}
+          <div class="notif-wrap" id="notif-wrap">
+            <button class="icon-btn notif-btn" id="notif-btn" title="الإشعارات">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span class="notif-badge" style="display:none">0</span>
+            </button>
+          </div>
           ${showSettings?`<button class="icon-btn${state.route==="admin"?" active-ctrl":""}" id="ctrl-btn" title="الإعدادات">⚙️</button>`:""}
           <button class="icon-btn" id="theme-btn"><span id="theme-ico">${document.documentElement.getAttribute("data-theme")==="dark"?"☀️":"🌙"}</span></button>
           <button class="icon-btn topbar-logout" id="top-logout" title="تسجيل الخروج"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
@@ -2007,7 +2268,13 @@ const App = (() => {
       <nav class="mobile-nav">${mnav}</nav>
     </div>`;
     $("#app").querySelectorAll("[data-nav]").forEach(a=>a.onclick=()=>go(a.dataset.nav));
-    const doLogout=async()=>{await api("/logout",{method:"POST"});state.user=null;render();};
+    const doLogout=async()=>{
+      await api("/logout",{method:"POST"});
+      state.user=null;
+      if(_notifInterval){clearInterval(_notifInterval);_notifInterval=null;}
+      _prevPresent=null; _notifs=[]; _notifSeen=new Set(); _closePanel();
+      render();
+    };
     $("#logout").onclick=doLogout;
     const tLogout=$("#top-logout"); if(tLogout)tLogout.onclick=doLogout;
     const ctrlBtn=$("#ctrl-btn"); if(ctrlBtn) ctrlBtn.onclick=()=>go("admin");
@@ -2015,6 +2282,24 @@ const App = (() => {
 
     const ham=$("#ham"); if(ham)ham.onclick=()=>{state.sidebarOpen=!state.sidebarOpen;render();};
     const scr=$("[data-scrim]"); if(scr)scr.onclick=()=>{state.sidebarOpen=false;render();};
+
+    // Notification bell
+    const nBtn=$("#notif-btn");
+    if(nBtn){
+      _renderBell();
+      nBtn.onclick=(e)=>{
+        e.stopPropagation();
+        if(_notifOpen){_closePanel();}
+        else{_notifOpen=true;_renderPanel();}
+      };
+    }
+    // Close panel on outside click
+    document.addEventListener("click",(e)=>{
+      if(_notifOpen&&!e.target.closest("#notif-wrap")&&!e.target.closest("#notif-panel")){
+        _closePanel();
+      }
+    },{once:true});
+
     setupSearch();
     updateAvailBadge();
   }
@@ -2139,7 +2424,7 @@ const App = (() => {
       </button>
       ${branches.map(b=>`
         <button class="bchip bchip-branch ${String(dashBranch)===String(b.id)?"on":""}" data-bf="${b.id}">
-          <span class="bchip-top"><span class="bchip-name">${esc(b.name)}</span><span class="bchip-n">${presentInBranch(b.id)}</span></span>
+          <span class="bchip-top"><span class="bc-info-btn bchip-info" role="button" data-binfo="${b.id}" title="بيانات الفرع"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="5.5" r=".8" fill="currentColor" stroke="none"/><line x1="8" y1="8" x2="8" y2="12"/></svg></span><span class="bchip-name">${esc(b.name)}</span><span class="bchip-n">${presentInBranch(b.id)}</span></span>
           <span class="bchip-hours">${b.hours?`🕐 ${esc(b.hours)}`:""}</span>
         </button>`).join("")}
     </div>`;
@@ -2245,7 +2530,14 @@ const App = (() => {
       <div class="page-title">ممارسو اليوم</div>
       ${branchBar}
       <div id="dash-body"></div>`;
-    $("#branch-bar").querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{
+    $("#branch-bar").querySelectorAll("[data-bf]").forEach(b=>b.onclick=(e)=>{
+      const info=e.target.closest("[data-binfo]");
+      if(info){
+        e.stopPropagation();
+        const br=branches.find(x=>String(x.id)===String(info.dataset.binfo));
+        if(br)branchInfoModal(br);
+        return;
+      }
       dashBranch=b.dataset.bf;
       $("#branch-bar").querySelectorAll(".bchip").forEach(x=>x.classList.toggle("on",x===b));
       drawBody();
@@ -2262,7 +2554,8 @@ const App = (() => {
       <div class="page-sub">${branches.length} فروع — اضغط على الفرع لعرض أطبائه</div>
       <div class="branch-grid" style="margin-top:18px">${branches.map(b=>`
         <div class="branch-card" data-b="${b.id}">
-          <div class="bc-top"><div><h3>${esc(b.name)}</h3><div class="grp">${esc(b.grp||"")}</div></div><div style="font-size:26px">🏥</div></div>
+          <div class="bc-top"><div><h3>${esc(b.name)}</h3><div class="grp">${esc(b.grp||"")}</div></div>
+            <div class="bc-icons"><button type="button" class="bc-info-btn" data-binfo="${b.id}" title="بيانات الفرع"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="5.5" r=".8" fill="currentColor" stroke="none"/><line x1="8" y1="8" x2="8" y2="12"/></svg></button><span style="font-size:26px">🏥</span></div></div>
           ${b.info?`<div class="page-sub" style="margin-top:6px">${esc(b.info)}</div>`:""}
           <div class="bc-stat">
             <div><div class="n">${b.doctor_count}</div><div class="x">طبيب</div></div>
@@ -2270,8 +2563,136 @@ const App = (() => {
             <div><div class="n">${b.specialties.length}</div><div class="x">تخصص</div></div>
           </div>
         </div>`).join("")}</div>`;
-    $("#content").querySelectorAll("[data-b]").forEach(c=>c.onclick=()=>go("branches",{id:c.dataset.b}));
+    $("#content").querySelectorAll("[data-b]").forEach(c=>c.onclick=(e)=>{
+      if(e.target.closest("[data-binfo]")) return;
+      go("branches",{id:c.dataset.b});
+    });
+    $("#content").querySelectorAll("[data-binfo]").forEach(btn=>btn.onclick=(e)=>{
+      e.stopPropagation();
+      const b=branches.find(x=>String(x.id)===String(btn.dataset.binfo));
+      if(b) branchInfoModal(b);
+    });
   };
+
+  // ---- Branch info modal: fields config (extensible — add new fields here) ----
+  const BRANCH_FIELDS=[
+    {key:"name",label:"اسم الفرع",required:true},
+    {key:"grp",label:"المجموعة"},
+    {key:"info",label:"الوصف"},
+    {key:"hours",label:"ساعات العمل"},
+    {key:"phone",label:"رقم الجوال",type:"tel",dir:"ltr"},
+    {key:"landline",label:"الهاتف الثابت",type:"tel",dir:"ltr"},
+    {key:"bank_account",label:"رقم الحساب البنكي",dir:"ltr"},
+    {key:"iban",label:"الآيبان (IBAN)",dir:"ltr"},
+    {key:"extra_info",label:"معلومات إضافية",type:"textarea"},
+  ];
+
+  function branchInfoModal(b, opts={}){
+    const editable=can("branch_manage")&&canBranch(b.id);
+
+    /* ── VIEW renderers ── */
+    const secItemView=(it)=>{
+      if(!it.name&&!it.desc)return"";
+      return`<div class="bsec-item-v">
+        <div class="biv-name">${esc(it.name||"")}</div>
+        ${it.desc?`<div class="biv-desc">${esc(it.desc||"")}</div>`:""}
+      </div>`;};
+    const secView=(sec)=>{
+      const items=(sec.items||[]).filter(it=>it.name||it.desc);
+      if(!sec.title&&!items.length)return"";
+      return`<div class="bsec-v">
+        <div class="bsec-head-v">${esc(sec.title||"")}</div>
+        <div class="bsec-items-v">${items.map(secItemView).join("")}</div>
+      </div>`;};
+
+    /* ── EDIT renderers ── */
+    const secItemHTML=(it,isNew)=>{
+      const hasDesc=(it.desc&&String(it.desc).trim())||(!it.name&&!it.desc&&isNew);
+      const inner=hasDesc
+        ?`<div class="bi-pair">
+          <textarea class="bi-name" placeholder="اسم الجهاز / البند" rows="1">${esc(it.name||"")}</textarea>
+          <textarea class="bi-desc" placeholder="التفاصيل" rows="2">${esc(it.desc||"")}</textarea>
+        </div>`
+        :`<textarea class="bi-name" placeholder="البند" rows="2">${esc(it.name||"")}</textarea>`;
+      return`<div class="bsec-item">${inner}<button type="button" class="sbtn sbtn-del" data-del-item title="حذف">✕</button></div>`;};
+    const secHTML=(sec)=>`<div class="bsec">
+      <div class="bsec-head">
+        <input class="bsec-title" placeholder="عنوان القسم" value="${esc(sec.title||"")}">
+        <button type="button" class="sbtn sbtn-del" data-del-sec title="حذف القسم">✕</button>
+      </div>
+      <div class="bsec-items">${(sec.items||[]).map(it=>secItemHTML(it)).join("")}</div>
+      <button type="button" class="btn btn-ghost btn-xs" data-add-item>+ بند</button>
+    </div>`;
+
+    if(!opts.edit){
+      /* ── VIEW MODE ── */
+      const hasFields=BRANCH_FIELDS.some(f=>b[f.key]);
+      const fieldsHTML=hasFields?`<div class="binfo-fields">${BRANCH_FIELDS.filter(f=>b[f.key]).map(f=>`
+        <div class="binfo-row"><span class="bir-lbl">${f.label}</span><span class="bir-val"${f.dir?` dir="${f.dir}"`:""}>${esc(b[f.key])}</span></div>`).join("")}</div>`:"";
+      const secsHTML=(b.details||[]).length
+        ?`<div class="bsec-sep"><span>أقسام تفصيلية</span></div>${(b.details||[]).map(secView).join("")}`:"";
+      const body=`<div class="binfo-view">${fieldsHTML}${secsHTML}</div>`;
+      const foot=editable
+        ?`<button class="btn btn-ghost" data-x2>إغلاق</button><button class="btn btn-primary" data-edit>✏️ تعديل</button>`
+        :`<button class="btn btn-ghost" data-x2>إغلاق</button>`;
+      openModal({title:`📋 بيانات الفرع — ${b.name}`,bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
+        m.querySelector("[data-x2]").onclick=closeModal;
+        const eb=m.querySelector("[data-edit]");
+        if(eb)eb.onclick=()=>{closeModal();setTimeout(()=>branchInfoModal(b,{edit:true}),200);};
+      }});
+    } else {
+      /* ── EDIT MODE ── */
+      const body=`<form id="binfo-form">${BRANCH_FIELDS.map(f=>{
+        const v=esc(b[f.key]||"");
+        const attrs=`name="${f.key}" ${f.dir?`dir="${f.dir}"`:""} ${f.required?"required":""}`;
+        return`<div class="field"><label>${f.label}${f.required?" *":""}</label>${
+          f.type==="textarea"?`<textarea ${attrs} rows="3">${v}</textarea>`
+          :`<input type="${f.type||"text"}" ${attrs} value="${v}">`}</div>`;
+      }).join("")}
+      <div class="bsec-sep"><span>أقسام تفصيلية</span></div>
+      <div id="binfo-secs">${(b.details||[]).map(secHTML).join("")}</div>
+      <button type="button" class="btn btn-ghost btn-sm" data-add-sec>+ قسم جديد</button>
+      </form>`;
+      const foot=`<button class="btn btn-ghost" data-x2>إلغاء</button><button class="btn btn-primary" data-save form="binfo-form">💾 حفظ</button>`;
+      openModal({title:`✏️ تعديل الفرع — ${b.name}`,bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
+        m.querySelector("[data-x2]").onclick=()=>{closeModal();setTimeout(()=>branchInfoModal(b),200);};
+        const secsEl=m.querySelector("#binfo-secs");
+        const wire=(scope)=>{
+          scope.querySelectorAll("[data-del-sec]").forEach(x=>x.onclick=()=>x.closest(".bsec").remove());
+          scope.querySelectorAll("[data-del-item]").forEach(x=>x.onclick=()=>x.closest(".bsec-item").remove());
+          scope.querySelectorAll("[data-add-item]").forEach(x=>x.onclick=()=>{
+            const holder=x.closest(".bsec").querySelector(".bsec-items");
+            holder.insertAdjacentHTML("beforeend",secItemHTML({},true));
+            wire(holder.lastElementChild);
+          });
+        };
+        wire(m);
+        const addSec=m.querySelector("[data-add-sec]");
+        if(addSec)addSec.onclick=()=>{secsEl.insertAdjacentHTML("beforeend",secHTML({items:[{}]}));wire(secsEl.lastElementChild);};
+        const sv=m.querySelector("[data-save]");
+        if(sv)sv.onclick=async(e)=>{
+          e.preventDefault();
+          const form=m.querySelector("#binfo-form");
+          if(!form.reportValidity())return;
+          const payload={};
+          BRANCH_FIELDS.forEach(f=>{const el2=form.elements[f.key];if(el2)payload[f.key]=el2.value.trim();});
+          payload.details=[...secsEl.querySelectorAll(".bsec")].map(s=>({
+            title:s.querySelector(".bsec-title").value.trim(),
+            items:[...s.querySelectorAll(".bsec-item")].map(it=>({
+              name:it.querySelector(".bi-name").value.trim(),
+              desc:(it.querySelector(".bi-desc")?.value||"").trim()
+            })).filter(it=>it.name||it.desc)
+          })).filter(s=>s.title||s.items.length);
+          sv.disabled=true;
+          try{
+            await api("/branches/"+b.id,{method:"PUT",body:payload});
+            toast("✅ تم حفظ بيانات الفرع","ok");
+            closeModal();setTimeout(()=>branchInfoModal({...b,...payload}),200);
+          }catch(err){toast(err.message||"تعذر الحفظ","warn");sv.disabled=false;}
+        };
+      }});
+    }
+  }
 
   async function renderBranch(id){
     shell(`<div class="loader"><div class="spin"></div></div>`);
