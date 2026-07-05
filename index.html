@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -2070,7 +2069,7 @@ const App = (() => {
           <div class="la-info">${isSecondmentCard?"🔀":"🔴"} ${esc(activeLv?activeLv.type:live.leaveType||(isSecondmentCard?"ندب":"إجازة"))}</div>
           ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.secondment_branch_name?` · إلى ${esc(activeLv.secondment_branch_name)}`:""}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
         </div>
-        ${hasLeaveRecord?`<div class="la-actions">
+        ${hasLeaveRecord&&can("leave_manage")?`<div class="la-actions">
           <button class="btn btn-xs btn-ghost" data-edit-leave="${activeLv.id}">تعديل</button>
           <button class="btn btn-xs btn-danger" data-del-leave="${activeLv.id}">${isSecondmentCard?"إلغاء الندب":"إلغاء"}</button>
         </div>`:""}
@@ -2082,10 +2081,10 @@ const App = (() => {
           <div class="lu-info">🟡 إجازة قادمة · ${esc(ul.type||"إجازة")}</div>
           <div class="lu-dates">من ${esc(fmtDate(ul.start_date))} إلى ${esc(fmtDate(ul.end_date))}${ul.reason?` · ${esc(ul.reason)}`:""}</div>
         </div>
-        <div class="lu-actions">
+        ${can("leave_manage")?`<div class="lu-actions">
           <button class="btn btn-xs btn-ghost" data-edit-ul="${ul.id}">تعديل</button>
           <button class="btn btn-xs btn-danger" data-del-ul="${ul.id}">إلغاء</button>
-        </div>
+        </div>`:""}
       </div>`).join("");
 
     const visitToggle=can("doctor_edit")&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
@@ -2100,11 +2099,14 @@ const App = (() => {
       ${leaveSection}${upcomingSection}
       <div class="qd-rows">${rows.map(([k,v])=>`<div class="qd-row"><div class="k">${k}</div><div class="vv">${v}</div></div>`).join("")}</div>`;
 
-    const foot=`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>
-      ${isOnLeave&&!hasLeaveRecord
-        ?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`
-        :(!isOnLeave&&!isSecondmentCard)?`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة / ندب</button>`
-        :""}`;
+    const foot=`
+      ${can("doctor_edit")?`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>`:""}
+      ${can("leave_manage")?(
+        isOnLeave&&!hasLeaveRecord
+          ?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`
+          :(!isOnLeave&&!isSecondmentCard)?`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة / ندب</button>`
+          :""
+      ):""}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
       const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=async()=>{
