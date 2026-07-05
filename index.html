@@ -386,6 +386,8 @@ a{color:inherit;text-decoration:none}
 .dcard.st-finished{border-inline-start-color:var(--red)}
 .dcard.st-leave{border-inline-start-color:var(--leave);background:color-mix(in srgb,var(--leave-soft) 60%,var(--surface))}
 .dcard.st-off{border-inline-start-color:var(--black)}
+.dcard.st-terminated{border-inline-start-color:#7c3aed;background:color-mix(in srgb,#ede9fe 50%,var(--surface))}
+[data-theme="dark"] .dcard.st-terminated{background:color-mix(in srgb,#2e1065 40%,var(--surface))}
 .dcard-leave-info span{color:var(--leave)!important;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;display:block;max-width:100%}
 .leave-active-row{background:color-mix(in srgb,var(--leave-soft) 80%,var(--surface));border:1px solid var(--leave);
@@ -436,6 +438,8 @@ a{color:inherit;text-decoration:none}
 .sp-finished{background:var(--red-soft);color:var(--red)}
 .sp-leave{background:var(--leave-soft);color:var(--leave);font-weight:700}
 .sp-off{background:var(--black-soft);color:var(--black)}
+.sp-terminated{background:#ede9fe;color:#6d28d9;font-weight:700}
+[data-theme="dark"] .sp-terminated{background:#2e1065;color:#c4b5fd}
 .sp-in-visit{background:#f3e8ff;color:#7c3aed;font-weight:700}
 [data-theme="dark"] .sp-in-visit{background:#2e1065;color:#a78bfa}
 .st-in-visit{border-inline-start-color:#7c3aed}
@@ -1059,6 +1063,7 @@ const LocalDB = (() => {
   }
 
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
+    if (doc.terminated) return {state:"terminated",label:"منتهي العقد",color:"terminated"};
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
     if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple"};
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
@@ -1277,7 +1282,7 @@ const LocalDB = (() => {
       needAuth();
       const {day,nowMin,dateStr}=nowInfo();
       return {branches: db.branches.map(b=>{
-        const docs=db.doctors.filter(d=>d.branch_id==b.id&&!d.archived);
+        const docs=db.doctors.filter(d=>d.branch_id==b.id&&!d.archived&&!d.terminated);
         const present=docs.filter(d=>computeStatus(d,nowMin,day,dateStr,db.leaves).state==="present").length;
         return {...b,doctor_count:docs.length,present,specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
       })};
@@ -1288,7 +1293,7 @@ const LocalDB = (() => {
       if (method==="GET") {
         needAuth();
         const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
-        const docs=db.doctors.filter(d=>d.branch_id===bid&&!d.archived).sort((a,b)=>a.name.localeCompare(b.name));
+        const docs=db.doctors.filter(d=>d.branch_id===bid&&!d.archived&&!d.terminated).sort((a,b)=>a.name.localeCompare(b.name));
         return {branch:b,doctors:docs.map(d=>withStatus(d,db)),specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
       }
       if (method==="PUT") {
@@ -1316,10 +1321,11 @@ const LocalDB = (() => {
     if (method==="GET" && (path==="/doctors" || path.startsWith("/doctors?"))) {
       needAuth();
       const incArch=path.includes("archived=1");
-      let docs=db.doctors.filter(d=>incArch||!d.archived).sort((a,b)=>a.name.localeCompare(b.name));
+      const incTerm=path.includes("terminated=1");
+      let docs=db.doctors.filter(d=>(incArch||!d.archived)&&(incTerm||!d.terminated)).sort((a,b)=>a.name.localeCompare(b.name));
       return {doctors:docs.map(d=>withStatus(d,db))};
     }
-    const docM = path.match(/^\/doctors\/(\d+)(\/archive)?$/);
+    const docM = path.match(/^\/doctors\/(\d+)(\/archive|\/terminate)?$/);
     if (docM) {
       const did=+docM[1];
       if (method==="GET") {
@@ -1352,6 +1358,17 @@ const LocalDB = (() => {
         d.archived=body.unarchive?0:1;
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
         log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
+      }
+      if (method==="POST" && docM[2]==="/terminate") {
+        needPerm("doctor_edit");
+        const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
+        needBranch(d.branch_id);
+        needSpecialty(d.specialty);
+        d.terminated=body.unterm?0:1;
+        if(d.terminated) d.terminated_date=new Date().toISOString().slice(0,10);
+        else delete d.terminated_date;
+        const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
+        log(db,d.terminated?"إنهاء عقد طبيب":"إعادة تفعيل طبيب","doctor",did,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
       if (method==="DELETE") {
         needPerm("doctor_delete");
@@ -1440,7 +1457,7 @@ const LocalDB = (() => {
       needAuth();
       const branch_id=path.includes("branch_id=")?+path.split("branch_id=")[1]:null;
       const {day,nowMin,dateStr}=nowInfo();
-      const docs=db.doctors.filter(d=>!d.archived&&(!branch_id||d.branch_id===branch_id));
+      const docs=db.doctors.filter(d=>!d.archived&&!d.terminated&&(!branch_id||d.branch_id===branch_id));
       const buckets={present:[],upcoming:[],finished:[],leave:[],off:[]};
       const stats={present:0,morning:0,evening:0,leave:0,home_visit_now:0,total:docs.length};
       docs.forEach(d=>{
@@ -1815,7 +1832,7 @@ const App = (() => {
     "أنف وأذن وحنجرة","عيون","مسالك بولية","جراحة","أسنان","علاج طبيعي","المختبر","الأشعة"];
   const deptRank = (s)=>{ const i=DEPT_ORDER.indexOf(s); return i<0?999:i; };
   // availability priority: present -> upcoming(soonest) -> finished -> off -> leave
-  const STATE_PRIORITY = {in_visit:0, present:1, upcoming:2, finished:3, off:4, leave:5, archived:6};
+  const STATE_PRIORITY = {in_visit:0, present:1, upcoming:2, finished:3, off:4, leave:5, terminated:6, archived:7};
   function availSort(a,b){
     const pa=STATE_PRIORITY[a.live.state]??9, pb=STATE_PRIORITY[b.live.state]??9;
     if(pa!==pb) return pa-pb;
@@ -1952,7 +1969,7 @@ const App = (() => {
   const initials = (n)=> (n||"؟").replace(/^د\.?\s*/,"").trim().slice(0,2);
   const avatar = (d)=> d.photo ? `<div class="avatar"><img src="${esc(d.photo)}"></div>`
       : `<div class="avatar">${esc(initials(d.name))}</div>`;
-  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit"};
+  const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit",terminated:"terminated"};
   function statusPill(live){ const s=live.state;
     return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
 
@@ -1966,15 +1983,17 @@ const App = (() => {
   function doctorCard(d){
     const live=d.live||{state:"off",label:""};
     const isLeave=live.state==="leave";
+    const isTerminated=live.state==="terminated";
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
-    const shift=isLeave?"":todayShift(d);
-    // Unified info row: shift times for working doctors, leave info for on-leave doctors
-    const infoRow=shift
-      ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
-      :isLeave
-        ?`<div class="dcard-shift dcard-leave-info"><span>🔴 ${esc(live.leaveType||"إجازة")}${live.leave&&live.leave.end_date?` · حتى ${esc(fmtDate(live.leave.end_date))}`:""}  </span></div>`
-        :"";
+    const shift=(isLeave||isTerminated)?"":todayShift(d);
+    const infoRow=isTerminated
+      ?`<div class="dcard-shift" style="color:#7c3aed">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
+      :shift
+        ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
+        :isLeave
+          ?`<div class="dcard-shift dcard-leave-info"><span>🔴 ${esc(live.leaveType||"إجازة")}${live.leave&&live.leave.end_date?` · حتى ${esc(fmtDate(live.leave.end_date))}`:""}  </span></div>`
+          :"";
     const branchRow=d.branch_name?`<div class="dcard-meta" style="margin-top:3px"><span>🏥 ${esc(d.branch_name)}</span></div>`:"";
     return `<div class="dcard st-${STATE_CLS[live.state]}" data-doc="${d.id}">
       ${avatar(d)}
@@ -3052,7 +3071,7 @@ const App = (() => {
       if(!confirm("حذف الإجازة؟"))return; await api("/leaves/"+b.dataset.dl,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");render();});
   };
 
-  const LEAVE_TYPES=["إجازة سنوية","إجازة طارئة","إجازة مرضية","ندب","أخرى"];
+  const LEAVE_TYPES=["إجازة سنوية","إجازة طارئة","إجازة مرضية","ندب","أخرى","إنهاء عقد"];
 
   async function leaveForm(docId,docName,onDone){
     const {doctors}=await api("/doctors");
@@ -3076,9 +3095,21 @@ const App = (() => {
       onMount:(m)=>{ m.querySelector("[data-x3]").onclick=closeModal;
         m.querySelector("#save-lv").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf")); const p=Object.fromEntries(f.entries());
+          p.doctor_id=+p.doctor_id;
+          // إنهاء عقد — يحدّث حالة الممارس مباشرة بدل إنشاء إجازة
+          if(p.type==="إنهاء عقد"){
+            const dName=(doctors.find(d=>d.id===p.doctor_id)||{}).name||"الممارس";
+            if(!confirm(`هل تريد إنهاء عقد "${dName}"؟\nسيتم إخفاؤه من جميع الواجهات التشغيلية.`)) return;
+            try{
+              await api("/doctors/"+p.doctor_id+"/terminate",{method:"POST",body:{}});
+              toast("✅ تم إنهاء عقد "+dName,"ok");
+              closeModal();
+              if(typeof onDone==="function") onDone(); else go(state.route);
+            }catch(e){toast("❌ "+e.message,"err");}
+            return;
+          }
           if(!p.start_date||!p.end_date){toast("أدخل التواريخ","warn");return;}
           if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
-          p.doctor_id=+p.doctor_id;
           try{
             await api("/leaves",{method:"POST",body:p});
             toast("✅ تمت إضافة الإجازة بنجاح","ok");
@@ -3127,9 +3158,9 @@ const App = (() => {
 
   // ============================================================ PRACTITIONERS MANAGEMENT (control panel tab)
   async function drawDoctorsMgmtPanel(){
-    const [{doctors},{branches}]=await Promise.all([api("/doctors?archived=1"),api("/branches")]);
+    const [{doctors},{branches}]=await Promise.all([api("/doctors?archived=1&terminated=1"),api("/branches")]);
     const bname={}; branches.forEach(b=>bname[b.id]=b.name);
-    const active=doctors.filter(d=>!d.archived), arch=doctors.filter(d=>d.archived);
+    const active=doctors.filter(d=>!d.archived&&!d.terminated), arch=doctors.filter(d=>d.archived), termed=doctors.filter(d=>d.terminated);
 
     const renderCards=(list,isArch)=>{
       if(!list.length) return `<div class="empty" style="padding:16px">لا يوجد</div>`;
@@ -3167,6 +3198,15 @@ const App = (() => {
           toast(u?"✅ تم استرجاع الممارس بنجاح":"✅ تمت أرشفة الممارس بنجاح","ok"); drawDoctorsMgmtPanel();
         },bid,spec);
       });
+      document.querySelectorAll("[data-unterm]").forEach(btn=>btn.onclick=()=>{
+        const d=doctors.find(x=>String(x.id)===btn.dataset.unterm);
+        const bid=d?d.branch_id:undefined, spec=d?d.specialty:undefined;
+        requirePerm("doctor_edit",async()=>{
+          if(!confirm(`إعادة تفعيل "${d?d.name:"الممارس"}"؟`))return;
+          await api("/doctors/"+btn.dataset.unterm+"/terminate",{method:"POST",body:{unterm:1}});
+          toast("✅ تم إعادة تفعيل الممارس","ok"); drawDoctorsMgmtPanel();
+        },bid,spec);
+      });
       document.querySelectorAll("[data-del]").forEach(btn=>btn.onclick=()=>{
         const d=doctors.find(x=>String(x.id)===btn.dataset.del);
         const bid=d?d.branch_id:undefined;
@@ -3187,16 +3227,42 @@ const App = (() => {
 
     let archOpen=false;
 
+    const renderTermCards=(list)=>{
+      if(!list.length) return `<div class="empty" style="padding:16px">لا يوجد</div>`;
+      return `<div class="mgr-cards">
+        ${list.map(d=>`<div class="mgr-card" style="border-inline-start:3px solid #7c3aed">
+          ${avatar(d)}
+          <div class="mgr-card-body">
+            <div class="mgr-card-name">${esc(d.name)}</div>
+            <div class="mgr-card-meta">
+              ${d.specialty?`<span class="spec-tag">${esc(d.specialty)}</span>`:""}
+              ${bname[d.branch_id]?`<span>🏥 ${esc(bname[d.branch_id])}</span>`:""}
+              ${d.terminated_date?`<span style="color:#7c3aed">⛔ منذ ${esc(d.terminated_date)}</span>`:""}
+            </div>
+          </div>
+          <div class="mgr-card-actions">
+            <button class="btn btn-ghost btn-xs" data-unterm="${d.id}">↩ إعادة تفعيل</button>
+            <button class="btn btn-danger btn-xs" data-del="${d.id}">حذف</button>
+          </div>
+        </div>`).join("")}
+      </div>`;
+    };
+
     const redraw=(q)=>{
       const activeList=q?sortedByScore(active,q):active;
       const archList=q?sortedByScore(arch,q):arch;
-      const activeEl=$("#active-rows"), archEl=$("#arch-rows");
+      const termList=q?sortedByScore(termed,q):termed;
+      const activeEl=$("#active-rows"), archEl=$("#arch-rows"), termEl=$("#term-rows");
       if(activeEl) activeEl.innerHTML=renderCards(activeList,false);
       if(archEl){
         archEl.innerHTML=renderCards(archList,true);
-        // auto-expand archive section when search has results there
         if(q&&archList.length&&!archOpen){ archEl.style.display=""; }
         else if(!q&&!archOpen){ archEl.style.display="none"; }
+      }
+      if(termEl){
+        termEl.innerHTML=renderTermCards(termList);
+        if(q&&termList.length){ termEl.style.display=""; }
+        else if(!q){ termEl.style.display="none"; }
       }
       const cnt=$("#active-count"); if(cnt) cnt.textContent=activeList.length;
       bindEvents();
@@ -3209,6 +3275,14 @@ const App = (() => {
       </div>
       <div class="section-head"><h2>الممارسون النشطون</h2><span class="count" id="active-count">${active.length}</span></div>
       <div id="active-rows">${renderCards(active,false)}</div>
+      ${termed.length?`
+        <div>
+          <div class="section-head" style="margin-top:20px;cursor:pointer" id="term-toggle">
+            <h2 style="color:#7c3aed">⛔ منتهو العقد</h2><span class="count" style="background:#ede9fe;color:#6d28d9">${termed.length}</span>
+            <span style="font-size:12px;color:var(--muted);margin-inline-start:auto" id="term-chevron">▼</span>
+          </div>
+          <div id="term-rows" style="display:none">${renderTermCards(termed)}</div>
+        </div>`:""}
       ${arch.length?`
         <div class="mgr-arch-section">
           <div class="section-head" style="margin-top:20px;cursor:pointer" id="arch-toggle">
@@ -3219,6 +3293,14 @@ const App = (() => {
         </div>`:""}`;
 
     bindEvents();
+
+    const termToggle=$("#term-toggle");
+    if(termToggle) termToggle.onclick=()=>{
+      const rows=$("#term-rows"), chev=$("#term-chevron");
+      const open=rows.style.display==="none";
+      rows.style.display=open?"":"none";
+      if(chev) chev.textContent=open?"▲":"▼";
+    };
 
     const archToggle=$("#arch-toggle");
     if(archToggle) archToggle.onclick=()=>{
