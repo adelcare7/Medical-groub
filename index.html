@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -780,7 +779,7 @@ body.modal-open{overflow:hidden}
   .modal-head{padding:14px 16px;border-radius:20px 20px 0 0;flex-shrink:0;
     position:sticky;top:0;z-index:3;background:var(--surface);border-bottom:1px solid var(--line)}
   .modal-head [data-x]{min-width:40px;min-height:40px;font-size:20px}
-  .modal-body{padding:14px 16px;overflow-y:auto;flex:1;min-height:0;
+  .modal-body{padding:14px 16px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;
     -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
   .modal-foot{padding:12px 16px;flex-wrap:wrap;gap:8px;flex-shrink:0;
     background:var(--surface);border-radius:0;border-top:1px solid var(--line)}
@@ -796,6 +795,18 @@ body.modal-open{overflow:hidden}
   /* -- Forms mobile (font-size ≥16px prevents iOS zoom) -- */
   .field input,.field select,.field textarea{padding:11px 14px;font-size:16px}
   .field label{font-size:13px;margin-bottom:6px}
+
+  /* -- Branch modal mobile -- */
+  .bsec{width:100%;box-sizing:border-box;overflow:hidden}
+  .bsec-item{flex-wrap:nowrap;min-width:0}
+  .bi-pair{width:100%;min-width:0;box-sizing:border-box}
+  .bi-pair .bi-name,.bi-pair .bi-desc,
+  .bsec-item .bi-name,.bsec-title,
+  .binfo-fields input,.binfo-fields textarea,.binfo-fields select{
+    font-size:16px;width:100%;box-sizing:border-box;max-width:100%}
+  .binfo-row{flex-wrap:wrap;gap:4px}
+  .bir-lbl{flex:0 0 100%;font-size:12px}
+  .bir-val{flex:0 0 100%;font-size:14px}
   .btn{padding:11px 18px;font-size:15px;min-height:44px}
   .btn-block{padding:13px 18px}
 
@@ -1771,37 +1782,15 @@ const App = (() => {
     const dk=_todayStr();
     if(dk!==_notifDateKey){ _notifDateKey=dk; _notifSeen=new Set([]); }
     try{
-      const [{doctors},{branches},leavesRes] = await Promise.all([
-        api("/doctors"),
-        api("/branches"),
-        api("/leaves")
-      ]);
-      const bmap={}; branches.forEach(b=>bmap[b.id]=b.name);
+      const leavesRes = await api("/leaves");
       const today=_todayStr(), tomorrow=_tomorrowStr();
-      const nowPresent=new Set(doctors.filter(d=>d.live&&d.live.state==="present").map(d=>d.id));
-
-      // ── Doctor arrived / departed ──
-      if(_prevPresent!==null){
-        for(const d of doctors){
-          const isNowPresent=d.live&&d.live.state==="present";
-          const wasPresent=_prevPresent.has(d.id);
-          if(isNowPresent&&!wasPresent){
-            _pushNotif(`arrived-${d.id}-${today}-${_timeLabel()}`,
-              "arrived",`د. ${d.name} حضر الآن`,bmap[d.branch_id]||"");
-          } else if(!isNowPresent&&wasPresent&&d.live&&d.live.state!=="upcoming"){
-            _pushNotif(`departed-${d.id}-${today}-${_timeLabel()}`,
-              "departed",`د. ${d.name} غادر`,bmap[d.branch_id]||"");
-          }
-        }
-      }
-      _prevPresent=nowPresent;
-
-      // ── Leaves ending today / tomorrow ──
       const leaves=leavesRes.leaves||[];
+      // ── Leaves ending today ──
       leaves.filter(l=>!l.synthetic&&l.end_date===today).forEach(l=>{
         _pushNotif(`leave-end-${l.id}-${today}`,"leave-end",
           `إجازة ${l.doctor_name} تنتهي اليوم`,l.branch_name||"");
       });
+      // ── Leaves ending tomorrow ──
       leaves.filter(l=>!l.synthetic&&l.end_date===tomorrow).forEach(l=>{
         _pushNotif(`leave-tmrw-${l.id}-${today}`,"leave",
           `إجازة ${l.doctor_name} تنتهي غداً`,l.branch_name||"");
@@ -2294,12 +2283,12 @@ const App = (() => {
         else{_notifOpen=true;_renderPanel();}
       };
     }
-    // Close panel on outside click
+    // Close panel on outside click or navigation (persistent, not once)
     document.addEventListener("click",(e)=>{
       if(_notifOpen&&!e.target.closest("#notif-wrap")&&!e.target.closest("#notif-panel")){
         _closePanel();
       }
-    },{once:true});
+    });
 
     setupSearch();
     updateAvailBadge();
