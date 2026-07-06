@@ -1119,7 +1119,12 @@ const LocalDB = (() => {
 
   function withStatus(doc, db) {
     const {day,nowMin,dateStr} = nowInfo();
-    return { ...doc, live: computeStatus(doc, nowMin, day, dateStr, db.leaves) };
+    const live = computeStatus(doc, nowMin, day, dateStr, db.leaves);
+    if (live.isSecondment && live.secondmentBranchId) {
+      const sb = db.branches.find(b=>b.id==live.secondmentBranchId);
+      if (sb) live.secondmentBranchName = sb.name;
+    }
+    return { ...doc, live };
   }
 
   function getExtra(db) {
@@ -2009,7 +2014,7 @@ const App = (() => {
         ?(shift
           ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
           :"")
-        +`<div class="dcard-shift" style="color:#0e7490;font-size:12px;margin-top:2px">🔀 منتدب${live.leave&&live.leave.secondment_branch_name?` · ${esc(live.leave.secondment_branch_name)}`:""}</div>`
+        +`<div class="dcard-shift" style="color:#0e7490;font-size:12px;margin-top:2px">🔀 منتدب إلى: ${esc(live.secondmentBranchName||"")}</div>`
       :shift
         ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
         :isLeave
