@@ -866,10 +866,113 @@ body.modal-open{overflow:hidden}
   .cal-cell{min-height:52px;padding:4px;font-size:10.5px}
   .cal-head{font-size:10.5px}
 
+  /* -- Leave cards (mobile) -- */
+  .leave-cards{display:flex;flex-direction:column;gap:10px}
+  .leave-card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:13px 14px;
+  }
+  .lc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .lc-name{font-weight:700;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lc-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .lc-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+  .lc-lbl{color:var(--muted);flex-shrink:0;font-size:12px}
+  .lc-val{text-align:start;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lc-actions{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+  .lc-actions .btn{flex:1;justify-content:center}
+
   /* -- Tabs mobile -- */
   .tabs{overflow-x:auto;scrollbar-width:none;gap:2px;flex-wrap:nowrap}
   .tabs::-webkit-scrollbar{display:none}
   .tab{padding:8px 12px;font-size:13px;white-space:nowrap;flex-shrink:0}
+
+  /* -- Sticky section tabs (ctrl-tabs): يثبت أسفل الـ topbar مباشرة -- */
+  #ctrl-tabs{
+    position:sticky;
+    top:65px;          /* ارتفاع الـ topbar */
+    z-index:20;
+    background:var(--surface);
+    padding:6px 0 0;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--line);
+    overflow-x:auto;
+    overflow-y:hidden;  /* يمنع أي تمرير رأسي داخل الشريط */
+    scrollbar-width:none;
+    flex-wrap:nowrap;
+    touch-action:pan-x; /* يسمح فقط بالتمرير الأفقي داخل الشريط */
+  }
+  #ctrl-tabs::-webkit-scrollbar{display:none}
+
+  /* -- Sticky admin tabs (admin-tabs): يثبت أسفل الـ topbar -- */
+  #admin-tabs{
+    position:sticky;
+    top:65px;
+    z-index:20;
+    background:var(--surface);
+    padding:6px 0 0;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--line);
+    overflow-x:auto;
+    overflow-y:hidden;
+    scrollbar-width:none;
+    flex-wrap:nowrap;
+    touch-action:pan-x;
+  }
+  #admin-tabs::-webkit-scrollbar{display:none}
+
+  /* -- Branch cards (admin > branches) -- */
+  .branch-cards{display:flex;flex-direction:column;gap:10px}
+  .branch-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:13px 14px;}
+  .bc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .bc-name{font-weight:700;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bc-cnt{background:var(--primary);color:#fff;border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0}
+  .bc-rows{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .bc-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+  .bc-lbl{color:var(--muted);flex-shrink:0;font-size:12px}
+  .bc-val{text-align:start;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bc-actions{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+  .bc-actions .btn{flex:1;justify-content:center}
+
+  /* -- Leaves panel: تخطيط بطاقات بدلاً من جدول أفقي -- */
+  #ctrl-body{overflow-x:hidden}
+  .toolbar{flex-wrap:wrap;gap:6px}
+  .toolbar .search-input{max-width:100%!important;width:100%}
+  .toolbar .select-mini{flex:1 1 calc(50% - 3px);min-width:0}
+  .toolbar .btn{width:100%;margin-top:2px}
+  /* حقلا التاريخ — صف مستقل بعرض كامل مقسّم نصفين */
+  .lf-dates-row{width:100%;display:flex;gap:6px}
+  .lf-date-wrap{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+  .lf-date-lbl{font-size:11.5px;color:var(--muted);font-weight:600;padding-right:2px}
+  .lf-date-inp{width:100%;box-sizing:border-box;font-size:15px;padding:8px 10px;height:auto}
+
+  /* تحويل جدول الإجازات إلى بطاقات -- */
+  #leaves-list .tbl,
+  #leaves-list .tbl tbody{display:block;width:100%}
+  #leaves-list .tbl thead{display:none}
+  #leaves-list .tbl tr{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:3px 8px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    margin-bottom:8px;
+    background:var(--surface);
+  }
+  #leaves-list .tbl td{
+    display:block;padding:1px 0;font-size:12.5px;
+    border:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  /* اسم الممارس: سطر كامل وبخط أثقل */
+  #leaves-list .tbl td:nth-child(1){
+    grid-column:1/-1;font-weight:700;font-size:14px;white-space:normal;
+  }
+  /* التخصص: مخفي */
+  #leaves-list .tbl td:nth-child(3){display:none}
+  /* أزرار التعديل/الحذف: سطر كامل */
+  #leaves-list .tbl td:last-child{
+    grid-column:1/-1;display:flex;gap:8px;margin-top:4px;white-space:normal;
+  }
 }
 
 /* ============ SMALL PHONES (≤480px) ============ */
@@ -3496,26 +3599,53 @@ const App = (() => {
 
       const el=$("#leaves-list"); if(!el)return;
       if(!list.length){el.innerHTML=`<div class="empty">لا نتائج</div>`;return;}
-      el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} إجازة</div>
-        <table class="tbl"><thead><tr>
-          <th>الممارس</th><th>الفرع</th><th>التخصص</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th></th>
-        </tr></thead><tbody>
-        ${list.map(l=>`<tr>
-          <td><b>${esc(l.doctor_name)}</b></td>
-          <td>${esc(l.branch_name||"—")}</td>
-          <td>${esc(l.specialty||"—")}</td>
-          <td>${esc(l.type||"—")}</td>
-          <td>${l.synthetic?"—":esc(l.start_date)}</td>
-          <td>${l.synthetic?"—":esc(l.end_date)}</td>
-          <td>${l.synthetic?`<span class="status-pill sp-leave" style="font-size:11px">يدوي ⚙️</span>`:stBadge(lvStatus(l))}</td>
-          <td style="white-space:nowrap">
-            ${l.synthetic
-              ? `<span style="font-size:11px;color:var(--muted)">من حالة الممارس</span>`
-              : `<button class="btn btn-ghost btn-sm" data-el='${esc(JSON.stringify(l))}'>تعديل</button>
-                 <button class="btn btn-danger btn-sm" data-dlo="${l.id}">حذف</button>`
-            }
-          </td></tr>`).join("")}
-        </tbody></table>`;
+      const isMob=window.innerWidth<=860;
+      if(isMob){
+        el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:10px">${list.length} إجازة</div>
+          <div class="leave-cards">
+          ${list.map(l=>`
+            <div class="leave-card" data-lid="${l.id}">
+              <div class="lc-head">
+                <span class="lc-name">${esc(l.doctor_name)}</span>
+                ${l.synthetic?`<span class="status-pill sp-leave" style="font-size:11px">يدوي ⚙️</span>`:stBadge(lvStatus(l))}
+              </div>
+              <div class="lc-rows">
+                <div class="lc-row"><span class="lc-lbl">🏥 الفرع</span><span class="lc-val">${esc(l.branch_name||"—")}</span></div>
+                <div class="lc-row"><span class="lc-lbl">🩺 التخصص</span><span class="lc-val">${esc(l.specialty||"—")}</span></div>
+                <div class="lc-row"><span class="lc-lbl">📋 النوع</span><span class="lc-val">${esc(l.type||"—")}</span></div>
+                ${l.synthetic?"":`<div class="lc-row"><span class="lc-lbl">📅 الفترة</span><span class="lc-val">${esc(l.start_date)} ← ${esc(l.end_date)}</span></div>`}
+              </div>
+              ${l.synthetic
+                ?`<div style="font-size:11px;color:var(--muted);margin-top:6px">من حالة الممارس</div>`
+                :`<div class="lc-actions">
+                    <button class="btn btn-ghost btn-sm" data-el='${esc(JSON.stringify(l))}'>✎ تعديل</button>
+                    <button class="btn btn-danger btn-sm" data-dlo="${l.id}">حذف</button>
+                  </div>`
+              }
+            </div>`).join("")}
+          </div>`;
+      } else {
+        el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} إجازة</div>
+          <table class="tbl"><thead><tr>
+            <th>الممارس</th><th>الفرع</th><th>التخصص</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th></th>
+          </tr></thead><tbody>
+          ${list.map(l=>`<tr>
+            <td><b>${esc(l.doctor_name)}</b></td>
+            <td>${esc(l.branch_name||"—")}</td>
+            <td>${esc(l.specialty||"—")}</td>
+            <td>${esc(l.type||"—")}</td>
+            <td>${l.synthetic?"—":esc(l.start_date)}</td>
+            <td>${l.synthetic?"—":esc(l.end_date)}</td>
+            <td>${l.synthetic?`<span class="status-pill sp-leave" style="font-size:11px">يدوي ⚙️</span>`:stBadge(lvStatus(l))}</td>
+            <td style="white-space:nowrap">
+              ${l.synthetic
+                ?`<span style="font-size:11px;color:var(--muted)">من حالة الممارس</span>`
+                :`<button class="btn btn-ghost btn-sm" data-el='${esc(JSON.stringify(l))}'>تعديل</button>
+                  <button class="btn btn-danger btn-sm" data-dlo="${l.id}">حذف</button>`
+              }
+            </td></tr>`).join("")}
+          </tbody></table>`;
+      }
       el.querySelectorAll("[data-el]").forEach(btn=>btn.onclick=()=>{
         const lv=JSON.parse(btn.dataset.el);
         requirePerm("leave_manage",()=>leaveEditForm(lv,()=>{drawLeavesPanel();}),lv.branch_id,lv.specialty);
@@ -3553,8 +3683,16 @@ const App = (() => {
           <option value="upcoming">قادمة</option>
           <option value="expired">منتهية</option>
         </select>
-        <input type="date" class="select-mini" id="lf-from" title="إجازات تنتهي في هذا التاريخ أو بعده">
-        <input type="date" class="select-mini" id="lf-to" title="إجازات تبدأ في هذا التاريخ أو قبله">
+        <div class="lf-dates-row">
+          <label class="lf-date-wrap">
+            <span class="lf-date-lbl">📅 تنتهي بعد</span>
+            <input type="date" class="select-mini lf-date-inp" id="lf-from">
+          </label>
+          <label class="lf-date-wrap">
+            <span class="lf-date-lbl">📅 تبدأ قبل</span>
+            <input type="date" class="select-mini lf-date-inp" id="lf-to">
+          </label>
+        </div>
         <button class="btn btn-primary btn-sm" id="add-lv-panel">＋ إضافة إجازة</button>
       </div>
       <div id="leaves-list"></div>`;
@@ -3968,17 +4106,36 @@ const App = (() => {
 
   async function drawBranchesPanel(){
     const {branches}=await api("/branches");
+    const mob=window.innerWidth<=860;
+    const branchRows = mob
+      ? `<div class="branch-cards">${branches.map(b=>`
+          <div class="branch-card">
+            <div class="bc-head">
+              <span class="bc-name">🏥 ${esc(b.name)}</span>
+              <span class="bc-cnt">👨‍⚕️ ${b.doctor_count}</span>
+            </div>
+            <div class="bc-rows">
+              ${b.grp?`<div class="bc-row"><span class="bc-lbl">المجموعة</span><span class="bc-val">${esc(b.grp)}</span></div>`:""}
+              ${b.hours?`<div class="bc-row"><span class="bc-lbl">ساعات الدوام</span><span class="bc-val">${esc(b.hours)}</span></div>`:""}
+              ${b.info?`<div class="bc-row"><span class="bc-lbl">المعلومات</span><span class="bc-val">${esc(b.info)}</span></div>`:""}
+            </div>
+            <div class="bc-actions">
+              <button class="btn btn-ghost btn-sm" data-eb='${esc(JSON.stringify(b))}'>تعديل</button>
+              <button class="btn btn-ghost btn-sm" data-db="${b.id}">حذف</button>
+            </div>
+          </div>`).join("")}</div>`
+      : `<table class="tbl"><thead><tr><th>الفرع</th><th>المجموعة</th><th>ساعات الدوام</th><th>المعلومات</th><th>الممارسون</th><th></th></tr></thead>
+         <tbody>${branches.map(b=>`<tr>
+           <td><b>${esc(b.name)}</b></td><td>${esc(b.grp||"")}</td>
+           <td style="font-size:12.5px">${esc(b.hours||"—")}</td>
+           <td style="font-size:12.5px">${esc(b.info||"—")}</td>
+           <td>${b.doctor_count}</td>
+           <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-eb='${esc(JSON.stringify(b))}'>تعديل</button>
+           <button class="btn btn-ghost btn-sm" data-db="${b.id}">حذف</button></td></tr>`).join("")}</tbody></table>`;
     $("#ctrl-body").innerHTML=`
       <div style="display:flex;justify-content:flex-end;margin:6px 0 12px">
         <button class="btn btn-primary btn-sm" id="add-branch">＋ إضافة فرع</button></div>
-      <table class="tbl"><thead><tr><th>الفرع</th><th>المجموعة</th><th>ساعات الدوام</th><th>المعلومات</th><th>الممارسون</th><th></th></tr></thead>
-      <tbody>${branches.map(b=>`<tr>
-        <td><b>${esc(b.name)}</b></td><td>${esc(b.grp||"")}</td>
-        <td style="font-size:12.5px">${esc(b.hours||"—")}</td>
-        <td style="font-size:12.5px">${esc(b.info||"—")}</td>
-        <td>${b.doctor_count}</td>
-        <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-eb='${esc(JSON.stringify(b))}'>تعديل</button>
-        <button class="btn btn-ghost btn-sm" data-db="${b.id}">حذف</button></td></tr>`).join("")}</tbody></table>`;
+      ${branchRows}`;
     $("#add-branch").onclick=()=>requirePerm("branch_manage",()=>branchForm(null));
     $("#ctrl-body").querySelectorAll("[data-eb]").forEach(b=>b.onclick=()=>requirePerm("branch_manage",()=>branchForm(JSON.parse(b.dataset.eb))));
     $("#ctrl-body").querySelectorAll("[data-db]").forEach(b=>b.onclick=()=>requirePerm("branch_manage",async()=>{
