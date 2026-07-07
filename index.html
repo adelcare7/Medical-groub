@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-06">
+<meta name="app-version" content="2026-07-07-07">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -2346,37 +2346,66 @@ const App = (() => {
     if(vn.includes(t))                 return w* 15;
     return 0;
   }
+  // fuzzy: يسمح بفرق حرف واحد للرموز التي طولها 3+ أحرف (يعالج الأخطاء الإملائية البسيطة)
+  function _fuzzyMatch(t,hay){
+    if(hay.includes(t))return true;
+    if(t.length<3)return false;
+    for(let i=0;i<t.length;i++){
+      const r=t.slice(0,i)+t.slice(i+1);
+      if(r.length>=2&&hay.includes(r))return true;
+    }
+    return false;
+  }
+  function _scoreIdCode(t,id){
+    if(!/^\d+$/.test(t))return 0;
+    const ids=String(id);
+    if(ids===t)           return 480;
+    if(ids.startsWith(t)) return 250;
+    if(ids.includes(t))   return 120;
+    return 0;
+  }
+  // دالة تسجيل النقاط المركزية — مستخدمة في جميع سياقات البحث
   function scoreDoctorMgmt(q,d,bname){
     if(!q)return 1;
     const qNorm=normAr(q);
     const tokens=qNorm.split(/\s+/).filter(t=>t.length>0&&!_STOP.has(t));
     if(!tokens.length)return 1;
-    const nameN=normAr(d.name||"");
-    const enName=(d.en_name||d.name_en||"").toLowerCase();
-    const specN=normAr(d.specialty||"");
-    const rankN=normAr(d.rank||"");
-    const natN=normAr(d.nationality||"");
-    const branchN=normAr(bname[d.branch_id]||"");
-    const qualN=normAr(d.qualification||"");
+    const nameN  =normAr(d.name||"");
+    const enName =(d.en_name||d.name_en||"").toLowerCase();
+    const specN  =normAr(d.specialty||"");
+    const rankN  =normAr(d.rank||"");
+    const natN   =normAr(d.nationality||"");
+    const branchN=normAr((bname&&bname[d.branch_id])||d.branch_name||"");
+    const qualN  =normAr(d.qualification||"");
     const genderN=normAr(d.gender||"");
-    const expN=normAr(d.experience||"");
-    const casesN=normAr(d.cases||"");
-    const coordN=normAr(d.notes_coord||"");
+    const expN   =normAr(d.experience||"");
+    const casesN =normAr(d.cases||"");
+    const coordN =normAr(d.notes_coord||"");
+    const statusN=normAr(d.live?.label||"");
+    const hoursN =normAr(d.hours_raw||"");
+    const langN  =normAr(d.languages||"");
+    const allHay =nameN+" "+enName+" "+specN+" "+rankN+" "+natN+" "+branchN+" "+qualN+" "+genderN+" "+expN+" "+casesN+" "+coordN+" "+statusN+" "+hoursN+" "+langN;
     let total=0;
     for(const t of tokens){
-      const s=Math.max(
+      let s=Math.max(
         scoreNameFn(t,nameN),
         scoreEnNameFn(t,enName),
         scoreFieldFn(t,specN,10),
         scoreFieldFn(t,rankN,9),
         scoreFieldFn(t,branchN,8),
         scoreFieldFn(t,natN,7),
+        scoreFieldFn(t,statusN,6),
         scoreFieldFn(t,qualN,5),
         scoreFieldFn(t,genderN,4),
+        scoreFieldFn(t,langN,3),
         scoreFieldFn(t,expN,3),
         scoreFieldFn(t,casesN,2),
-        scoreFieldFn(t,coordN,2)
+        scoreFieldFn(t,coordN,2),
+        scoreFieldFn(t,hoursN,1),
+        _scoreIdCode(t,d.id)
       );
+      // fuzzy للأخطاء الإملائية البسيطة (أقل أولوية)
+      if(!s&&_fuzzyMatch(t,allHay))s=40;
       if(!s)return 0;
       total+=s;
     }
@@ -3224,23 +3253,36 @@ const App = (() => {
       </div>
       <div class="toolbar"><input class="search-input" id="bsearch" style="max-width:340px;border-radius:var(--r-s);padding:9px 14px" placeholder="بحث داخل الفرع..."></div>
       <div id="branch-docs"></div>`;
+    const bname={}; doctors.forEach(d=>bname[d.branch_id]=branch.name);
     const drawSecs=()=>{
       const wrap=$("#branch-docs"); let html="";
-      ordered.forEach(sp=>{
-        let arr=bySpec[sp].slice().sort(availSort);
-        if(presentOnly) arr=arr.filter(d=>d.live.state==="present");
-        if(queryNorm){const tokens=queryNorm.split(/\s+/).filter(Boolean);arr=arr.filter(d=>{const hay=normAr([d.name,d.rank,d.nationality,d.cases].filter(Boolean).join(" "));return tokens.every(t=>hay.includes(t));});}
-        if(!arr.length) return;
-        html+=`<div class="section-head"><h2>${esc(sp)}</h2><span class="count">${arr.length}</span></div>
-          <div class="status-grid">${arr.map(doctorCard).join("")}</div>`;
-      });
-      wrap.innerHTML=html||`<div class="empty">${presentOnly?"لا يوجد ممارسون متواجدون الآن في هذا الفرع":"لا ممارسون مطابقون"}</div>`;
+      if(query){
+        // بحث ذكي: قائمة مستوية مرتّبة حسب درجة التطابق
+        let arr=doctors.filter(d=>!presentOnly||d.live.state==="present");
+        arr=arr.map(d=>({d,s:scoreDoctorMgmt(query,d,bname)})).filter(x=>x.s>0)
+          .sort((a,b)=>b.s-a.s||(a.d.name||"").localeCompare(b.d.name||""))
+          .map(x=>x.d);
+        wrap.innerHTML=arr.length
+          ?`<div class="status-grid">${arr.map(doctorCard).join("")}</div>`
+          :`<div class="empty">لا نتائج لـ "${esc(query)}"</div>`;
+      }else{
+        // عرض مقسّم بالتخصص مع ترتيب الحضور
+        ordered.forEach(sp=>{
+          let arr=bySpec[sp].slice().sort(availSort);
+          if(presentOnly) arr=arr.filter(d=>d.live.state==="present");
+          if(!arr.length) return;
+          html+=`<div class="section-head"><h2>${esc(sp)}</h2><span class="count">${arr.length}</span></div>
+            <div class="status-grid">${arr.map(doctorCard).join("")}</div>`;
+        });
+        wrap.innerHTML=html||`<div class="empty">${presentOnly?"لا يوجد ممارسون متواجدون الآن في هذا الفرع":"لا ممارسون في هذا الفرع"}</div>`;
+      }
       bindCards(wrap);
     };
+    let _bsTimer;
     $("#back").onclick=()=>go("branches");
     $("#t-present").onclick=()=>{presentOnly=!presentOnly;
       $("#t-present").classList.toggle("on",presentOnly); drawSecs();};
-    $("#bsearch").addEventListener("input",e=>{query=e.target.value.trim();queryNorm=normAr(query);drawSecs();});
+    $("#bsearch").addEventListener("input",e=>{query=e.target.value.trim();clearTimeout(_bsTimer);_bsTimer=setTimeout(drawSecs,80);});
     drawSecs();
   }
 
@@ -3270,55 +3312,8 @@ const App = (() => {
     const bname={}; branches.forEach(b=>bname[b.id]=b.name);
     doctors.forEach(d=>d.branch_name=bname[d.branch_id]||"");
 
-    // Fuzzy helper: allow 1-char difference for tokens >= 3 chars
-    function fuzzyMatch(t,hay){
-      if(hay.includes(t))return true;
-      if(t.length<3)return false;
-      // try removing each char from token (handles insertions/typos)
-      for(let i=0;i<t.length;i++){
-        const reduced=t.slice(0,i)+t.slice(i+1);
-        if(reduced.length>=2&&hay.includes(reduced))return true;
-      }
-      return false;
-    }
-
-    function scoreDoctor(q,d){
-      if(!q)return 1;
-      const qNorm=normAr(q);
-      const tokens=qNorm.split(/\s+/).filter(t=>t.length>0&&!_STOP.has(t));
-      if(!tokens.length)return 1;
-      const nameN=normAr(d.name||"");
-      const enName=(d.en_name||d.name_en||"").toLowerCase();
-      const specN=normAr(d.specialty||""); const rankN=normAr(d.rank||"");
-      const natN=normAr(d.nationality||""); const branchN=normAr(bname[d.branch_id]||"");
-      const qualN=normAr(d.qualification||""); const genderN=normAr(d.gender||"");
-      const expN=normAr(d.experience||""); const casesN=normAr(d.cases||"");
-      const coordN=normAr(d.notes_coord||""); const statusN=normAr(d.live?.label||"");
-      const hoursN=normAr(d.hours_raw||""); const langN=normAr(d.languages||"");
-      let total=0;
-      const allFields=nameN+" "+enName+" "+specN+" "+rankN+" "+natN+" "+branchN+" "+qualN+" "+genderN+" "+expN+" "+casesN+" "+coordN+" "+statusN+" "+hoursN+" "+langN;
-      for(const t of tokens){
-        let s=Math.max(
-          scoreNameFn(t,nameN), scoreEnNameFn(t,enName),
-          scoreFieldFn(t,specN,10), scoreFieldFn(t,rankN,9),
-          scoreFieldFn(t,branchN,8), scoreFieldFn(t,natN,7),
-          scoreFieldFn(t,qualN,5), scoreFieldFn(t,genderN,4),
-          scoreFieldFn(t,expN,3), scoreFieldFn(t,casesN,2),
-          scoreFieldFn(t,coordN,2), scoreFieldFn(t,statusN,6),
-          scoreFieldFn(t,hoursN,1), scoreFieldFn(t,langN,3)
-        );
-        // Doctor code (id) matching — priority 4
-        if(!s && /^\d+$/.test(t)){
-          const ids=String(d.id);
-          if(ids===t)s=480; else if(ids.startsWith(t))s=250; else if(ids.includes(t))s=120;
-        }
-        // Fuzzy fallback for typos
-        if(!s && fuzzyMatch(t,allFields)) s=50;
-        if(!s)return 0;
-        total+=s;
-      }
-      return total;
-    }
+    // يستخدم الدالة المركزية scoreDoctorMgmt المعرّفة في نطاق IIFE الخارجي
+    const scoreDoctor=(q,d)=>scoreDoctorMgmt(q,d,bname);
 
     let _dsearchTimer;
     const draw=()=>{ const rawQ=$("#dsearch").value.trim(); const sp=$("#fspec").value;
@@ -3637,20 +3632,8 @@ const App = (() => {
         const docSel=m.querySelector("#lv-doc-sel"), exWrap=m.querySelector("#lv-existing");
         // ── بحث حي في قائمة الممارسين (اسم / جزء اسم / رمز) مع ترتيب أفضل تطابق ──
         const docSearch=m.querySelector("#lv-doc-search"), docCount=m.querySelector("#lv-doc-count");
-        const rankDoc=(q,d)=>{ // نفس أولوية البحث: تطابق>يبدأ>يحتوي>رمز
-          const nm=normAr(d.name||""), tokq=normAr(q);
-          if(!tokq)return 1;
-          const ws=nm.split(/\s+/).filter(Boolean);
-          if(nm===tokq)return 10000;
-          if(nm.startsWith(tokq))return 5000;
-          if(ws[0]&&ws[0].startsWith(tokq))return 3000;
-          if(ws.some(w=>w.startsWith(tokq)))return 1500;
-          if(nm.includes(tokq))return 500;
-          if(normAr(d.specialty||"").includes(tokq))return 300;
-          if(/^\d+$/.test(tokq)){const ids=String(d.id);
-            if(ids===tokq)return 480; if(ids.startsWith(tokq))return 250; if(ids.includes(tokq))return 120;}
-          return 0;
-        };
+        // يستخدم الدالة المركزية scoreDoctorMgmt (اسم + تخصص + رمز + fuzzy)
+        const rankDoc=(q,d)=>scoreDoctorMgmt(q,d,{});
         const rebuildDocs=()=>{
           const q=(docSearch.value||"").trim(); const cur=docSel.value;
           const ranked=doctors.map(d=>({d,s:rankDoc(q,d)})).filter(x=>x.s>0)
@@ -4959,23 +4942,29 @@ const App = (() => {
     const m=document.querySelector('meta[name="app-version"]');
     return m?m.getAttribute('content'):null;
   }
+  let _updateChecking=false;
   async function checkForUpdate(){
+    if(_updateChecking)return;
+    _updateChecking=true;
     const cur=_currentVersion();
-    if(!cur) return;
+    if(!cur){_updateChecking=false;return;}
     try{
-      // cache-bust + no-store لضمان جلب أحدث HTML من الخادم وليس من الكاش
-      const res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
-      if(!res.ok) return;
+      // cache-bust مزدوج: query string + رأس Cache-Control لتجاوز CDN والكاش المحلي
+      const res=await fetch(location.pathname+'?_cv='+Date.now(),{
+        cache:'no-store',
+        headers:{'Cache-Control':'no-cache, no-store','Pragma':'no-cache'}
+      });
+      if(!res.ok){_updateChecking=false;return;}
       const html=await res.text();
       const m=html.match(/<meta\s+name="app-version"\s+content="([^"]+)"/i);
       const latest=m?m[1]:null;
-      if(!latest||latest===cur) return;
-      // إصدار أحدث موجود — تجنّب حلقة إعادة تحميل لا نهائية
-      if(sessionStorage.getItem('adelcare_reloaded_for')===latest) return;
+      if(!latest||latest===cur){_updateChecking=false;return;}
+      // إصدار أحدث — تجنّب حلقة إعادة تحميل لا نهائية
+      if(sessionStorage.getItem('adelcare_reloaded_for')===latest){_updateChecking=false;return;}
       sessionStorage.setItem('adelcare_reloaded_for',latest);
       toast("🔄 يتوفر تحديث جديد — جارٍ التحديث...","ok");
-      setTimeout(()=>location.reload(),1200);
-    }catch(e){/* الشبكة غير متاحة — نتجاهل */}
+      setTimeout(()=>location.reload(true),1200);
+    }catch(e){/* الشبكة غير متاحة — نتجاهل */}finally{_updateChecking=false;}
   }
 
   async function boot(){
@@ -4992,10 +4981,13 @@ const App = (() => {
     setInterval(()=>{
       if(state.route==="dashboard"||state.route==="doctors") render();
     },60000);
-    // فحص وجود إصدار أحدث: عند الإقلاع، وكل دقيقة، وعند العودة للتطبيق
+    // فحص وجود إصدار أحدث: عند الإقلاع + كل 30 ثانية + عند العودة بأي طريقة
     checkForUpdate();
-    setInterval(checkForUpdate,60*1000);
+    setInterval(checkForUpdate,30*1000);
     document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkForUpdate(); });
+    window.addEventListener('focus',checkForUpdate);
+    // pageshow يُعالج الرجوع من bfcache (الضغط على زر الرجوع)
+    window.addEventListener('pageshow',(e)=>{ if(e.persisted) checkForUpdate(); });
   }
   return { boot };
 })();
