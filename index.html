@@ -1,10 +1,15 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0ea5a4">
+<!-- منع تخزين نسخة قديمة من الصفحة في المتصفح -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
+<meta name="app-version" content="2026-07-07-06">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -387,8 +392,8 @@ a{color:inherit;text-decoration:none}
 .dcard.st-finished{border-inline-start-color:var(--red)}
 .dcard.st-leave{border-inline-start-color:var(--leave);background:color-mix(in srgb,var(--leave-soft) 60%,var(--surface))}
 .dcard.st-off{border-inline-start-color:var(--black)}
-.dcard.st-terminated{border-inline-start-color:#7c3aed;background:color-mix(in srgb,#ede9fe 50%,var(--surface))}
-[data-theme="dark"] .dcard.st-terminated{background:color-mix(in srgb,#2e1065 40%,var(--surface))}
+.dcard.st-terminated{border-inline-start-color:#475569;background:color-mix(in srgb,#e2e8f0 55%,var(--surface))}
+[data-theme="dark"] .dcard.st-terminated{background:color-mix(in srgb,#1e293b 55%,var(--surface))}
 .dcard-leave-info span{color:var(--leave)!important;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;display:block;max-width:100%}
 .leave-active-row{background:color-mix(in srgb,var(--leave-soft) 80%,var(--surface));border:1px solid var(--leave);
@@ -443,8 +448,8 @@ a{color:inherit;text-decoration:none}
 [data-theme="dark"] .sp-secondment{background:#164e63;color:#67e8f9}
 .dcard.st-secondment{border-inline-start-color:#06b6d4;background:color-mix(in srgb,#cffafe 40%,var(--surface))}
 [data-theme="dark"] .dcard.st-secondment{background:color-mix(in srgb,#164e63 40%,var(--surface))}
-.sp-terminated{background:#ede9fe;color:#6d28d9;font-weight:700}
-[data-theme="dark"] .sp-terminated{background:#2e1065;color:#c4b5fd}
+.sp-terminated{background:#e2e8f0;color:#334155;font-weight:700}
+[data-theme="dark"] .sp-terminated{background:#334155;color:#cbd5e1}
 .sp-in-visit{background:#f3e8ff;color:#7c3aed;font-weight:700}
 [data-theme="dark"] .sp-in-visit{background:#2e1065;color:#a78bfa}
 .st-in-visit{border-inline-start-color:#7c3aed}
@@ -1037,9 +1042,8 @@ const LocalDB = (() => {
   // Restore persisted lockout on boot
   const _fails = (()=>{ try{return JSON.parse(localStorage.getItem(FAIL_KEY)||"{}");}catch(e){return {};} })();
   let _fsDB, _fsColl, _initPromise, _lastWriteTs = 0;
-  // كل قسم في مستند مستقل — حد 1MB لكل قسم بدلاً من النظام كله
-  const _SECT_DOCS = { doctors:'doctors', branches:'branches', leaves:'leaves', settings:'settings', _seq:'meta', audit:'audit' };
-  let _lastWritten = {}; // آخر قيمة مكتوبة/مقروءة لكل قسم — لتجنب الكتابة غير الضرورية
+  // مستند واحد (main) لكل البيانات + مستند منفصل للسجل (audit) — نفس صيغة الموقع الحي
+  let _lastMain = null, _lastAudit = null; // آخر قيمة مكتوبة/مقروءة — لتجنب الكتابة غير الضرورية
 
   function load() { return _memDB; }
 
@@ -1065,20 +1069,22 @@ const LocalDB = (() => {
     try { localStorage.setItem(SESS, JSON.stringify(withExp)); } catch(e) {}
   }
 
-  function _sectStr(db, key) {
-    const v = db[key] === undefined ? (key === 'audit' ? [] : (key === '_seq' ? {} : null)) : db[key];
-    return JSON.stringify(v);
-  }
+  // بنية main = كل شيء عدا السجل (audit)
+  function _mainObj(db) { const {audit, ...main} = db; return main; }
 
   function save(db) {
     _memDB = db;
     if (_fsColl) {
       _lastWriteTs = Date.now();
-      for (const [key, docName] of Object.entries(_SECT_DOCS)) {
-        const str = _sectStr(db, key);
-        if (_lastWritten[key] === str) continue;
-        _lastWritten[key] = str;
-        _fsColl.doc(docName).set({ data: str }).catch(e => console.error('[Adelcare] Firestore write ('+docName+'):', e));
+      const mainStr = JSON.stringify(_mainObj(db));
+      if (_lastMain !== mainStr) {
+        _lastMain = mainStr;
+        _fsColl.doc('main').set({ data: mainStr }).catch(e => console.error('[Adelcare] Firestore write (main):', e));
+      }
+      const auditStr = JSON.stringify(db.audit || []);
+      if (_lastAudit !== auditStr) {
+        _lastAudit = auditStr;
+        _fsColl.doc('audit').set({ data: auditStr }).catch(e => console.error('[Adelcare] Firestore write (audit):', e));
       }
     }
     try{
@@ -1089,49 +1095,136 @@ const LocalDB = (() => {
       localStorage.setItem('adelcare_backup_ts', new Date().toISOString());
     }catch(e){}
     _maybeDailySnapshot();
+    _scheduleOpSnapshot();   // نسخة تشغيلية موثّقة بعد كل عملية
   }
 
-  // ── نسخ تاريخية تلقائية في Firestore (يُحتفظ بآخر 30) ──
-  const SNAP_KEEP = 30;
+  // ══════════════════════════════════════════════════════════════════
+  //  نظام النسخ الاحتياطي الاحترافي (Version History في Firestore)
+  //  ─ نسخة تلقائية بعد كل عملية (إضافة/تعديل/حذف) عبر debounce قصير
+  //  ─ نسخة يومية أساسية + نسخة قبل كل استعادة/استيراد/تصفير
+  //  ─ نسخة يدوية عند الطلب — كل نسخة موثّقة (وقت/عملية/مستخدم/أعداد)
+  //  ─ يُحتفظ بسجل متدرّج حسب النوع (تقليم تلقائي)
+  // ══════════════════════════════════════════════════════════════════
+  //  ─ التصميم: كل نسخة = مستند بيانات (data blob) في adelcare_snapshots،
+  //    مع مستند فهرس واحد "__index__" يحوي بيانات وصفية خفيفة لكل النسخ.
+  //    العرض/التقليم يقرآن الفهرس فقط (بايتات) — لا يُنزَّل أي blob إلا عند الاستعادة.
+  const SNAP_KEEP = { op:60, auto:30, pre:20, manual:40 }; // الحد لكل نوع
+  const OP_SNAP_DEBOUNCE = 1500;   // تجميع الحفظات المتتالية (مللي ثانية)
   let _snapInFlight = false;
+  let _opTimer = null, _opPending = null, _snapIndexReady = false;
+
   function _snapColl(){ return _fsDB ? _fsDB.collection('adelcare_snapshots') : null; }
-  function _writeSnapshot(id, db){
-    const coll=_snapColl(); const src=db||_memDB;
-    if(!coll||!src) return Promise.resolve();
-    const {audit, ...main}=src;
-    return coll.doc(id).set({ data: JSON.stringify(main), ts: new Date().toISOString() });
+  function _snapIndexRef(){ const c=_snapColl(); return c ? c.doc('__index__') : null; }
+  function _snapKind(id){
+    if(id.startsWith('op_'))     return 'op';
+    if(id.startsWith('auto_'))   return 'auto';
+    if(id.startsWith('manual_')) return 'manual';
+    if(id.startsWith('pre_'))    return 'pre';
+    return 'op';
   }
-  async function _pruneSnapshots(){
-    const coll=_snapColl(); if(!coll) return;
+  // بناء الفهرس لمرة واحدة من النسخ القديمة (ترحيل من الصيغة السابقة)
+  async function _bootstrapSnapIndex(){
+    const coll=_snapColl(), idxRef=_snapIndexRef(); if(!coll||!idxRef) return [];
     try{
-      const qs=await coll.get();
-      const docs=qs.docs.map(d=>({id:d.id, ts:(d.data()||{}).ts||""})).sort((a,b)=>a.ts<b.ts?-1:1);
-      for(let i=0;i<docs.length-SNAP_KEEP;i++) await coll.doc(docs[i].id).delete();
-    }catch(e){ console.error('[Adelcare] prune snapshots:', e); }
+      const qs=await coll.get(); const list=[];
+      qs.docs.forEach(d=>{ if(d.id==='__index__') return; const dd=d.data()||{};
+        list.push({ id:d.id, ts:dd.ts||"", action:dd.action||"", user:dd.user||"",
+          kind:dd.kind||_snapKind(d.id), n:dd.n||null }); });
+      list.sort((a,b)=>a.ts<b.ts?1:-1);
+      await idxRef.set({ list });
+      return list;
+    }catch(e){ console.error('[Adelcare] bootstrap snap index:',e); return []; }
   }
+  // ضمان وجود الفهرس قبل أي كتابة — يبني من النسخ القديمة مرة واحدة (يحمي من فقدها)
+  async function _ensureSnapIndex(){
+    if(_snapIndexReady) return;
+    const ref=_snapIndexRef(); if(!ref){ return; }
+    try{ const s=await ref.get(); if(!s.exists) await _bootstrapSnapIndex(); }
+    catch(e){ console.error('[Adelcare] ensure snap index:',e); }
+    _snapIndexReady=true;
+  }
+  // قراءة الفهرس (خفيف) — قائمة بيانات وصفية مرتّبة (الأحدث أولاً)
+  async function _readSnapIndex(){
+    const ref=_snapIndexRef(); if(!ref) return [];
+    try{
+      const s=await ref.get();
+      if(!s.exists){ const l=await _bootstrapSnapIndex(); _snapIndexReady=true; return l; } // ترحيل لمرة واحدة
+      _snapIndexReady=true;
+      const list=(s.data().list)||[];
+      return Array.isArray(list)?list.slice().sort((a,b)=>a.ts<b.ts?1:-1):[];
+    }catch(e){ console.error('[Adelcare] read snap index:',e); return []; }
+  }
+  // كتابة نسخة: (1) مستند البيانات (2) تحديث الفهرس + تقليم — والتقليم يقرأ الفهرس فقط
+  async function _writeSnapshot(id, db, meta){
+    const coll=_snapColl(); const src=db||_memDB;
+    if(!coll||!src||!_fsDB) return;
+    await _ensureSnapIndex();   // يضمن ترحيل النسخ القديمة قبل أول كتابة (يمنع فقدها)
+    const {audit, ...main}=src;
+    const ts=new Date().toISOString(); const m=meta||{};
+    const entry={ id, ts, action:m.action||"", user:m.user||"", kind:m.kind||_snapKind(id),
+      n:{ doctors:(main.doctors||[]).length, branches:(main.branches||[]).length, leaves:(main.leaves||[]).length } };
+    // 1) مستند البيانات (blob) — منفصل عن الفهرس
+    await coll.doc(id).set({ data: JSON.stringify(main), ts });
+    // 2) تحديث الفهرس بمعاملة آمنة + تحديد النسخ الزائدة للحذف
+    const idxRef=_snapIndexRef(); let toDelete=[];
+    try{
+      await _fsDB.runTransaction(async tx=>{
+        const s=await tx.get(idxRef);
+        let list=(s.exists&&Array.isArray(s.data().list))?s.data().list.slice():[];
+        list=list.filter(e=>e.id!==id); list.push(entry);
+        const byKind={}; list.forEach(e=>{ (byKind[e.kind]=byKind[e.kind]||[]).push(e); });
+        let kept=[]; toDelete=[];
+        for(const k in byKind){
+          const cap=SNAP_KEEP[k]||30;
+          const arr=byKind[k].sort((a,b)=>a.ts<b.ts?1:-1); // الأحدث أولاً
+          kept=kept.concat(arr.slice(0,cap));
+          toDelete=toDelete.concat(arr.slice(cap).map(e=>e.id));
+        }
+        kept.sort((a,b)=>a.ts<b.ts?1:-1);
+        tx.set(idxRef,{ list:kept });
+      });
+    }catch(e){ console.error('[Adelcare] snap index tx:',e); }
+    // 3) حذف مستندات البيانات الزائدة (خارج المعاملة)
+    for(const did of toDelete){ if(did!==id){ try{ await coll.doc(did).delete(); }catch(e){} } }
+  }
+  // نسخة يومية أساسية (مرة كل يوم)
   function _maybeDailySnapshot(){
     if(_snapInFlight||!_fsDB||!_memDB) return;
     const today=new Date().toISOString().slice(0,10);
     let done=null; try{ done=localStorage.getItem('adelcare_snap_date'); }catch(e){}
     if(done===today) return;
     _snapInFlight=true;
-    _writeSnapshot('auto_'+today).then(()=>{
+    _writeSnapshot('auto_'+today, null, {kind:'auto', action:'نسخة يومية تلقائية'}).then(()=>{
       try{ localStorage.setItem('adelcare_snap_date', today); }catch(e){}
-      return _pruneSnapshots();
     }).catch(e=>console.error('[Adelcare] daily snapshot:', e))
       .finally(()=>{ _snapInFlight=false; });
+  }
+  // نسخة تشغيلية بعد كل عملية — مع debounce لتجميع الحفظات المتلاحقة
+  function _scheduleOpSnapshot(){
+    if(!_fsDB) return;
+    const a=_lastAction;
+    _opPending = { action:(a&&a.action)||"تحديث بيانات", user:(a&&a.user)||"", count:((_opPending&&_opPending.count)||0)+1 };
+    if(_opTimer) clearTimeout(_opTimer);
+    _opTimer=setTimeout(()=>{
+      const p=_opPending; _opPending=null; _opTimer=null;
+      if(!p) return;
+      const label = p.count>1 ? `${p.action} (+${p.count-1} عملية)` : p.action;
+      const id='op_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);
+      _writeSnapshot(id, null, {kind:'op', action:label, user:p.user})
+        .catch(e=>console.error('[Adelcare] op snapshot:', e));
+    }, OP_SNAP_DEBOUNCE);
   }
 
   async function _writeAllSections(db) {
     if (!_fsColl) return;
     _lastWriteTs = Date.now();
-    const writes = [];
-    for (const [key, docName] of Object.entries(_SECT_DOCS)) {
-      const str = _sectStr(db, key);
-      _lastWritten[key] = str;
-      writes.push(_fsColl.doc(docName).set({ data: str }));
-    }
-    await Promise.all(writes);
+    const mainStr = JSON.stringify(_mainObj(db));
+    const auditStr = JSON.stringify(db.audit || []);
+    _lastMain = mainStr; _lastAudit = auditStr;
+    await Promise.all([
+      _fsColl.doc('main').set({ data: mainStr }),
+      _fsColl.doc('audit').set({ data: auditStr })
+    ]);
   }
 
   async function _doInit() {
@@ -1140,40 +1233,29 @@ const LocalDB = (() => {
     _fsDB   = firebase.firestore();
     _fsColl = _fsDB.collection('adelcare');
 
-    const qs = await _fsColl.get();
-    const docs = {};
-    qs.forEach(d => { docs[d.id] = d.data(); });
-    const parse = (id, fallback) => {
-      try { return docs[id] && typeof docs[id].data === 'string' ? JSON.parse(docs[id].data) : fallback; }
+    const parseRaw = (raw, fallback) => {
+      try { return raw && typeof raw.data === 'string' ? JSON.parse(raw.data) : fallback; }
       catch(e) { return fallback; }
     };
 
     const defSeq = {doctors:200, branches:10, leaves:50, audit:100};
-    if (docs.doctors) {
-      // الصيغة الجديدة — مستندات مقسمة
-      _memDB = {
-        doctors:  parse('doctors', []),
-        branches: parse('branches', []),
-        leaves:   parse('leaves', []),
-        settings: parse('settings', {}),
-        _seq:     parse('meta', defSeq),
-        audit:    parse('audit', [])
-      };
-      for (const [key] of Object.entries(_SECT_DOCS)) _lastWritten[key] = _sectStr(_memDB, key);
-    } else if (docs.main) {
-      // ترحيل تلقائي من الصيغة القديمة (مستند واحد) — يُكتب مرة واحدة كمستندات مقسمة
-      const main = parse('main', {});
+    const mainSnap  = await _fsColl.doc('main').get();
+    const auditSnap = await _fsColl.doc('audit').get();
+    if (mainSnap.exists) {
+      // الصيغة الحية — مستند main واحد + audit منفصل
+      const main = parseRaw(mainSnap.data(), {});
       _memDB = {
         doctors:  main.doctors  || [],
         branches: main.branches || [],
         leaves:   main.leaves   || [],
         settings: main.settings || {},
         _seq:     main._seq     || defSeq,
-        audit:    parse('audit', [])
+        audit:    parseRaw(auditSnap.exists ? auditSnap.data() : null, [])
       };
-      await _writeAllSections(_memDB);
-      console.info('[Adelcare] تم ترحيل البيانات إلى الصيغة المقسمة');
+      _lastMain  = JSON.stringify(_mainObj(_memDB));
+      _lastAudit = JSON.stringify(_memDB.audit);
     } else {
+      // أول تشغيل على الإطلاق — تهيئة من البذرة
       _memDB = JSON.parse(JSON.stringify({
         doctors:  SEED.doctors,
         branches: SEED.branches,
@@ -1192,16 +1274,26 @@ const LocalDB = (() => {
       let changed = false;
       snap.docChanges().forEach(ch => {
         if (ch.type === 'removed') return;
-        const entry = Object.entries(_SECT_DOCS).find(([k, d]) => d === ch.doc.id);
-        if (!entry) return; // يتجاهل المستند القديم main وأي مستندات أخرى
-        const [key] = entry;
+        const id = ch.doc.id;
+        if (id !== 'main' && id !== 'audit') return; // يتجاهل أي مستندات مقسّمة قديمة
         const raw = ch.doc.data();
-        if (!raw || typeof raw.data !== 'string' || _lastWritten[key] === raw.data) return;
-        try {
-          _memDB[key] = JSON.parse(raw.data);
-          _lastWritten[key] = raw.data;
-          if (key !== 'audit') changed = true;
-        } catch(e) {}
+        if (!raw || typeof raw.data !== 'string') return;
+        if (id === 'main') {
+          if (_lastMain === raw.data) return;
+          try {
+            const m = JSON.parse(raw.data);
+            _memDB.doctors  = m.doctors  || [];
+            _memDB.branches = m.branches || [];
+            _memDB.leaves   = m.leaves   || [];
+            _memDB.settings = m.settings || {};
+            _memDB._seq     = m._seq     || _memDB._seq;
+            _lastMain = raw.data;
+            changed = true;
+          } catch(e) {}
+        } else { // audit
+          if (_lastAudit === raw.data) return;
+          try { _memDB.audit = JSON.parse(raw.data); _lastAudit = raw.data; } catch(e) {}
+        }
       });
       if (changed) document.dispatchEvent(new CustomEvent('adelcare:sync'));
     });
@@ -1223,6 +1315,7 @@ const LocalDB = (() => {
     return id;
   }
 
+  let _lastAction = null; // آخر عملية مسجّلة — لتوثيق النسخة التشغيلية
   function log(db, action, entity, entity_id, detail, extra) {
     const s=getSession();
     const entry={
@@ -1234,6 +1327,74 @@ const LocalDB = (() => {
     if(extra) Object.assign(entry,extra);
     db.audit.unshift(entry);
     if (db.audit.length > 500) db.audit.length = 500;
+    _lastAction = { action, user:(s.name||"زائر") };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  سجل تفصيلي — أدوات مقارنة الحقول (قبل ← بعد) بلغة مقروءة
+  // ══════════════════════════════════════════════════════════════════
+  const _DAY_AR=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+  const _AUDIT_LABELS={ name:"الاسم", en_name:"الاسم بالإنجليزية", name_en:"الاسم بالإنجليزية",
+    specialty:"التخصص", rank:"الدرجة", nationality:"الجنسية", gender:"الجنس", experience:"الخبرة",
+    phone:"الهاتف", qualification:"المؤهل", cases:"الحالات المستقبلة", notes_coord:"ملاحظات التنسيق",
+    notes_admin:"ملاحظات إدارية", languages:"اللغات", hours_raw:"نص الدوام" };
+  function _fmtD(iso){ if(!iso) return "—"; const p=String(iso).split("-"); return p.length<3?String(iso):`${+p[2]}/${+p[1]}/${p[0]}`; }
+  function _fmtDayShifts(arr){ return (arr&&arr.length)?arr.map(([s,e])=>fmtMin(s)+"–"+fmtMin(e)).join("، "):"—"; }
+  function _auditVal(db,field,v){
+    if(v===undefined||v===null||v==="") return "—";
+    if(field==="branch_id"||field==="secondment_branch_id"){ const b=db.branches.find(x=>x.id==v); return b?b.name:("#"+v); }
+    if(field==="home_visit") return v?"نعم":"لا";
+    if(field==="status")     return v==="leave"?"إجازة":(v==="active"?"نشط":String(v));
+    if(field==="dayoff"){ const a=Array.isArray(v)?v:[]; return a.length?a.slice().sort((x,y)=>x-y).map(i=>_DAY_AR[i]||i).join("، "):"—"; }
+    return String(v);
+  }
+  // يقارن ممارساً قبل/بعد ويُرجع قائمة تغييرات مقروءة
+  function _diffDoctor(db,o,n){
+    const ch=[];
+    Object.keys(_AUDIT_LABELS).forEach(f=>{
+      if(_AUDIT_LABELS[f] && (f in n) && String(o[f]??"")!==String(n[f]??""))
+        ch.push(`${_AUDIT_LABELS[f]}: ${_auditVal(db,f,o[f])} ← ${_auditVal(db,f,n[f])}`);
+    });
+    if(("branch_id" in n) && String(o.branch_id)!==String(n.branch_id))
+      ch.push(`الفرع: ${_auditVal(db,'branch_id',o.branch_id)} ← ${_auditVal(db,'branch_id',n.branch_id)}`);
+    if(("home_visit" in n) && (o.home_visit?1:0)!==(n.home_visit?1:0))
+      ch.push(`الزيارة المنزلية: ${o.home_visit?"نعم":"لا"} ← ${n.home_visit?"نعم":"لا"}`);
+    if(("status" in n) && (o.status||"")!==(n.status||""))
+      ch.push(`الحالة: ${_auditVal(db,'status',o.status)} ← ${_auditVal(db,'status',n.status)}`);
+    if("dayoff" in n){ const a=(o.dayoff||[]).slice().sort().join(","), b=(n.dayoff||[]).slice().sort().join(",");
+      if(a!==b) ch.push(`الإجازة الأسبوعية: ${_auditVal(db,'dayoff',o.dayoff)} ← ${_auditVal(db,'dayoff',n.dayoff)}`); }
+    if("schedule" in n){ const os=o.schedule||{}, ns=n.schedule||{};
+      for(let d=0;d<7;d++){ const oa=os[d]||os[String(d)]||[], na=ns[d]||ns[String(d)]||[];
+        if(JSON.stringify(oa)!==JSON.stringify(na)){
+          if(!oa.length)      ch.push(`أُضيف دوام ${_DAY_AR[d]}: ${_fmtDayShifts(na)}`);
+          else if(!na.length) ch.push(`أُلغي دوام ${_DAY_AR[d]} (كان ${_fmtDayShifts(oa)})`);
+          else                ch.push(`دوام ${_DAY_AR[d]}: ${_fmtDayShifts(oa)} ← ${_fmtDayShifts(na)}`);
+        }
+      }
+    }
+    return ch;
+  }
+  // يقارن فرعاً قبل/بعد
+  const _BRANCH_LABELS={ name:"الاسم", grp:"المجموعة", info:"معلومات", hours:"ساعات العمل",
+    phone:"الجوال", landline:"الهاتف الأرضي", bank_account:"الحساب البنكي", iban:"الآيبان", extra_info:"معلومات إضافية" };
+  function _diffBranch(o,n){
+    const ch=[];
+    Object.keys(_BRANCH_LABELS).forEach(f=>{
+      if((f in n) && String(o[f]??"")!==String(n[f]??""))
+        ch.push(`${_BRANCH_LABELS[f]}: ${o[f]||"—"} ← ${n[f]||"—"}`);
+    });
+    return ch;
+  }
+  // يقارن سجل إجازة/ندب قبل/بعد
+  function _diffLeave(db,o,n){
+    const ch=[];
+    if((o.type||"")!==(n.type||"")) ch.push(`النوع: ${o.type||"—"} ← ${n.type||"—"}`);
+    if((o.start_date||"")!==(n.start_date||"")) ch.push(`من تاريخ: ${_fmtD(o.start_date)} ← ${_fmtD(n.start_date)}`);
+    if((o.end_date||"")!==(n.end_date||"")) ch.push(`إلى تاريخ: ${_fmtD(o.end_date)} ← ${_fmtD(n.end_date)}`);
+    if(String(o.secondment_branch_id||"")!==String(n.secondment_branch_id||""))
+      ch.push(`فرع الندب: ${_auditVal(db,'secondment_branch_id',o.secondment_branch_id)} ← ${_auditVal(db,'secondment_branch_id',n.secondment_branch_id)}`);
+    if((o.reason||"")!==(n.reason||"")) ch.push(`الملاحظات: ${o.reason||"—"} ← ${n.reason||"—"}`);
+    return ch;
   }
 
   // ── Helpers ──────────────────────────────────────────────────
@@ -1254,6 +1415,30 @@ const LocalDB = (() => {
     return leaves.find(l =>
       l.doctor_id == doctorId && l.start_date <= dateStr && l.end_date >= dateStr
     );
+  }
+
+  // يبحث عن سجل إجازة/ندب متداخل مع الفترة [start,end] لنفس الممارس (عدا السجل المستثنى)
+  function overlapLeaveFn(leaves, doctorId, start, end, excludeId) {
+    return leaves.find(l =>
+      l.doctor_id == doctorId && l.id !== excludeId && !l.synthetic &&
+      start <= l.end_date && l.start_date <= end
+    );
+  }
+
+  // تفعيل إنهاء العقد المجدول تلقائياً عند وصول تاريخه — يحوّله إلى حالة دائمة
+  function applyDueTerminations(db) {
+    if (!db || !db.doctors) return false;
+    const today = new Date().toISOString().slice(0,10);
+    let changed = false;
+    db.doctors.forEach(d => {
+      if (d.termination_scheduled && !d.terminated && d.termination_scheduled <= today) {
+        d.terminated = 1;
+        d.terminated_date = d.termination_scheduled;
+        delete d.termination_scheduled;
+        changed = true;
+      }
+    });
+    return changed;
   }
 
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
@@ -1313,6 +1498,7 @@ const LocalDB = (() => {
       const sb = db.branches.find(b=>b.id==live.secondmentBranchId);
       if (sb) live.secondmentBranchName = sb.name;
     }
+    if (doc.termination_scheduled) live.termSched = doc.termination_scheduled;
     return { ...doc, live };
   }
 
@@ -1357,6 +1543,8 @@ const LocalDB = (() => {
     let _patched=false;
     (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_patched=true;}if(!u.specialties){u.specialties=["*"];_patched=true;}});
     if(_patched) save(db);
+    // تفعيل أي إنهاء عقد مجدول حان تاريخه (حالة دائمة)
+    if(applyDueTerminations(db)) save(db);
 
     // AUTH
     if (method==="POST" && path==="/login") {
@@ -1395,7 +1583,7 @@ const LocalDB = (() => {
       const id="u"+Date.now();
       const u={id,name,pin,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],specialties:body.specialties||["*"],created:new Date().toISOString()};
       db.settings.users.push(u);
-      log(db,"إضافة مستخدم","user",id,name); save(db);
+      log(db,"إضافة مستخدم","user",id,`إضافة مستخدم "${name}" (${(u.permissions||[]).length} صلاحية)`); save(db);
       return {id};
     }
     const usrM=path.match(/^\/users\/([^/]+)$/);
@@ -1405,6 +1593,7 @@ const LocalDB = (() => {
         needPerm("users_manage");
         const u=(db.settings.users||[]).find(x=>x.id===uid); if(!u) throw Object.assign(new Error("not found"),{status:404});
         if(u.role==="super_admin"&&sess.userId!==u.id) throw new Error("لا يمكن تعديل المدير الرئيسي");
+        const _uBefore={name:u.name,active:u.active,pin:u.pin,permissions:(u.permissions||[]).slice(),branches:(u.branches||[]).slice(),specialties:(u.specialties||[]).slice()};
         if(body.name) u.name=body.name.trim();
         if(body.pin){
           const newPin=body.pin.trim();
@@ -1420,7 +1609,16 @@ const LocalDB = (() => {
         if(body.specialties!==undefined&&u.role!=="super_admin") u.specialties=body.specialties;
         if(body.active!==undefined&&u.role!=="super_admin") u.active=!!body.active;
         if(sess.userId===uid) setSession({...sess,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"]});
-        log(db,"تعديل مستخدم","user",uid,u.name); save(db);
+        const uch=[];
+        if(_uBefore.name!==u.name) uch.push(`الاسم: ${_uBefore.name} ← ${u.name}`);
+        if(_uBefore.pin!==u.pin) uch.push(`تغيير رمز الدخول`);
+        if(_uBefore.active!==u.active) uch.push(`الحالة: ${_uBefore.active?"نشط":"متوقف"} ← ${u.active?"نشط":"متوقف"}`);
+        const _pb=_uBefore.permissions.join(","), _pa=(u.permissions||[]).join(",");
+        if(_pb!==_pa) uch.push(`الصلاحيات: ${_uBefore.permissions.length} ← ${(u.permissions||[]).length} صلاحية`);
+        if(_uBefore.branches.join(",")!==(u.branches||[]).join(",")) uch.push(`صلاحية الفروع محدّثة`);
+        if(_uBefore.specialties.join(",")!==(u.specialties||[]).join(",")) uch.push(`صلاحية الأقسام محدّثة`);
+        const uDetail=uch.length?`تعديل مستخدم "${u.name}":\n• ${uch.join("\n• ")}`:`فتح مستخدم "${u.name}" دون تغيير`;
+        log(db,"تعديل مستخدم","user",uid,uDetail); save(db);
         return {ok:true};
       }
       if(method==="DELETE"){
@@ -1428,7 +1626,7 @@ const LocalDB = (() => {
         const u=(db.settings.users||[]).find(x=>x.id===uid); if(!u) throw Object.assign(new Error("not found"),{status:404});
         if(u.role==="super_admin") throw new Error("لا يمكن حذف المدير الرئيسي");
         db.settings.users=db.settings.users.filter(x=>x.id!==uid);
-        log(db,"حذف مستخدم","user",uid,u.name); save(db);
+        log(db,"حذف مستخدم","user",uid,`حذف المستخدم "${u.name}"`); save(db);
         return {ok:true};
       }
     }
@@ -1436,13 +1634,22 @@ const LocalDB = (() => {
     // SETTINGS
     if (method==="GET" && path==="/settings") {
       needPerm("settings_access");
-      return {access_code:db.settings.access_code||"123", last_backup_download:db.settings.last_backup_download||null};
+      return {access_code:db.settings.access_code||"123", last_backup_download:db.settings.last_backup_download||null,
+        last_auto_export:db.settings.last_auto_export||null,
+        auto_export_enabled:db.settings.auto_export_enabled!==false,
+        auto_export_days:db.settings.auto_export_days||7};
     }
     if (method==="PUT" && path==="/settings") {
       needPerm("settings_access");
-      if(body.last_backup_download){ db.settings.last_backup_download=body.last_backup_download; save(db); return {ok:true}; }
+      // تحديثات خفيفة لا تُسجَّل في سجل العمليات (طوابع/إعدادات النسخ)
+      let touched=false;
+      if(body.last_backup_download){ db.settings.last_backup_download=body.last_backup_download; touched=true; }
+      if(body.last_auto_export){ db.settings.last_auto_export=body.last_auto_export; touched=true; }
+      if(typeof body.auto_export_enabled==="boolean"){ db.settings.auto_export_enabled=body.auto_export_enabled; touched=true; }
+      if(body.auto_export_days){ const n=+body.auto_export_days; if(n>=1&&n<=90){ db.settings.auto_export_days=n; touched=true; } }
+      if(touched && !(body.access_code&&body.access_code.trim())){ save(db); return {ok:true}; }
       if(body.access_code&&body.access_code.trim()) db.settings.access_code=body.access_code.trim();
-      log(db,"تغيير رمز العرض","settings");
+      log(db,"تغيير إعدادات","settings");
       save(db); return {ok:true};
     }
 
@@ -1506,22 +1713,26 @@ const LocalDB = (() => {
       if (method==="PUT") {
         needPerm("branch_manage");
         const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
+        const _bBefore={...b};
         ["name","grp","info","hours","phone","landline","bank_account","iban","extra_info","details"].forEach(k=>{ if(k in body) b[k]=body[k]; });
-        log(db,"تعديل فرع","branch",bid,b.name); save(db); return {ok:true};
+        const bchanges=_diffBranch(_bBefore,b);
+        const bDetail=bchanges.length?`تعديل فرع "${b.name}":\n• ${bchanges.join("\n• ")}`:`فتح فرع "${b.name}" دون تغيير`;
+        log(db,"تعديل فرع","branch",bid,bDetail); save(db); return {ok:true};
       }
       if (method==="DELETE") {
         needPerm("branch_manage");
+        const _bDel=db.branches.find(x=>x.id===bid);
         const n=db.doctors.filter(d=>d.branch_id===bid&&!d.archived).length;
         if(n) throw new Error(`لا يمكن حذف فرع يضم ${n} طبيب`);
         db.branches=db.branches.filter(x=>x.id!==bid);
-        log(db,"حذف فرع","branch",bid,""); save(db); return {ok:true};
+        log(db,"حذف فرع","branch",bid,_bDel?`حذف فرع "${_bDel.name}"`:"حذف فرع"); save(db); return {ok:true};
       }
     }
     if (method==="POST" && path==="/branches") {
       needPerm("branch_manage");
       const id=nextId(db,"branches");
       const b={id,name:body.name||"",grp:body.grp||"",info:body.info||"",hours:body.hours||"",phone:body.phone||"",landline:body.landline||"",bank_account:body.bank_account||"",iban:body.iban||"",extra_info:body.extra_info||""};
-      db.branches.push(b); log(db,"إضافة فرع","branch",id,b.name); save(db); return {id};
+      db.branches.push(b); log(db,"إضافة فرع","branch",id,`إضافة فرع جديد "${b.name}"`); save(db); return {id};
     }
 
     // DOCTORS
@@ -1553,9 +1764,11 @@ const LocalDB = (() => {
         if(body.schedule) updated.schedule=body.schedule;
         if(body.dayoff) updated.dayoff=body.dayoff;
         updated.home_visit=body.home_visit?1:0;
+        const changes=_diffDoctor(db,old,updated);
         db.doctors[idx]=updated;
         const bn=(db.branches.find(x=>x.id===updated.branch_id)||{}).name||"";
-        log(db,"تعديل طبيب","doctor",did,updated.name,{branch:bn,branch_id:updated.branch_id}); save(db); return {ok:true};
+        const detail=changes.length?`تعديل بيانات "${updated.name}":\n• ${changes.join("\n• ")}`:`فتح بيانات "${updated.name}" دون تغيير`;
+        log(db,"تعديل طبيب","doctor",did,detail,{branch:bn,branch_id:updated.branch_id}); save(db); return {ok:true};
       }
       if (method==="POST" && docM[2]==="/archive") {
         needPerm("doctor_delete");
@@ -1564,18 +1777,30 @@ const LocalDB = (() => {
         needSpecialty(d.specialty);
         d.archived=body.unarchive?0:1;
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
-        log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
+        log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,`${d.archived?"أرشفة":"استرجاع"} الممارس "${d.name}" (الفرع ${bn||"—"})`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
       if (method==="POST" && docM[2]==="/terminate") {
         needPerm("doctor_edit");
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
         needBranch(d.branch_id);
         needSpecialty(d.specialty);
-        d.terminated=body.unterm?0:1;
-        if(d.terminated) d.terminated_date=new Date().toISOString().slice(0,10);
-        else delete d.terminated_date;
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
-        log(db,d.terminated?"إنهاء عقد طبيب":"إعادة تفعيل طبيب","doctor",did,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
+        const today=new Date().toISOString().slice(0,10);
+        if(body.unterm){
+          // إلغاء إنهاء العقد / إعادة تفعيل — يمسح المجدول والمنفّذ
+          const wasSched=d.termination_scheduled;
+          d.terminated=0; delete d.terminated_date; delete d.termination_scheduled;
+          log(db,"إعادة تفعيل طبيب","doctor",did,`إلغاء إنهاء عقد "${d.name}"${wasSched?` (كان مجدولاً بتاريخ ${_fmtD(wasSched)})`:""} وإعادة تفعيله`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
+        }
+        const date=body.date||today;
+        if(date>today){
+          // تاريخ مستقبلي — يُفعّل تلقائياً عند وصوله (لا يزال يعمل حتى ذلك اليوم)
+          d.termination_scheduled=date; d.terminated=0; delete d.terminated_date;
+          log(db,"جدولة إنهاء عقد","doctor",did,`جدولة إنهاء عقد "${d.name}" بتاريخ ${_fmtD(date)} (يستمر بالعمل حتى ذلك التاريخ)`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true,scheduled:date};
+        }
+        // اليوم أو تاريخ سابق — إنهاء فوري
+        d.terminated=1; d.terminated_date=date; delete d.termination_scheduled;
+        log(db,"إنهاء عقد طبيب","doctor",did,`إنهاء عقد "${d.name}" بتاريخ ${_fmtD(date)}`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
       if (method==="DELETE") {
         needPerm("doctor_delete");
@@ -1584,7 +1809,7 @@ const LocalDB = (() => {
         db.doctors=db.doctors.filter(x=>x.id!==did);
         db.leaves=db.leaves.filter(l=>l.doctor_id!==did);
         const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
-        log(db,"حذف طبيب","doctor",did,d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
+        log(db,"حذف طبيب","doctor",did,d?`حذف نهائي للممارس "${d.name}" · ${d.specialty||"—"} · الفرع ${bn||"—"}`:"حذف ممارس",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
       }
     }
     if (method==="POST" && path==="/doctors") {
@@ -1595,7 +1820,7 @@ const LocalDB = (() => {
       const d={id,...body,home_visit:body.home_visit?1:0,archived:0,status:body.status||"active"};
       db.doctors.push(d);
       const bn=(db.branches.find(x=>x.id===+body.branch_id)||{}).name||"";
-      log(db,"إضافة طبيب","doctor",id,d.name,{branch:bn,branch_id:d.branch_id}); save(db); return {id};
+      log(db,"إضافة طبيب","doctor",id,`إضافة ممارس جديد "${d.name}" · ${d.specialty||"—"} · الفرع ${bn||"—"}`,{branch:bn,branch_id:d.branch_id}); save(db); return {id};
     }
     const visitM=path.match(/^\/doctors\/(\d+)\/visit$/);
     if(visitM && method==="POST"){
@@ -1606,7 +1831,7 @@ const LocalDB = (() => {
       needSpecialty(d.specialty);
       d.in_visit=!!body.in_visit;
       const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
-      log(db,d.in_visit?"تفعيل زيارة":"إلغاء زيارة","doctor",vid,d.name,{branch:bn,branch_id:d.branch_id}); save(db);
+      log(db,d.in_visit?"تفعيل زيارة":"إلغاء زيارة","doctor",vid,d.in_visit?`تغيير حالة "${d.name}": الدوام المعتاد ← في زيارة الآن`:`تغيير حالة "${d.name}": في زيارة الآن ← العودة للدوام المعتاد`,{branch:bn,branch_id:d.branch_id}); save(db);
       return {ok:true,in_visit:d.in_visit};
     }
 
@@ -1614,9 +1839,10 @@ const LocalDB = (() => {
     if (method==="GET" && path==="/leaves") {
       needAuth();
       const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
-      const dmap={};db.doctors.forEach(d=>{dmap[d.id]={name:d.name,branch_id:d.branch_id,specialty:d.specialty||""};});
+      const dmap={};db.doctors.forEach(d=>{dmap[d.id]={name:d.name,branch_id:d.branch_id,specialty:d.specialty||"",terminated:!!d.terminated,archived:!!d.archived};});
       const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
-      const realLeaves=db.leaves.map(l=>{
+      // استثناء منتهي العقد والمؤرشفين — لا يُحتسبون كإجازات
+      const realLeaves=db.leaves.filter(l=>{const doc=dmap[l.doctor_id];return !doc||(!doc.terminated&&!doc.archived);}).map(l=>{
         const doc=dmap[l.doctor_id]||{};
         return {...l,doctor_name:doc.name||"",branch_id:doc.branch_id||null,branch_name:bmap[doc.branch_id]||"",specialty:doc.specialty||"",
           secondment_branch_name:l.secondment_branch_id?bmap[l.secondment_branch_id]||"":""};
@@ -1624,7 +1850,7 @@ const LocalDB = (() => {
       // Include doctors manually set to leave status with no active leave record
       const docIdsWithActiveLeave=new Set(db.leaves.filter(l=>l.start_date<=today&&l.end_date>=today).map(l=>l.doctor_id));
       const syntheticLeaves=db.doctors
-        .filter(d=>!d.archived&&d.status==="leave"&&!docIdsWithActiveLeave.has(d.id))
+        .filter(d=>!d.archived&&!d.terminated&&d.status==="leave"&&!docIdsWithActiveLeave.has(d.id))
         .map(d=>({id:"syn_"+d.id,doctor_id:d.id,start_date:today,end_date:today,type:"وضع يدوي",reason:"",synthetic:true,
           doctor_name:d.name,branch_id:d.branch_id||null,branch_name:bmap[d.branch_id]||"",specialty:d.specialty||""}));
       return {leaves:[...realLeaves,...syntheticLeaves].sort((a,b)=>b.start_date.localeCompare(a.start_date))};
@@ -1633,12 +1859,18 @@ const LocalDB = (() => {
       needPerm("leave_manage");
       const d=db.doctors.find(x=>x.id===+body.doctor_id);
       if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
+      const clash=overlapLeaveFn(db.leaves,+body.doctor_id,body.start_date,body.end_date,null);
+      if(clash) throw Object.assign(new Error(`⛔ تعارض في التواريخ: يوجد "${clash.type||"إجازة"}" من ${clash.start_date} إلى ${clash.end_date}`),{status:409});
       const id=nextId(db,"leaves");
       const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||"",
         secondment_branch_id:(body.type==="ندب"&&body.secondment_branch_id)?+body.secondment_branch_id:null};
       db.leaves.push(lv);
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
-      log(db,"إضافة إجازة","leave",id,`${d?d.name:""} ${lv.start_date}→${lv.end_date}`,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {id};
+      const dNm=d?d.name:"";
+      const lvDetail=(lv.type==="ندب")
+        ?`إنشاء ندب لـ"${dNm}" إلى فرع ${_auditVal(db,'secondment_branch_id',lv.secondment_branch_id)} من ${_fmtD(lv.start_date)} إلى ${_fmtD(lv.end_date)}`
+        :`إضافة ${lv.type} لـ"${dNm}" من ${_fmtD(lv.start_date)} إلى ${_fmtD(lv.end_date)}`;
+      log(db,"إضافة إجازة","leave",id,lvDetail,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {id};
     }
     const lvM=path.match(/^\/leaves\/(\d+)$/);
     if(lvM&&method==="PUT"){
@@ -1647,10 +1879,16 @@ const LocalDB = (() => {
       if(!l) throw Object.assign(new Error("not found"),{status:404});
       const d=db.doctors.find(x=>x.id===l.doctor_id);
       if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
+      const _ns=("start_date" in body)?body.start_date:l.start_date, _ne=("end_date" in body)?body.end_date:l.end_date;
+      const clash=overlapLeaveFn(db.leaves,l.doctor_id,_ns,_ne,l.id);
+      if(clash) throw Object.assign(new Error(`⛔ تعارض في التواريخ: يوجد "${clash.type||"إجازة"}" من ${clash.start_date} إلى ${clash.end_date}`),{status:409});
+      const _before={type:l.type,start_date:l.start_date,end_date:l.end_date,reason:l.reason,secondment_branch_id:l.secondment_branch_id};
       ["start_date","end_date","type","reason"].forEach(k=>{ if(k in body) l[k]=body[k]; });
       l.secondment_branch_id=(l.type==="ندب"&&body.secondment_branch_id)?+body.secondment_branch_id:null;
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
-      log(db,"تعديل إجازة","leave",+lvM[1],d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
+      const lchanges=_diffLeave(db,_before,l);
+      const editDetail=lchanges.length?`تعديل ${l.type||"إجازة"} لـ"${d?d.name:""}":\n• ${lchanges.join("\n• ")}`:`فتح إجازة "${d?d.name:""}" دون تغيير`;
+      log(db,"تعديل إجازة","leave",+lvM[1],editDetail,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
     }
     if(lvM&&method==="DELETE"){
       needPerm("leave_manage");
@@ -1659,7 +1897,11 @@ const LocalDB = (() => {
       db.leaves=db.leaves.filter(lx=>lx.id!==+lvM[1]);
       const d=l?db.doctors.find(x=>x.id===l.doctor_id):null;
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
-      log(db,"حذف إجازة","leave",+lvM[1],d?d.name:"",{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
+      const delDetail=l?(l.type==="ندب"
+          ?`إلغاء ندب "${d?d.name:""}" إلى ${_auditVal(db,'secondment_branch_id',l.secondment_branch_id)} (${_fmtD(l.start_date)} — ${_fmtD(l.end_date)})`
+          :`إلغاء ${l.type||"إجازة"} لـ"${d?d.name:""}" (${_fmtD(l.start_date)} — ${_fmtD(l.end_date)})`)
+        :"إلغاء إجازة";
+      log(db,"حذف إجازة","leave",+lvM[1],delDetail,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
     }
 
     // DASHBOARD
@@ -1776,6 +2018,15 @@ const LocalDB = (() => {
         const shiftNorm=shiftStr.replace(/\s/g,"").toLowerCase();
         return shiftStr.includes(t)||shiftNorm.includes(t)?30:0;
       }
+      // Doctor code (id) matching — priority 4 (below name-contains=500)
+      function scoreCode(t,id){
+        if(!/^\d+$/.test(t))return 0;   // only numeric tokens
+        const ids=String(id);
+        if(ids===t)             return 480;  // exact code
+        if(ids.startsWith(t))   return 250;  // code prefix
+        if(ids.includes(t))     return 120;  // code contains
+        return 0;
+      }
       // ────────────────────────────────────────────────────────────────────
 
       // Pre-compute first-shift hour for morning/evening filter
@@ -1827,7 +2078,8 @@ const LocalDB = (() => {
             scoreField  (t, hoursN,    4),             // hours text:   400
             scoreField  (t, casesN,    2),             // cases:        200
             scoreField  (t, coordN,    2),             // coord notes:  200
-            scoreShifts (t, d.schedule)                // shift times:   30
+            scoreShifts (t, d.schedule),               // shift times:   30
+            scoreCode   (t, d.id)                      // doctor code:  480
           );
           if(!s){allMatch=false;break;}
           totalScore+=s;
@@ -1898,12 +2150,12 @@ const LocalDB = (() => {
   function importDB(data){
     // نسخة تلقائية من البيانات الحالية قبل الاستبدال
     const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    _writeSnapshot('pre_restore_'+ts).catch(e=>console.error('[Adelcare] pre-restore snapshot:',e));
+    _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل استيراد ملف'}).catch(e=>console.error('[Adelcare] pre-restore snapshot:',e));
     const db={doctors:data.doctors||[],branches:data.branches||[],leaves:data.leaves||[],audit:data.audit||[],settings:data.settings||{},_seq:data._seq||{doctors:200,branches:10,leaves:50,audit:100}};
     save(db);
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return coll.get().then(qs=>({snapshots:qs.docs.map(d=>({id:d.id,ts:(d.data()||{}).ts||""})).sort((a,b)=>a.ts<b.ts?1:-1)}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts);const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); } };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); } };
 })();
 
   </script>
@@ -2198,11 +2450,15 @@ const App = (() => {
     const isLeave=live.state==="leave";
     const isTerminated=live.state==="terminated";
     const isSecondment=!!live.isSecondment;
+    const isSchedTerm=!!live.termSched;
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
     const shift=(isLeave||isTerminated)?"":todayShift(d);
+    const schedTermRow=isSchedTerm
+      ?`<div class="dcard-shift" style="color:#b45309;font-size:11.5px;margin-top:2px">⏳ إنهاء عقد مجدول · ${esc(fmtDate(live.termSched))}</div>`
+      :"";
     const infoRow=isTerminated
-      ?`<div class="dcard-shift" style="color:#7c3aed">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
+      ?`<div class="dcard-shift" style="color:#475569">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
       :isSecondment
         ?(shift
           ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
@@ -2223,6 +2479,7 @@ const App = (() => {
         </div>
         <div class="dcard-meta"><span class="spec-tag">${esc(d.specialty||"")}</span>${meta}</div>
         ${infoRow}
+        ${schedTermRow}
         ${branchRow}
       </div></div>`;
   }
@@ -2285,6 +2542,17 @@ const App = (() => {
         </div>`:""}
       </div>`).join("");
 
+    const schedTermSection=live.termSched?`
+      <div class="leave-upcoming-row" style="border-color:#d97706;background:color-mix(in srgb,#fef3c7 40%,var(--surface))">
+        <div>
+          <div class="lu-info" style="color:#92400e">⏳ إنهاء عقد مجدول</div>
+          <div class="lu-dates">بتاريخ ${esc(fmtDate(live.termSched))} · سيصبح "منتهي العقد" تلقائياً</div>
+        </div>
+        ${can("doctor_edit")?`<div class="lu-actions">
+          <button class="btn btn-xs btn-danger" data-cancel-term="${d.id}">إلغاء</button>
+        </div>`:""}
+      </div>`:"";
+
     const visitToggle=can("doctor_edit")&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
     const body=`
       <div class="qd-head">
@@ -2294,17 +2562,13 @@ const App = (() => {
           <div style="margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${statusPill(live)}${visitToggle}</div>
         </div>
       </div>
-      ${leaveSection}${upcomingSection}
+      ${schedTermSection}${leaveSection}${upcomingSection}
       <div class="qd-rows">${rows.map(([k,v])=>`<div class="qd-row"><div class="k">${k}</div><div class="vv">${v}</div></div>`).join("")}</div>`;
 
     const foot=`
       ${can("doctor_edit")?`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>`:""}
-      ${can("leave_manage")?(
-        isOnLeave&&!hasLeaveRecord
-          ?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`
-          :(!isOnLeave&&!isSecondmentCard)?`<button class="btn btn-ghost" data-leave="${d.id}">＋ إجازة / ندب</button>`
-          :""
-      ):""}`;
+      ${can("leave_manage")&&isOnLeave&&!hasLeaveRecord?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`:""}
+      ${can("leave_manage")&&!d.terminated?`<button class="btn btn-ghost" data-leave="${d.id}">＋ جدولة إجازة / ندب</button>`:""}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
       const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=async()=>{
@@ -2314,6 +2578,12 @@ const App = (() => {
       };
       const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id,d.specialty);
       const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requirePerm("leave_manage",()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
+      const ctb=m.querySelector("[data-cancel-term]"); if(ctb)ctb.onclick=()=>requirePerm("doctor_edit",async()=>{
+        if(!confirm(`إلغاء جدولة إنهاء عقد "${d.name}"؟\nسيستمر الممارس بالعمل كالمعتاد.`))return;
+        try{await api("/doctors/"+d.id+"/terminate",{method:"POST",body:{unterm:true}});
+          toast("✅ تم إلغاء جدولة إنهاء العقد","ok");closeModal();go(state.route);}
+        catch(e){toast("❌ "+e.message,"err");}
+      },d.branch_id,d.specialty);
       // Active leave inline buttons
       const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
       const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requirePerm("leave_manage",async()=>{
@@ -3037,6 +3307,11 @@ const App = (() => {
           scoreFieldFn(t,coordN,2), scoreFieldFn(t,statusN,6),
           scoreFieldFn(t,hoursN,1), scoreFieldFn(t,langN,3)
         );
+        // Doctor code (id) matching — priority 4
+        if(!s && /^\d+$/.test(t)){
+          const ids=String(d.id);
+          if(ids===t)s=480; else if(ids.startsWith(t))s=250; else if(ids.includes(t))s=120;
+        }
         // Fuzzy fallback for typos
         if(!s && fuzzyMatch(t,allFields)) s=50;
         if(!s)return 0;
@@ -3205,6 +3480,16 @@ const App = (() => {
             return [sm, em<sm ? em+1440 : em];
           });
         });
+        // تنبيه وقائي: ورديات أطول من 16 ساعة غالباً خطأ ص/م عند الإدخال
+        const longShifts=[];
+        Object.entries(schedule).forEach(([day,shifts])=>{
+          shifts.forEach(([s,e])=>{ if(e-s>16*60) longShifts.push([+day,s,e]); });
+        });
+        if(longShifts.length){
+          const dayNames=["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+          const lines=longShifts.map(([day,s,e])=>`• ${dayNames[day]}: ${fmtMin(s%1440)} ← ${fmtMin(e%1440)} (${((e-s)/60).toFixed(1)} ساعة)`).join("\n");
+          if(!confirm(`⚠️ لديك ورديات طويلة جداً (أكثر من 16 ساعة):\n\n${lines}\n\nقد يكون السبب خطأ في ص/م (مثلاً 4:30م بدل 4:30ص).\nتأكد من أوقات البداية والنهاية.\n\nهل تريد الحفظ رغم ذلك؟`)) return;
+        }
         payload.schedule=schedule; payload.dayoff=dayoff;
         delete payload.hours_raw;
         try{
@@ -3309,14 +3594,23 @@ const App = (() => {
     const _tom=new Date(_n); _tom.setDate(_tom.getDate()+1);
     const _tomorrow=`${_tom.getFullYear()}-${_p(_tom.getMonth()+1)}-${_p(_tom.getDate())}`;
     const body=`<form id="lvf">
-      <div class="field"><label>الممارس *</label><select name="doctor_id" required>
-        ${doctors.map(d=>`<option value="${d.id}" ${docId==d.id?"selected":""}>${esc(d.name)} — ${esc(d.specialty)}</option>`).join("")}</select></div>
-      <div class="grid2">
-        <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" value="${_today}" required></div>
-        <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" value="${_tomorrow}" required></div>
-      </div>
+      <div class="field"><label>الممارس *</label>
+        <input type="text" id="lv-doc-search" placeholder="🔍 ابحث بالاسم أو جزء منه أو رمز الممارس..." autocomplete="off" style="margin-bottom:6px">
+        <select name="doctor_id" id="lv-doc-sel" required size="1">
+        ${doctors.map(d=>`<option value="${d.id}" ${docId==d.id?"selected":""}>${esc(d.name)} — ${esc(d.specialty)} (#${d.id})</option>`).join("")}</select>
+        <div id="lv-doc-count" style="font-size:11px;color:var(--muted);margin-top:3px"></div></div>
+      <div id="lv-existing" style="margin:-4px 0 12px"></div>
       <div class="field"><label>النوع</label><select name="type" id="lv-type">
         ${LEAVE_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div>
+      <div class="grid2" id="lv-dates-row">
+        <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" id="lv-start" value="${_today}"></div>
+        <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" id="lv-end" value="${_tomorrow}"></div>
+      </div>
+      <div class="field" id="lv-term-field" style="display:none">
+        <label>📅 تاريخ إنهاء العقد *</label>
+        <input type="date" name="term_date" id="lv-term-date" value="${_today}">
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">يصبح الممارس "منتهي العقد" تلقائياً عند وصول هذا التاريخ (حالة دائمة).</div>
+      </div>
       <div class="field" id="lv-branch-field" style="display:none">
         <label>الفرع المنتدب إليه *</label>
         <select name="secondment_branch_id" id="lv-branch-sel">
@@ -3329,20 +3623,82 @@ const App = (() => {
     openModal({title:"إضافة إجازة"+(docName?" — "+docName:""),bodyHTML:body,
       footHTML:`<button class="btn btn-primary" id="save-lv">حفظ</button><button class="btn btn-ghost" data-x3>إلغاء</button>`,
       onMount:(m)=>{ m.querySelector("[data-x3]").onclick=closeModal;
-        // show/hide branch selector based on type
+        // إظهار/إخفاء الحقول حسب النوع
         const typeEl=m.querySelector("#lv-type"), branchField=m.querySelector("#lv-branch-field");
-        typeEl.addEventListener("change",()=>{ branchField.style.display=typeEl.value==="ندب"?"":"none"; });
+        const datesRow=m.querySelector("#lv-dates-row"), termField=m.querySelector("#lv-term-field");
+        const syncFields=()=>{
+          const isTerm=typeEl.value==="إنهاء عقد", isSec=typeEl.value==="ندب";
+          datesRow.style.display=isTerm?"none":"";
+          termField.style.display=isTerm?"":"none";
+          branchField.style.display=isSec?"":"none";
+        };
+        typeEl.addEventListener("change",syncFields); syncFields();
+        // عرض السجلات الحالية للممارس المختار + اقتراح تاريخ بداية بعد آخر سجل (لتفادي التعارض)
+        const docSel=m.querySelector("#lv-doc-sel"), exWrap=m.querySelector("#lv-existing");
+        // ── بحث حي في قائمة الممارسين (اسم / جزء اسم / رمز) مع ترتيب أفضل تطابق ──
+        const docSearch=m.querySelector("#lv-doc-search"), docCount=m.querySelector("#lv-doc-count");
+        const rankDoc=(q,d)=>{ // نفس أولوية البحث: تطابق>يبدأ>يحتوي>رمز
+          const nm=normAr(d.name||""), tokq=normAr(q);
+          if(!tokq)return 1;
+          const ws=nm.split(/\s+/).filter(Boolean);
+          if(nm===tokq)return 10000;
+          if(nm.startsWith(tokq))return 5000;
+          if(ws[0]&&ws[0].startsWith(tokq))return 3000;
+          if(ws.some(w=>w.startsWith(tokq)))return 1500;
+          if(nm.includes(tokq))return 500;
+          if(normAr(d.specialty||"").includes(tokq))return 300;
+          if(/^\d+$/.test(tokq)){const ids=String(d.id);
+            if(ids===tokq)return 480; if(ids.startsWith(tokq))return 250; if(ids.includes(tokq))return 120;}
+          return 0;
+        };
+        const rebuildDocs=()=>{
+          const q=(docSearch.value||"").trim(); const cur=docSel.value;
+          const ranked=doctors.map(d=>({d,s:rankDoc(q,d)})).filter(x=>x.s>0)
+            .sort((a,b)=>b.s-a.s||(a.d.name||"").localeCompare(b.d.name||"")).map(x=>x.d);
+          docSel.innerHTML=ranked.map(d=>`<option value="${d.id}">${esc(d.name)} — ${esc(d.specialty)} (#${d.id})</option>`).join("");
+          // إبقاء الاختيار الحالي إن بقي ضمن النتائج، وإلا اختيار الأول
+          if(ranked.some(d=>String(d.id)===cur))docSel.value=cur;
+          else if(ranked.length){docSel.value=String(ranked[0].id);}
+          docCount.textContent=q?`${ranked.length} نتيجة`:"";
+          if(docSel.value!==cur)loadExisting(docSel.value);
+        };
+        if(docSearch)docSearch.addEventListener("input",rebuildDocs);
+        const addDays=(iso,n)=>{const dt=new Date(iso+"T00:00:00");dt.setDate(dt.getDate()+n);return `${dt.getFullYear()}-${_p(dt.getMonth()+1)}-${_p(dt.getDate())}`;};
+        const loadExisting=async(id)=>{
+          if(!id){exWrap.innerHTML="";return;}
+          let recs=[], doctorObj=null;
+          try{ const {doctor}=await api("/doctors/"+id); doctorObj=doctor; recs=(doctor&&doctor.leaves||[]).slice().sort((a,b)=>a.start_date.localeCompare(b.start_date)); }catch(e){}
+          const termSchedNote=doctorObj&&doctorObj.termination_scheduled
+            ?`<div style="font-size:12px;background:#fef3c7;border:1px solid #d97706;border-radius:8px;padding:5px 9px;margin-bottom:5px;color:#92400e">⏳ إنهاء عقد مجدول بتاريخ ${esc(fmtDate(doctorObj.termination_scheduled))}</div>`:"";
+          if(!recs.length){ exWrap.innerHTML=termSchedNote+`<div style="font-size:12px;color:var(--muted)">لا توجد سجلات سابقة لهذا الممارس</div>`; return; }
+          exWrap.innerHTML=termSchedNote+`<div style="font-size:12px;color:var(--muted);margin-bottom:5px">السجلات الحالية والمجدولة (${recs.length}):</div>
+            <div style="display:flex;flex-direction:column;gap:4px;max-height:120px;overflow:auto">
+            ${recs.map(l=>`<div style="font-size:12px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:5px 9px">
+              ${l.type==="ندب"?"🔀":"🔴"} ${esc(l.type||"إجازة")} · ${esc(fmtDate(l.start_date))} ← ${esc(fmtDate(l.end_date))}</div>`).join("")}</div>`;
+          // اقترح البداية بعد آخر سجل ينتهي
+          const latestEnd=recs.reduce((mx,l)=>l.end_date>mx?l.end_date:mx,"");
+          if(latestEnd){ const suggest=addDays(latestEnd,1); const nxt=suggest>_today?suggest:_today;
+            m.querySelector("#lv-start").value=nxt; m.querySelector("#lv-end").value=addDays(nxt,1); }
+        };
+        docSel&&docSel.addEventListener("change",()=>loadExisting(docSel.value));
+        if(docId) loadExisting(docId);
         m.querySelector("#save-lv").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf")); const p=Object.fromEntries(f.entries());
           p.doctor_id=+p.doctor_id;
           if(p.type==="ندب"&&!p.secondment_branch_id){toast("اختر الفرع المنتدب إليه","warn");return;}
-          // إنهاء عقد — يحدّث حالة الممارس مباشرة بدل إنشاء إجازة
+          // إنهاء عقد — تاريخ واحد فقط (حالة دائمة)؛ فوري إن كان اليوم/سابقاً، ومجدول إن كان مستقبلاً
           if(p.type==="إنهاء عقد"){
             const dName=(doctors.find(d=>d.id===p.doctor_id)||{}).name||"الممارس";
-            if(!confirm(`هل تريد إنهاء عقد "${dName}"؟\nسيتم إخفاؤه من جميع الواجهات التشغيلية.`)) return;
+            const termDate=p.term_date;
+            if(!termDate){toast("أدخل تاريخ إنهاء العقد","warn");return;}
+            const isFuture=termDate>_today;
+            const msg=isFuture
+              ?`جدولة إنهاء عقد "${dName}" بتاريخ ${termDate}؟\nسيستمر بالعمل حتى ذلك التاريخ ثم يصبح "منتهي العقد" تلقائياً.`
+              :`هل تريد إنهاء عقد "${dName}" الآن؟\nسيتم إخفاؤه من جميع الواجهات التشغيلية.`;
+            if(!confirm(msg)) return;
             try{
-              await api("/doctors/"+p.doctor_id+"/terminate",{method:"POST",body:{}});
-              toast("✅ تم إنهاء عقد "+dName,"ok");
+              await api("/doctors/"+p.doctor_id+"/terminate",{method:"POST",body:{date:termDate}});
+              toast(isFuture?`✅ تمت جدولة إنهاء عقد ${dName} بتاريخ ${termDate}`:"✅ تم إنهاء عقد "+dName,"ok");
               closeModal();
               if(typeof onDone==="function") onDone(); else go(state.route);
             }catch(e){toast("❌ "+e.message,"err");}
@@ -3404,7 +3760,7 @@ const App = (() => {
       <div class="page-sub">آخر ${audit.length} عملية</div>
       <table class="tbl" style="margin-top:16px"><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead>
       <tbody>${audit.map(a=>`<tr><td style="white-space:nowrap">${esc(a.ts.replace("T"," "))}</td>
-        <td>${esc(a.user)}</td><td>${esc(a.action)}</td><td>${esc(a.detail||"")}</td></tr>`).join("")}</tbody></table>`;
+        <td>${esc(a.user)}</td><td>${esc(a.action)}</td><td style="white-space:pre-line">${esc(a.detail||"")}</td></tr>`).join("")}</tbody></table>`;
   };
 
   // ============================================================ PRACTITIONERS MANAGEMENT (control panel tab)
@@ -3481,14 +3837,14 @@ const App = (() => {
     const renderTermCards=(list)=>{
       if(!list.length) return `<div class="empty" style="padding:16px">لا يوجد</div>`;
       return `<div class="mgr-cards">
-        ${list.map(d=>`<div class="mgr-card" style="border-inline-start:3px solid #7c3aed">
+        ${list.map(d=>`<div class="mgr-card" style="border-inline-start:3px solid #475569">
           ${avatar(d)}
           <div class="mgr-card-body">
             <div class="mgr-card-name">${esc(d.name)}</div>
             <div class="mgr-card-meta">
               ${d.specialty?`<span class="spec-tag">${esc(d.specialty)}</span>`:""}
               ${bname[d.branch_id]?`<span>🏥 ${esc(bname[d.branch_id])}</span>`:""}
-              ${d.terminated_date?`<span style="color:#7c3aed">⛔ منذ ${esc(d.terminated_date)}</span>`:""}
+              ${d.terminated_date?`<span style="color:#475569">⛔ منذ ${esc(d.terminated_date)}</span>`:""}
             </div>
           </div>
           <div class="mgr-card-actions">
@@ -3529,7 +3885,7 @@ const App = (() => {
       ${termed.length?`
         <div>
           <div class="section-head" style="margin-top:20px;cursor:pointer" id="term-toggle">
-            <h2 style="color:#7c3aed">⛔ منتهو العقد</h2><span class="count" style="background:#ede9fe;color:#6d28d9">${termed.length}</span>
+            <h2 style="color:#475569">⛔ منتهو العقد</h2><span class="count" style="background:#e2e8f0;color:#334155">${termed.length}</span>
             <span style="font-size:12px;color:var(--muted);margin-inline-start:auto" id="term-chevron">▼</span>
           </div>
           <div id="term-rows" style="display:none">${renderTermCards(termed)}</div>
@@ -3738,8 +4094,8 @@ const App = (() => {
         </div>
         ${list.length?list.map(d=>`
           <div class="dcard-mgmt" style="display:flex;align-items:center;gap:10px;padding:10px 12px;
-            background:color-mix(in srgb,#ede9fe 40%,var(--surface));
-            border:1px solid var(--line);border-inline-start:3px solid #7c3aed;
+            background:color-mix(in srgb,#e2e8f0 45%,var(--surface));
+            border:1px solid var(--line);border-inline-start:3px solid #475569;
             border-radius:var(--r);margin-bottom:8px">
             ${avatar(d)}
             <div style="flex:1;min-width:0">
@@ -3747,12 +4103,12 @@ const App = (() => {
               <div style="font-size:12px;color:var(--muted);margin-top:2px">
                 ${d.specialty?`<span class="sp-tag">${esc(d.specialty)}</span> `:""}
                 ${esc(bname[d.branch_id]||"")}
-                ${d.terminated_date?` · <span style="color:#7c3aed;font-size:11px">⛔ منذ ${esc(d.terminated_date)}</span>`:""}
+                ${d.terminated_date?` · <span style="color:#475569;font-size:11px">⛔ منذ ${esc(d.terminated_date)}</span>`:""}
               </div>
             </div>
             <div style="display:flex;gap:6px;flex-shrink:0">
               ${can("doctor_edit")?`<button class="btn btn-ghost btn-sm" data-edit-term="${d.id}">تعديل</button>`:""}
-              ${can("doctor_edit")?`<button class="btn btn-sm" style="background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd" data-unterm="${d.id}">↩ إعادة تفعيل</button>`:""}
+              ${can("doctor_edit")?`<button class="btn btn-sm" style="background:#e2e8f0;color:#334155;border:1px solid #94a3b8" data-unterm="${d.id}">↩ إعادة تفعيل</button>`:""}
             </div>
           </div>`).join("")
         :`<div class="empty">لا يوجد ممارسون منتهي العقد</div>`}`;
@@ -4027,18 +4383,37 @@ const App = (() => {
           </div>
         </div>
         <div class="card" style="padding:16px;background:var(--surface)">
-          <div style="font-size:15px;font-weight:700;margin-bottom:10px">🕓 النسخ التلقائية (سحابية)</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">تُحفظ نسخة تلقائية يومياً في السحابة، ويُحتفظ بآخر 30 نسخة. كما تُؤخذ نسخة تلقائية قبل أي استعادة.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
+            <div style="font-size:15px;font-weight:700">🕓 سجل النسخ الاحتياطية (سحابي)</div>
+            <button class="btn btn-primary btn-sm" id="btn-snap-now">💾 احفظ نسخة الآن</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">تُؤخذ نسخة تلقائياً <b>بعد كل عملية</b> (إضافة/تعديل/حذف)، بالإضافة إلى نسخة يومية ونسخة أمان قبل أي استعادة. كل نسخة موثّقة بالوقت ونوع العملية والمستخدم.</div>
           <div id="snap-list"><div style="font-size:13px;color:var(--muted);text-align:center;padding:8px">جارٍ التحميل…</div></div>
+        </div>
+        <div class="card" style="padding:16px;background:var(--surface)">
+          <div style="font-size:15px;font-weight:700;margin-bottom:8px">⬇️ تصدير تلقائي خارج Firebase</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">لحماية إضافية ضد أي عطل على مستوى Firebase، ينزّل التطبيق ملف نسخة (JSON) تلقائياً إلى جهاز المسؤول كل فترة محددة — يقوم به أول مسؤول يفتح التطبيق بعد انتهاء المدة، ويُسجَّل التاريخ سحابياً حتى لا يتكرر.</div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;cursor:pointer;margin-bottom:10px">
+            <input type="checkbox" id="ax-enabled" style="width:18px;height:18px"> تفعيل التصدير التلقائي
+          </label>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <span>كل</span>
+            <select id="ax-days" class="select-mini" style="max-width:120px">
+              <option value="1">يوم</option><option value="3">3 أيام</option><option value="7">أسبوع</option>
+              <option value="14">أسبوعين</option><option value="30">شهر</option>
+            </select>
+          </div>
+          <div id="ax-status" style="font-size:11.5px;color:var(--muted);margin-top:10px"></div>
         </div>
         <div class="card" style="padding:16px;background:var(--surface)">
           <div style="font-size:13px;color:var(--muted);line-height:1.8;text-align:right">
             <b>آلية العمل:</b><br>
-            ▪ البيانات محفوظة في <b>Firebase Firestore</b> (سحابية)<br>
-            ▪ أي تعديل يظهر فوراً لجميع المستخدمين<br>
-            ▪ نسخة تلقائية يومية في السحابة + نسخة قبل كل استعادة<br>
-            ▪ لتحديث الأكواد فقط: ارفع <b>index.html</b> على GitHub<br>
-            ▪ البيانات لا تتأثر عند تحديث الأكواد
+            ▪ البيانات محفوظة في <b>Firebase Firestore</b> (سحابية) — مستند رئيسي واحد<br>
+            ▪ أي تعديل يظهر فوراً لجميع المستخدمين (مزامنة لحظية)<br>
+            ▪ <b>نسخة احتياطية بعد كل عملية</b> تُحفظ في مجموعة منفصلة <code>adelcare_snapshots</code><br>
+            ▪ سجل إصدارات: حتى 60 نسخة تشغيلية + 30 يومية + 40 يدوية + 20 أمان<br>
+            ▪ <b>تصدير تلقائي</b> لملف JSON إلى جهاز المسؤول (نسخة خارج Firebase)<br>
+            ▪ تحديث الأكواد (رفع index.html) لا يؤثر على البيانات إطلاقاً
           </div>
         </div>
       </div>`;
@@ -4046,16 +4421,20 @@ const App = (() => {
       const box=$("#snap-list"); if(!box)return;
       try{
         const {snapshots}=await LocalDB.call("GET","/snapshots");
-        if(!snapshots.length){ box.innerHTML=`<div style="font-size:13px;color:var(--muted);text-align:center;padding:8px">لا توجد نسخ تلقائية بعد — ستُنشأ أول نسخة تلقائياً اليوم</div>`; return; }
-        box.innerHTML=snapshots.slice(0,10).map(s=>{
+        if(!snapshots.length){ box.innerHTML=`<div style="font-size:13px;color:var(--muted);text-align:center;padding:8px">لا توجد نسخ بعد — ستُنشأ نسخة تلقائياً بعد أول عملية</div>`; return; }
+        const KIND_ICO={op:'📝 بعد عملية',auto:'📅 يومية',manual:'💾 يدوية',pre:'🛡️ نسخة أمان'};
+        box.innerHTML=snapshots.slice(0,15).map(s=>{
           const d=s.ts?new Date(s.ts):null;
-          const when=d?d.toLocaleDateString('ar-SA')+' '+d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):s.id;
-          const kind=s.id.startsWith('auto_')?'📅 يومية':s.id.startsWith('pre_restore_')?'⏪ قبل استعادة':s.id.startsWith('pre_reset_')?'⚠️ قبل إعادة تعيين':'📦';
-          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
-            <div><div style="font-size:13px;font-weight:600">${kind}</div><div style="font-size:12px;color:var(--muted)">${esc(when)}</div></div>
-            <button class="btn btn-ghost btn-sm" data-restore-snap="${esc(s.id)}">استعادة</button>
+          const when=d?d.toLocaleDateString('ar-SA')+' '+d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):s.id;
+          const kind=KIND_ICO[s.kind]||'📦 نسخة';
+          const act=s.action?`<div style="font-size:12px;color:var(--text);margin-top:1px">${esc(s.action)}</div>`:"";
+          const nInfo=s.n?`<div style="font-size:11px;color:var(--muted)">${s.n.doctors} ممارس · ${s.n.branches} فرع · ${s.n.leaves} إجازة</div>`:"";
+          const who=s.user?` · ${esc(s.user)}`:"";
+          return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
+            <div style="min-width:0"><div style="font-size:12.5px;font-weight:700">${kind}</div>${act}<div style="font-size:11.5px;color:var(--muted)">${esc(when)}${who}</div>${nInfo}</div>
+            <button class="btn btn-ghost btn-sm" data-restore-snap="${esc(s.id)}" style="flex-shrink:0">استعادة</button>
           </div>`;
-        }).join("")+(snapshots.length>10?`<div style="font-size:12px;color:var(--muted);text-align:center">و ${snapshots.length-10} نسخة أقدم</div>`:"");
+        }).join("")+(snapshots.length>15?`<div style="font-size:12px;color:var(--muted);text-align:center">و ${snapshots.length-15} نسخة أقدم محفوظة</div>`:"");
         box.querySelectorAll("[data-restore-snap]").forEach(btn=>btn.onclick=async()=>{
           const id=btn.dataset.restoreSnap;
           const word=prompt(`⚠️ استعادة النسخة التلقائية؟\nسيتم استبدال جميع البيانات الحالية بمحتوى هذه النسخة.\n(ستُؤخذ نسخة من البيانات الحالية قبل الاستعادة)\n\nللتأكيد اكتب: استعادة`);
@@ -4066,17 +4445,35 @@ const App = (() => {
         });
       }catch(e){ box.innerHTML=`<div style="font-size:13px;color:var(--muted);text-align:center;padding:8px">تعذّر تحميل النسخ التلقائية</div>`; }
     })();
+    const snapNowBtn=$("#btn-snap-now");
+    if(snapNowBtn) snapNowBtn.onclick=async()=>{
+      const note=prompt("وصف اختياري لهذه النسخة (مثلاً: قبل تعديل الجداول):","نسخة يدوية");
+      if(note===null)return;
+      snapNowBtn.disabled=true; snapNowBtn.textContent="⏳ جارٍ الحفظ…";
+      try{ await LocalDB.call("POST","/snapshot-now",{note:(note.trim()||"نسخة يدوية")}); toast("✅ تم حفظ نسخة احتياطية الآن","ok"); drawDataPanel(); }
+      catch(e){ toast("❌ "+e.message,"err"); snapNowBtn.disabled=false; snapNowBtn.textContent="💾 احفظ نسخة الآن"; }
+    };
+    // ── إعدادات التصدير التلقائي ──
+    (async()=>{
+      const cb=$("#ax-enabled"), sel=$("#ax-days"), st=$("#ax-status"); if(!cb||!sel)return;
+      try{
+        const s=await api("/settings");
+        cb.checked = s.auto_export_enabled!==false;
+        sel.value = String(s.auto_export_days||7);
+        if(s.last_auto_export){ const d=new Date(s.last_auto_export);
+          st.textContent="آخر تصدير تلقائي: "+d.toLocaleDateString('ar-SA')+' '+d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}); }
+        else st.textContent="لم يُنفَّذ تصدير تلقائي بعد — سيتم عند اكتمال المدة";
+      }catch(e){}
+      const saveAx=async()=>{
+        try{ await api("/settings",{method:"PUT",body:{auto_export_enabled:cb.checked, auto_export_days:+sel.value}});
+          toast("✅ تم حفظ إعدادات التصدير التلقائي","ok"); }
+        catch(e){ toast("❌ "+e.message,"err"); }
+      };
+      cb.addEventListener("change",saveAx); sel.addEventListener("change",saveAx);
+    })();
     const backupBtn=$("#btn-backup");
     if(backupBtn) backupBtn.onclick=()=>{
-      const db=LocalDB.call("GET","/export-db");
-      if(!db){toast("❌ لا توجد بيانات","err");return;}
-      const now=new Date();
-      const ts=`${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-      const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
-      const a=document.createElement("a");
-      a.href=URL.createObjectURL(blob);
-      a.download=`adelcare_backup_${ts}.json`;
-      a.click(); URL.revokeObjectURL(a.href);
+      if(!downloadBackupFile(false)){toast("❌ لا توجد بيانات","err");return;}
       api("/settings",{method:"PUT",body:{last_backup_download:new Date().toISOString()}}).catch(()=>{});
       toast("✅ تم تنزيل النسخة الاحتياطية بنجاح","ok");
     };
@@ -4380,14 +4777,16 @@ const App = (() => {
       el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} عملية</div>
         <div class="audit-cards">${list.map(a=>{
           const dt=a.ts?a.ts.replace("T"," "):"";
+          const dPart=a.ts?a.ts.slice(0,10):"", tPart=a.ts?a.ts.slice(11,16):"";
+          const detailHTML=esc(a.detail||"—").replace(/\n/g,"<br>");
           return `<div class="audit-row">
             <div class="audit-row-head">
-              <span class="audit-user">${esc(a.user||"—")}</span>
+              <span class="audit-user">👤 ${esc(a.user||"—")}</span>
               <span class="audit-action">${esc(a.action||"—")}</span>
               ${a.branch?`<span class="audit-branch">🏥 ${esc(a.branch)}</span>`:""}
             </div>
-            <div class="audit-row-detail">${esc(a.detail||"—")}</div>
-            <div class="audit-row-time">${esc(dt)}</div>
+            <div class="audit-row-detail">${detailHTML}</div>
+            <div class="audit-row-time">📅 ${esc(dPart)} · 🕐 ${esc(tPart)}</div>
           </div>`;
         }).join("")}</div>`;
     }
@@ -4517,11 +4916,66 @@ const App = (() => {
     });
   }
 
+  // ============================================================ BACKUP EXPORT
+  // بناء وتنزيل ملف النسخة الاحتياطية (JSON) — مشترك بين الزر اليدوي والتصدير التلقائي
+  function downloadBackupFile(auto){
+    const db=LocalDB.call("GET","/export-db");
+    if(!db) return false;
+    const now=new Date();
+    const ts=`${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`adelcare_backup${auto?"_auto":""}_${ts}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+    return true;
+  }
+  // تصدير تلقائي مُساعَد بالمتصفح: عند فتح مسؤول للتطبيق ومرور المدة المحددة،
+  // يُنزَّل ملف النسخة إلى جهازه تلقائياً ويُسجَّل التاريخ سحابياً (جهاز واحد/دورة)
+  async function maybeAutoExport(){
+    if(!state.user||!can("settings_access")) return;
+    let s; try{ s=await api("/settings"); }catch(e){ return; }
+    if(s.auto_export_enabled===false) return;
+    const days=s.auto_export_days||7;
+    const last=s.last_auto_export?new Date(s.last_auto_export).getTime():0;
+    if(Date.now()-last < days*24*3600*1000) return;
+    // ننزّل أولاً ثم نسجّل التاريخ — إن حجب المتصفح التنزيل لا نتخطّى الدورة كاملة
+    const ok=downloadBackupFile(true);
+    if(!ok) return;
+    try{ await api("/settings",{method:"PUT",body:{last_auto_export:new Date().toISOString()}}); }catch(e){}
+    setTimeout(()=>toast(`📦 تم تنزيل نسخة احتياطية تلقائية (كل ${days} يوم) إلى جهازك — احفظها في مكان آمن`,"ok"),1200);
+  }
+
   // ============================================================ RENDER
   async function render(){
     if(!state.user){ renderLogin(); return; }
     const fn=routes[state.route]||routes.dashboard;
     await fn();
+  }
+
+  // ── فحص الإصدار: يجبر كل جهاز على تحميل آخر نسخة تلقائياً ──────
+  function _currentVersion(){
+    const m=document.querySelector('meta[name="app-version"]');
+    return m?m.getAttribute('content'):null;
+  }
+  async function checkForUpdate(){
+    const cur=_currentVersion();
+    if(!cur) return;
+    try{
+      // cache-bust + no-store لضمان جلب أحدث HTML من الخادم وليس من الكاش
+      const res=await fetch(location.pathname+'?_v='+Date.now(),{cache:'no-store'});
+      if(!res.ok) return;
+      const html=await res.text();
+      const m=html.match(/<meta\s+name="app-version"\s+content="([^"]+)"/i);
+      const latest=m?m[1]:null;
+      if(!latest||latest===cur) return;
+      // إصدار أحدث موجود — تجنّب حلقة إعادة تحميل لا نهائية
+      if(sessionStorage.getItem('adelcare_reloaded_for')===latest) return;
+      sessionStorage.setItem('adelcare_reloaded_for',latest);
+      toast("🔄 يتوفر تحديث جديد — جارٍ التحديث...","ok");
+      setTimeout(()=>location.reload(),1200);
+    }catch(e){/* الشبكة غير متاحة — نتجاهل */}
   }
 
   async function boot(){
@@ -4532,18 +4986,16 @@ const App = (() => {
     state.route="dashboard"; state.params={};
     if(location.hash) history.replaceState(null,"","#dashboard");
     render();
-    // تذكير بتنزيل نسخة احتياطية إذا مرّ أكثر من 7 أيام (للمسؤولين فقط)
-    if(state.user&&can("settings_access")){
-      api("/settings").then(s=>{
-        const last=s.last_backup_download?new Date(s.last_backup_download).getTime():0;
-        if(Date.now()-last>7*24*3600*1000)
-          setTimeout(()=>toast("📦 مرّ أكثر من 7 أيام على آخر نسخة احتياطية منزّلة — يُنصح بتنزيل نسخة من الإعدادات","warn"),1500);
-      }).catch(()=>{});
-    }
+    // تصدير تلقائي مُساعَد بالمتصفح (للمسؤولين) — نسخة خارج Firebase على جهاز حقيقي
+    maybeAutoExport();
     document.addEventListener('adelcare:sync', ()=>render());
     setInterval(()=>{
       if(state.route==="dashboard"||state.route==="doctors") render();
     },60000);
+    // فحص وجود إصدار أحدث: عند الإقلاع، وكل دقيقة، وعند العودة للتطبيق
+    checkForUpdate();
+    setInterval(checkForUpdate,60*1000);
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkForUpdate(); });
   }
   return { boot };
 })();
