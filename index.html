@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-07">
+<meta name="app-version" content="2026-07-07-08">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1315,12 +1315,20 @@ const LocalDB = (() => {
     return id;
   }
 
+  // ── توقيت الرياض ثابت UTC+3 بغض النظر عن جهاز المستخدم ────────────
+  function _riyadhTS() {
+    const d=new Date(Date.now()+3*3600000); // shift to UTC+3
+    const p=x=>String(x).padStart(2,'0');
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+  }
+  function _riyadhDate() { return _riyadhTS().slice(0,10); }
+
   let _lastAction = null; // آخر عملية مسجّلة — لتوثيق النسخة التشغيلية
   function log(db, action, entity, entity_id, detail, extra) {
     const s=getSession();
     const entry={
       id: nextId(db,'audit'),
-      ts: new Date().toISOString().slice(0,19),
+      ts: _riyadhTS(),
       user: (s.name || "زائر"), userId: s.userId||null,
       action, entity, entity_id: entity_id||null, detail: detail||""
     };
@@ -1428,7 +1436,7 @@ const LocalDB = (() => {
   // تفعيل إنهاء العقد المجدول تلقائياً عند وصول تاريخه — يحوّله إلى حالة دائمة
   function applyDueTerminations(db) {
     if (!db || !db.doctors) return false;
-    const today = new Date().toISOString().slice(0,10);
+    const today = _riyadhDate();
     let changed = false;
     db.doctors.forEach(d => {
       if (d.termination_scheduled && !d.terminated && d.termination_scheduled <= today) {
@@ -1483,12 +1491,12 @@ const LocalDB = (() => {
   }
 
   function nowInfo() {
-    const now = new Date();
-    const day = now.getDay();
-    const nowMin = now.getHours()*60 + now.getMinutes();
-    const pad = n => String(n).padStart(2,'0');
-    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-    return {day, nowMin, dateStr};
+    const d=new Date(Date.now()+3*3600000); // UTC+3 الرياض
+    const day=d.getUTCDay();
+    const nowMin=d.getUTCHours()*60+d.getUTCMinutes();
+    const p=x=>String(x).padStart(2,'0');
+    const dateStr=`${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;
+    return {day,nowMin,dateStr};
   }
 
   function withStatus(doc, db) {
@@ -1785,7 +1793,7 @@ const LocalDB = (() => {
         needBranch(d.branch_id);
         needSpecialty(d.specialty);
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
-        const today=new Date().toISOString().slice(0,10);
+        const today=_riyadhDate();
         if(body.unterm){
           // إلغاء إنهاء العقد / إعادة تفعيل — يمسح المجدول والمنفّذ
           const wasSched=d.termination_scheduled;
@@ -1840,7 +1848,7 @@ const LocalDB = (() => {
       needAuth();
       const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
       const dmap={};db.doctors.forEach(d=>{dmap[d.id]={name:d.name,branch_id:d.branch_id,specialty:d.specialty||"",terminated:!!d.terminated,archived:!!d.archived};});
-      const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
+      const today=_riyadhDate();
       // استثناء منتهي العقد والمؤرشفين — لا يُحتسبون كإجازات
       const realLeaves=db.leaves.filter(l=>{const doc=dmap[l.doctor_id];return !doc||(!doc.terminated&&!doc.archived);}).map(l=>{
         const doc=dmap[l.doctor_id]||{};
@@ -2172,9 +2180,11 @@ const App = (() => {
   let _notifInterval = null;
   let _notifDateKey = "";    // tracks date to reset daily notifs
 
-  function _todayStr(){const n=new Date(),p=x=>String(x).padStart(2,'0');return`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;}
-  function _tomorrowStr(){const n=new Date();n.setDate(n.getDate()+1);const p=x=>String(x).padStart(2,'0');return`${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;}
-  function _timeLabel(){const n=new Date();const p=x=>String(x).padStart(2,'0');return`${p(n.getHours())}:${p(n.getMinutes())}`;}
+  // دوال الوقت — ثابتة على توقيت الرياض UTC+3
+  function _riyadhNow(){return new Date(Date.now()+3*3600000);}
+  function _todayStr(){const d=_riyadhNow(),p=x=>String(x).padStart(2,'0');return`${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;}
+  function _tomorrowStr(){const d=_riyadhNow();d.setUTCDate(d.getUTCDate()+1);const p=x=>String(x).padStart(2,'0');return`${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}`;}
+  function _timeLabel(){const d=_riyadhNow(),p=x=>String(x).padStart(2,'0');return`${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;}
 
   const _NOTIF_ICONS={
     arrived:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="9 11 12 14 15 11" transform="translate(0 2)"/></svg>`,
@@ -2186,7 +2196,7 @@ const App = (() => {
   function _relTime(timeStr){
     if(!timeStr) return "";
     const [h,m]=timeStr.split(":").map(Number);
-    const now=new Date(), nowMin=now.getHours()*60+now.getMinutes();
+    const rn=_riyadhNow(), nowMin=rn.getUTCHours()*60+rn.getUTCMinutes();
     const tMin=h*60+m, diff=nowMin-tMin;
     if(diff<1) return "الآن";
     if(diff<60) return `منذ ${diff} د`;
@@ -2469,7 +2479,7 @@ const App = (() => {
 
   function todayShift(d){
     if(!d.schedule) return "";
-    const day=new Date().getDay();
+    const day=_riyadhNow().getUTCDay();
     const sh=d.schedule[day]||d.schedule[String(day)];
     if(!sh||!sh.length) return "";
     return sh.map(([s,e])=>fmtRange(s,e)).join(" ، ");
@@ -2942,7 +2952,7 @@ const App = (() => {
     const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
     const bname={}; branches.forEach(b=>bname[b.id]=b.name);
     doctors.forEach(d=>d.branch_name=bname[d.branch_id]||"");
-    const dayIdx=new Date().getDay();
+    const dayIdx=_riyadhNow().getUTCDay();
     const firstStart=(d)=>{const sh=(d.schedule&&(d.schedule[dayIdx]||d.schedule[String(dayIdx)]))||[];
       return sh.length?Math.min(...sh.map(x=>x[0])):null;};
     const effBranch=(d)=>d.live.isSecondment?d.live.secondmentBranchId:d.branch_id;
@@ -3039,7 +3049,7 @@ const App = (() => {
           <div class="status-grid">${cards}</div>`;
       }).join("")||`<div class="empty" style="padding:34px">لا يوجد ممارسون في هذا اليوم</div>`;
 
-      const now=new Date(); const nowTxt=fmtMin(now.getHours()*60+now.getMinutes());
+      const _rn=_riyadhNow(); const nowTxt=fmtMin(_rn.getUTCHours()*60+_rn.getUTCMinutes());
       const branchLabel=dashBranch?(" · "+(bname[dashBranch]||"")):"";
       const dayOpts=`<option value="-1" ${dashDay===-1?"selected":""}>اليوم</option>`+
         WEEK_ORDER.map(i=>`<option value="${i}" ${dashDay===i?"selected":""}>${DAYS[i]}</option>`).join("");
@@ -4905,7 +4915,7 @@ const App = (() => {
     const db=LocalDB.call("GET","/export-db");
     if(!db) return false;
     const now=new Date();
-    const ts=`${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    const _rn2=_riyadhNow();const ts=`${_rn2.getUTCFullYear()}${String(_rn2.getUTCMonth()+1).padStart(2,'0')}${String(_rn2.getUTCDate()).padStart(2,'0')}_${String(_rn2.getUTCHours()).padStart(2,'0')}${String(_rn2.getUTCMinutes()).padStart(2,'0')}`;
     const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
