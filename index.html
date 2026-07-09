@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-08">
+<meta name="app-version" content="2026-07-07-10">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1106,7 +1106,8 @@ const LocalDB = (() => {
   //  ─ يُحتفظ بسجل متدرّج حسب النوع (تقليم تلقائي)
   // ══════════════════════════════════════════════════════════════════
   //  ─ التصميم: كل نسخة = مستند بيانات (data blob) في adelcare_snapshots،
-  //    مع مستند فهرس واحد "__index__" يحوي بيانات وصفية خفيفة لكل النسخ.
+  //    مع مستند فهرس واحد "snap_index" يحوي بيانات وصفية خفيفة لكل النسخ.
+  //    (ملاحظة: Firestore يحجز المعرّفات بنمط __..__ لذا لا يمكن استخدام "__index__")
   //    العرض/التقليم يقرآن الفهرس فقط (بايتات) — لا يُنزَّل أي blob إلا عند الاستعادة.
   const SNAP_KEEP = { op:60, auto:30, pre:20, manual:40 }; // الحد لكل نوع
   const OP_SNAP_DEBOUNCE = 1500;   // تجميع الحفظات المتتالية (مللي ثانية)
@@ -1114,7 +1115,7 @@ const LocalDB = (() => {
   let _opTimer = null, _opPending = null, _snapIndexReady = false;
 
   function _snapColl(){ return _fsDB ? _fsDB.collection('adelcare_snapshots') : null; }
-  function _snapIndexRef(){ const c=_snapColl(); return c ? c.doc('__index__') : null; }
+  function _snapIndexRef(){ const c=_snapColl(); return c ? c.doc('snap_index') : null; }
   function _snapKind(id){
     if(id.startsWith('op_'))     return 'op';
     if(id.startsWith('auto_'))   return 'auto';
@@ -1127,7 +1128,7 @@ const LocalDB = (() => {
     const coll=_snapColl(), idxRef=_snapIndexRef(); if(!coll||!idxRef) return [];
     try{
       const qs=await coll.get(); const list=[];
-      qs.docs.forEach(d=>{ if(d.id==='__index__') return; const dd=d.data()||{};
+      qs.docs.forEach(d=>{ if(d.id==='snap_index'||d.id==='__index__') return; const dd=d.data()||{};
         list.push({ id:d.id, ts:dd.ts||"", action:dd.action||"", user:dd.user||"",
           kind:dd.kind||_snapKind(d.id), n:dd.n||null }); });
       list.sort((a,b)=>a.ts<b.ts?1:-1);
@@ -1847,20 +1848,22 @@ const LocalDB = (() => {
     if (method==="GET" && path==="/leaves") {
       needAuth();
       const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
-      const dmap={};db.doctors.forEach(d=>{dmap[d.id]={name:d.name,branch_id:d.branch_id,specialty:d.specialty||"",terminated:!!d.terminated,archived:!!d.archived};});
+      // work_days: أرقام الأيام (0=الأحد..6=السبت) التي للممارس فيها دوام — لحساب أول يوم عمل بعد الإجازة
+      const _workDays=(sc)=>{const o=sc||{};const out=[];for(let i=0;i<7;i++){const sh=o[i]||o[String(i)];if(sh&&sh.length)out.push(i);}return out;};
+      const dmap={};db.doctors.forEach(d=>{dmap[d.id]={name:d.name,branch_id:d.branch_id,specialty:d.specialty||"",terminated:!!d.terminated,archived:!!d.archived,work_days:_workDays(d.schedule)};});
       const today=_riyadhDate();
       // استثناء منتهي العقد والمؤرشفين — لا يُحتسبون كإجازات
       const realLeaves=db.leaves.filter(l=>{const doc=dmap[l.doctor_id];return !doc||(!doc.terminated&&!doc.archived);}).map(l=>{
         const doc=dmap[l.doctor_id]||{};
         return {...l,doctor_name:doc.name||"",branch_id:doc.branch_id||null,branch_name:bmap[doc.branch_id]||"",specialty:doc.specialty||"",
-          secondment_branch_name:l.secondment_branch_id?bmap[l.secondment_branch_id]||"":""};
+          work_days:doc.work_days||[],secondment_branch_name:l.secondment_branch_id?bmap[l.secondment_branch_id]||"":""};
       });
       // Include doctors manually set to leave status with no active leave record
       const docIdsWithActiveLeave=new Set(db.leaves.filter(l=>l.start_date<=today&&l.end_date>=today).map(l=>l.doctor_id));
       const syntheticLeaves=db.doctors
         .filter(d=>!d.archived&&!d.terminated&&d.status==="leave"&&!docIdsWithActiveLeave.has(d.id))
         .map(d=>({id:"syn_"+d.id,doctor_id:d.id,start_date:today,end_date:today,type:"وضع يدوي",reason:"",synthetic:true,
-          doctor_name:d.name,branch_id:d.branch_id||null,branch_name:bmap[d.branch_id]||"",specialty:d.specialty||""}));
+          doctor_name:d.name,branch_id:d.branch_id||null,branch_name:bmap[d.branch_id]||"",specialty:d.specialty||"",work_days:_workDays(d.schedule)}));
       return {leaves:[...realLeaves,...syntheticLeaves].sort((a,b)=>b.start_date.localeCompare(a.start_date))};
     }
     if (method==="POST" && path==="/leaves") {
@@ -2270,6 +2273,28 @@ const App = (() => {
     const p=document.getElementById("notif-panel"); if(p) p.remove();
   }
 
+  // أول يوم عمل فعلي بعد نهاية الإجازة — يتخطى الإجازات الأسبوعية والإجازات المتداخلة
+  function _nextWorkDay(endDateStr, workDays, docLeaves){
+    if(!workDays||!workDays.length||!endDateStr) return null; // لا جدول معروف
+    const covered=(ds)=>(docLeaves||[]).some(l=>!l.synthetic&&l.start_date<=ds&&l.end_date>=ds);
+    const p=endDateStr.split("-").map(Number);
+    const dt=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+    const pad=x=>String(x).padStart(2,'0');
+    for(let i=1;i<=21;i++){
+      dt.setUTCDate(dt.getUTCDate()+1);
+      const dow=dt.getUTCDay();
+      const ds=`${dt.getUTCFullYear()}-${pad(dt.getUTCMonth()+1)}-${pad(dt.getUTCDate())}`;
+      if(workDays.includes(dow)&&!covered(ds)) return {dow,ds,offset:i};
+    }
+    return null;
+  }
+  // صياغة "يعاود العمل": غداً / بعد غد / يوم كذا
+  function _returnPhrase(nx){
+    if(!nx) return "";
+    if(nx.offset===1) return `يعاود العمل غداً (${DAYS[nx.dow]})`;
+    return `يعاود العمل يوم ${DAYS[nx.dow]} ${fmtDate(nx.ds)}`;
+  }
+
   async function checkNotifications(){
     const dk=_todayStr();
     if(dk!==_notifDateKey){ _notifDateKey=dk; _notifSeen=new Set([]); }
@@ -2277,15 +2302,25 @@ const App = (() => {
       const leavesRes = await api("/leaves");
       const today=_todayStr(), tomorrow=_tomorrowStr();
       const leaves=leavesRes.leaves||[];
-      // ── Leaves ending today ──
+      const _docLeaves=(id)=>leaves.filter(x=>x.doctor_id===id);
+      // ── Leaves ending today — مع حساب أول يوم عمل فعلي ──
       leaves.filter(l=>!l.synthetic&&l.end_date===today).forEach(l=>{
+        const nx=_nextWorkDay(l.end_date,l.work_days,_docLeaves(l.doctor_id));
+        const isSec=l.type==="ندب";
+        const verb=isSec?"يعود من الندب":"";
+        const back=_returnPhrase(nx);
+        const subParts=[verb,back].filter(Boolean).join(" — ");
+        const sub=[subParts,l.branch_name].filter(Boolean).join(" · ");
         _pushNotif(`leave-end-${l.id}-${today}`,"leave-end",
-          `إجازة ${l.doctor_name} تنتهي اليوم`,l.branch_name||"");
+          `تنتهي ${isSec?"ندب":"إجازة"} ${l.doctor_name} اليوم`,sub);
       });
       // ── Leaves ending tomorrow ──
       leaves.filter(l=>!l.synthetic&&l.end_date===tomorrow).forEach(l=>{
+        const nx=_nextWorkDay(l.end_date,l.work_days,_docLeaves(l.doctor_id));
+        const back=_returnPhrase(nx);
+        const sub=[back,l.branch_name].filter(Boolean).join(" · ");
         _pushNotif(`leave-tmrw-${l.id}-${today}`,"leave",
-          `إجازة ${l.doctor_name} تنتهي غداً`,l.branch_name||"");
+          `تنتهي ${l.type==="ندب"?"ندب":"إجازة"} ${l.doctor_name} غداً`,sub);
       });
     }catch(e){}
   }
@@ -2526,6 +2561,35 @@ const App = (() => {
     c.addEventListener("click",()=>quickCard(c.dataset.doc).catch(e=>toast(e.message||"خطأ","err")))); }
 
   // ---------- Quick doctor card (modal) ----------
+  // تعديل موعد إنهاء العقد المجدول — مثل تعديل الإجازة القادمة
+  function editSchedTerm(d){
+    const cur=d.termination_scheduled||(d.live&&d.live.termSched)||"";
+    const _n=_riyadhNow(),_p=x=>String(x).padStart(2,'0');
+    const today=`${_n.getUTCFullYear()}-${_p(_n.getUTCMonth()+1)}-${_p(_n.getUTCDate())}`;
+    const body=`<form id="etf">
+      <div class="field" style="margin-bottom:0"><label>📅 تاريخ إنهاء العقد الجديد *</label>
+        <input type="date" id="et-date" value="${esc(cur)}" min="${esc(today)}">
+        <div style="font-size:11.5px;color:var(--muted);margin-top:6px">يستمر «${esc(d.name)}» بالعمل حتى هذا التاريخ ثم يصبح «منتهي العقد» تلقائياً.</div>
+      </div>
+    </form>`;
+    openModal({title:"تعديل موعد إنهاء العقد", bodyHTML:body,
+      footHTML:`<button class="btn btn-primary" id="et-save">حفظ التعديل</button><button class="btn btn-ghost" data-xet>إلغاء</button>`,
+      onMount:(m)=>{
+        m.querySelector("[data-xet]").onclick=closeModal;
+        m.querySelector("#et-save").onclick=()=>requirePerm("doctor_edit",async()=>{
+          const nd=m.querySelector("#et-date").value;
+          if(!nd){toast("اختر التاريخ","warn");return;}
+          if(nd===cur){toast("لم يتغيّر التاريخ","warn");return;}
+          if(nd<=today && !confirm("التاريخ اليوم أو سابق — سيُنهى العقد فوراً ويصبح «منتهي العقد». متابعة؟"))return;
+          try{
+            await api("/doctors/"+d.id+"/terminate",{method:"POST",body:{date:nd}});
+            toast(nd>today?"✅ تم تحديث موعد إنهاء العقد":"✅ تم إنهاء العقد","ok");
+            closeModal(); go(state.route);
+          }catch(e){toast("❌ "+e.message,"err");}
+        },d.branch_id,d.specialty);
+      }});
+  }
+
   async function quickCard(id){
     const {doctor:d}=await api("/doctors/"+id);
     const live=d.live||{};
@@ -2588,7 +2652,8 @@ const App = (() => {
           <div class="lu-dates">بتاريخ ${esc(fmtDate(live.termSched))} · سيصبح "منتهي العقد" تلقائياً</div>
         </div>
         ${can("doctor_edit")?`<div class="lu-actions">
-          <button class="btn btn-xs btn-danger" data-cancel-term="${d.id}">إلغاء</button>
+          <button class="btn btn-xs btn-ghost" data-edit-sched-term="${d.id}">✎ تعديل</button>
+          <button class="btn btn-xs btn-danger" data-cancel-term="${d.id}">حذف</button>
         </div>`:""}
       </div>`:"";
 
@@ -2618,11 +2683,12 @@ const App = (() => {
       const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id,d.specialty);
       const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requirePerm("leave_manage",()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
       const ctb=m.querySelector("[data-cancel-term]"); if(ctb)ctb.onclick=()=>requirePerm("doctor_edit",async()=>{
-        if(!confirm(`إلغاء جدولة إنهاء عقد "${d.name}"؟\nسيستمر الممارس بالعمل كالمعتاد.`))return;
+        if(!confirm(`حذف جدولة إنهاء عقد "${d.name}"؟\nسيستمر الممارس بالعمل كالمعتاد.`))return;
         try{await api("/doctors/"+d.id+"/terminate",{method:"POST",body:{unterm:true}});
-          toast("✅ تم إلغاء جدولة إنهاء العقد","ok");closeModal();go(state.route);}
+          toast("✅ تم حذف جدولة إنهاء العقد","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       },d.branch_id,d.specialty);
+      const etb=m.querySelector("[data-edit-sched-term]"); if(etb)etb.onclick=()=>requirePerm("doctor_edit",()=>editSchedTerm(d),d.branch_id,d.specialty);
       // Active leave inline buttons
       const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
       const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requirePerm("leave_manage",async()=>{
@@ -2696,6 +2762,8 @@ const App = (() => {
         const inp=$("#gsearch"), dd=_searchDD;
         if(inp&&dd&&dd.innerHTML){ positionDD(inp,dd); dd.style.display="block"; }
       }
+      // تحديث مؤجّل حدث أثناء فتح النافذة — طبّقه الآن
+      if(_softPending){ _softPending=false; softRender(); }
     };
     if(back){ back.classList.add("closing"); setTimeout(finish,150); }
     else finish();
@@ -3249,13 +3317,16 @@ const App = (() => {
     // group by department (specialty) and order: طب عام، باطنة، ...
     const bySpec={}; doctors.forEach(d=>{(bySpec[d.specialty]=bySpec[d.specialty]||[]).push(d);});
     const ordered=Object.keys(bySpec).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
-    let presentOnly=false, query="", queryNorm="";
+    // استعادة حالة الواجهة (بحث + فلتر الحضور) — تبقى بعد التحديث التلقائي، وتُصفّر عند تغيير الفرع
+    const _bui=(state.branchUI&&String(state.branchUI.id)===String(id))?state.branchUI:{};
+    let presentOnly=!!_bui.presentOnly, query=_bui.query||"", queryNorm=normAr(query);
+    const _saveBUI=()=>{ state.branchUI={id:String(id),query,presentOnly}; };
     $("#content").innerHTML=`
       <button class="btn btn-ghost btn-sm" id="back">→ كل الفروع</button>
       <div class="page-title" style="margin-top:12px">${esc(branch.name)}</div>
       <div class="page-sub">${esc(branch.info||"")} ${branch.hours?"· "+esc(branch.hours):""}</div>
       <div class="branch-chips">
-        <button class="bchip present-toggle" id="t-present"><span class="dot" style="background:var(--green)"></span> موجودون الآن <span class="bchip-n">${counts.present}</span></button>
+        <button class="bchip present-toggle${presentOnly?" on":""}" id="t-present"><span class="dot" style="background:var(--green)"></span> موجودون الآن <span class="bchip-n">${counts.present}</span></button>
         <span class="bchip ghost"><span class="dot" style="background:var(--amber)"></span> يبدأ لاحقاً ${counts.upcoming}</span>
         <span class="bchip ghost"><span class="dot" style="background:var(--black)"></span> إجازة/خارج ${counts.leave}</span>
         ${counts.seconded?`<span class="bchip ghost" style="color:#0e7490">🔀 منتدب ${counts.seconded}</span>`:""}
@@ -3289,10 +3360,11 @@ const App = (() => {
       bindCards(wrap);
     };
     let _bsTimer;
-    $("#back").onclick=()=>go("branches");
+    const _bsInput=$("#bsearch"); if(query) _bsInput.value=query;
+    $("#back").onclick=()=>{ state.branchUI=null; go("branches"); };
     $("#t-present").onclick=()=>{presentOnly=!presentOnly;
-      $("#t-present").classList.toggle("on",presentOnly); drawSecs();};
-    $("#bsearch").addEventListener("input",e=>{query=e.target.value.trim();clearTimeout(_bsTimer);_bsTimer=setTimeout(drawSecs,80);});
+      $("#t-present").classList.toggle("on",presentOnly); _saveBUI(); drawSecs();};
+    _bsInput.addEventListener("input",e=>{query=e.target.value.trim();_saveBUI();clearTimeout(_bsTimer);_bsTimer=setTimeout(drawSecs,80);});
     drawSecs();
   }
 
@@ -3328,6 +3400,8 @@ const App = (() => {
     let _dsearchTimer;
     const draw=()=>{ const rawQ=$("#dsearch").value.trim(); const sp=$("#fspec").value;
       const br=$("#fbranch").value; const st=$("#fstatus").value;
+      // حفظ الفلاتر في الحالة — تبقى بعد التحديث التلقائي للبيانات
+      state.docFilter={spec:sp,branch:br,status:st};
       // Filter by dropdown first
       let filtered=doctors.filter(d=>
         (!sp||d.specialty===sp)&&(!br||String(d.branch_id)===br)&&(!st||d.live.state===st));
@@ -3348,6 +3422,11 @@ const App = (() => {
     // Debounced live search (80ms) + instant filter changes
     const dsInput=$("#dsearch");
     if(state.doctorsSearch){ dsInput.value=state.doctorsSearch; }
+    // استعادة الفلاتر المحفوظة (تبقى بعد التحديث التلقائي)
+    const _df=state.docFilter||{};
+    if(_df.spec){ $("#fspec").value=_df.spec; }
+    if(_df.branch){ $("#fbranch").value=_df.branch; }
+    if(_df.status){ $("#fstatus").value=_df.status; }
     dsInput.addEventListener("input",()=>{state.doctorsSearch=dsInput.value;clearTimeout(_dsearchTimer);_dsearchTimer=setTimeout(draw,80);});
     ["fspec","fbranch","fstatus"].forEach(id=>{$("#"+id).addEventListener("change",draw);});
     const goM=$("#go-manage"); if(goM) goM.onclick=()=>go("control");
@@ -3598,12 +3677,22 @@ const App = (() => {
     const _today=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
     const _tom=new Date(_n); _tom.setDate(_tom.getDate()+1);
     const _tomorrow=`${_tom.getFullYear()}-${_p(_tom.getMonth()+1)}-${_p(_tom.getDate())}`;
+    // إذا فُتح النموذج من بطاقة ممارس → تثبيت الممارس وإخفاء خيار التغيير (تقليل الأخطاء)
+    const lockDoc=!!docId;
+    const _lockedDoc=lockDoc?(doctors.find(d=>String(d.id)===String(docId))||{name:docName||"",specialty:"",id:docId}):null;
+    const docFieldHTML=lockDoc
+      ? `<div class="field"><label>الممارس</label>
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface2);font-weight:600">
+            👤 ${esc(_lockedDoc.name)}${_lockedDoc.specialty?` <span style="font-weight:400;color:var(--muted);font-size:12px">— ${esc(_lockedDoc.specialty)} (#${esc(String(docId))})</span>`:""}
+          </div>
+          <input type="hidden" name="doctor_id" id="lv-doc-sel" value="${esc(String(docId))}"></div>`
+      : `<div class="field"><label>الممارس *</label>
+          <input type="text" id="lv-doc-search" placeholder="🔍 ابحث بالاسم أو جزء منه أو رمز الممارس..." autocomplete="off" style="margin-bottom:6px">
+          <select name="doctor_id" id="lv-doc-sel" required size="1">
+          ${doctors.map(d=>`<option value="${d.id}" ${docId==d.id?"selected":""}>${esc(d.name)} — ${esc(d.specialty)} (#${d.id})</option>`).join("")}</select>
+          <div id="lv-doc-count" style="font-size:11px;color:var(--muted);margin-top:3px"></div></div>`;
     const body=`<form id="lvf">
-      <div class="field"><label>الممارس *</label>
-        <input type="text" id="lv-doc-search" placeholder="🔍 ابحث بالاسم أو جزء منه أو رمز الممارس..." autocomplete="off" style="margin-bottom:6px">
-        <select name="doctor_id" id="lv-doc-sel" required size="1">
-        ${doctors.map(d=>`<option value="${d.id}" ${docId==d.id?"selected":""}>${esc(d.name)} — ${esc(d.specialty)} (#${d.id})</option>`).join("")}</select>
-        <div id="lv-doc-count" style="font-size:11px;color:var(--muted);margin-top:3px"></div></div>
+      ${docFieldHTML}
       <div id="lv-existing" style="margin:-4px 0 12px"></div>
       <div class="field"><label>النوع</label><select name="type" id="lv-type">
         ${LEAVE_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div>
@@ -4947,6 +5036,29 @@ const App = (() => {
     await fn();
   }
 
+  // ── تحديث ناعم: يُحدّث البيانات فقط مع الحفاظ على التركيز والمؤشر والتمرير والفلاتر ──
+  let _softPending=false;
+  async function softRender(){
+    // لا تُقاطع المستخدم أثناء فتح نافذة (نموذج) — أجّل حتى إغلاقها
+    const root=document.getElementById("modal-root");
+    if(root&&root.children.length>0){ _softPending=true; return; }
+    // التقاط حالة الواجهة قبل إعادة الرسم
+    const ae=document.activeElement;
+    const focusId=(ae&&ae.id)?ae.id:null;
+    const canSel=ae&&("selectionStart"in ae);
+    const selS=canSel?ae.selectionStart:null, selE=canSel?ae.selectionEnd:null;
+    const sx=window.scrollX, sy=window.scrollY;
+    try{ await render(); }catch(e){ return; }
+    // استعادة التمرير أولاً ثم التركيز والمؤشر
+    window.scrollTo(sx,sy);
+    if(focusId){
+      const el=document.getElementById(focusId);
+      if(el){ try{ el.focus({preventScroll:true});
+        if(selS!=null&&"setSelectionRange"in el){ el.setSelectionRange(selS,selE); }
+      }catch(_){} }
+    }
+  }
+
   // ── فحص الإصدار: يجبر كل جهاز على تحميل آخر نسخة تلقائياً ──────
   function _currentVersion(){
     const m=document.querySelector('meta[name="app-version"]');
@@ -4987,9 +5099,10 @@ const App = (() => {
     render();
     // تصدير تلقائي مُساعَد بالمتصفح (للمسؤولين) — نسخة خارج Firebase على جهاز حقيقي
     maybeAutoExport();
-    document.addEventListener('adelcare:sync', ()=>render());
+    // تحديث ناعم يحافظ على الفلاتر والبحث والتمرير والقسم المفتوح
+    document.addEventListener('adelcare:sync', ()=>softRender());
     setInterval(()=>{
-      if(state.route==="dashboard"||state.route==="doctors") render();
+      if(state.route==="dashboard"||state.route==="doctors") softRender();
     },60000);
     // فحص وجود إصدار أحدث: عند الإقلاع + كل 30 ثانية + عند العودة بأي طريقة
     checkForUpdate();
