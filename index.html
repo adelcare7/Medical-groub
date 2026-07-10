@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-10">
+<meta name="app-version" content="2026-07-07-11">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -2524,13 +2524,10 @@ const App = (() => {
     const isLeave=live.state==="leave";
     const isTerminated=live.state==="terminated";
     const isSecondment=!!live.isSecondment;
-    const isSchedTerm=!!live.termSched;
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
     const shift=(isLeave||isTerminated)?"":todayShift(d);
-    const schedTermRow=isSchedTerm
-      ?`<div class="dcard-shift" style="color:#b45309;font-size:11.5px;margin-top:2px">⏳ إنهاء عقد مجدول · ${esc(fmtDate(live.termSched))}</div>`
-      :"";
+    // ملاحظة: إنهاء العقد المجدول لا يظهر على البطاقة الخارجية — يُرى فقط داخل تفاصيل البطاقة (quickCard)، كالإجازات القادمة
     const infoRow=isTerminated
       ?`<div class="dcard-shift" style="color:#475569">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
       :isSecondment
@@ -2553,7 +2550,6 @@ const App = (() => {
         </div>
         <div class="dcard-meta"><span class="spec-tag">${esc(d.specialty||"")}</span>${meta}</div>
         ${infoRow}
-        ${schedTermRow}
         ${branchRow}
       </div></div>`;
   }
