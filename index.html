@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-12">
+<meta name="app-version" content="2026-07-07-16">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -407,6 +407,25 @@ a{color:inherit;text-decoration:none}
 .leave-upcoming-row .lu-dates{font-size:12px;color:var(--muted);margin-top:2px}
 .leave-upcoming-row .lu-actions{display:flex;gap:6px;flex-shrink:0}
 .btn-xs{padding:4px 10px;font-size:12px;border-radius:7px}
+/* ---------- Searchable dropdown (قائمة قابلة للبحث) ---------- */
+.ss{position:relative}
+.ss-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);
+  font:inherit;color:var(--text);cursor:pointer;text-align:start}
+.ss-trigger:focus,.ss.open .ss-trigger{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);outline:none}
+.ss-val{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-ph{color:var(--muted)}
+.ss-caret{color:var(--muted);font-size:11px;flex-shrink:0;transition:.15s}
+.ss.open .ss-caret{transform:rotate(180deg)}
+.ss-panel{position:absolute;z-index:60;top:calc(100% + 4px);inset-inline:0;background:var(--surface);
+  border:1px solid var(--brand);border-radius:var(--r-s);box-shadow:var(--shadow-l);overflow:hidden}
+.ss-search{width:100%;border:none;border-bottom:1px solid var(--line);padding:10px 12px;
+  font:inherit;font-size:14px;color:var(--text);background:var(--surface2);outline:none}
+.ss-list{max-height:220px;overflow-y:auto}
+.ss-opt{padding:9px 12px;cursor:pointer;font-size:14px}
+.ss-opt:hover{background:var(--surface2)}
+.ss-opt.sel{background:var(--brand-soft);color:var(--brand-d);font-weight:600}
+.ss-empty{padding:12px;text-align:center;color:var(--muted);font-size:12.5px}
 .mini-stat.s-leave{border-inline-start-color:var(--leave)} .mini-stat.s-leave .ms-v{color:var(--leave)}
 .mini-stat.s-leave.active{background:var(--leave-soft)}
 .mini-stat.s-purple{border-inline-start-color:#7c3aed} .mini-stat.s-purple .ms-v{color:#7c3aed}
@@ -775,6 +794,19 @@ body.modal-open{overflow:hidden}
   .dcard{height:auto;min-height:90px;padding:11px 12px;gap:10px}
   .dcard-name{font-size:14.5px}
   .avatar{width:42px;height:42px;font-size:15px;border-radius:11px}
+
+  /* -- بطاقات مصغّرة لنتائج البحث (جوال) — عدد أكبر في الشاشة، تمرير رأسي فقط -- */
+  .status-grid.compact{gap:6px}
+  .status-grid.compact .dcard,
+  #search-dd .dcard{min-height:0;height:auto;padding:7px 10px;gap:9px;border-radius:11px;align-items:center}
+  .status-grid.compact .avatar,
+  #search-dd .avatar{width:32px;height:32px;font-size:12.5px;border-radius:9px}
+  .status-grid.compact .dcard-name,
+  #search-dd .dcard-name{font-size:13.5px}
+  .status-grid.compact .dcard-meta,
+  #search-dd .dcard-meta{font-size:11px;margin-top:1px!important;line-height:1.3}
+  .status-grid.compact .dcard-shift,
+  #search-dd .dcard-shift{font-size:10.5px;margin-top:1px!important;max-height:15px;line-height:1.3}
 
   /* -- Mini stat cards -- */
   .mini-stats{grid-template-columns:repeat(2,1fr);gap:7px}
@@ -2933,9 +2965,12 @@ const App = (() => {
     const spaceBelow=Math.max(160, vvh - r.bottom - 16);
     dd.style.top       =(r.bottom+5)+"px";
     dd.style.bottom    ="auto";
-    dd.style.left      =r.left+"px";
-    dd.style.right     ="auto";
-    dd.style.width     =r.width+"px";
+    if(window.matchMedia("(max-width:860px)").matches){
+      // جوال: قائمة عريضة تملأ الشاشة تقريباً — ليظهر اسم الممارس كاملاً
+      dd.style.left="8px"; dd.style.right="8px"; dd.style.width="auto";
+    } else {
+      dd.style.left=r.left+"px"; dd.style.right="auto"; dd.style.width=r.width+"px";
+    }
     dd.style.maxHeight =Math.min(spaceBelow,520)+"px";
   }
   function setupSearch(){
@@ -3339,7 +3374,7 @@ const App = (() => {
           .sort((a,b)=>b.s-a.s||(a.d.name||"").localeCompare(b.d.name||""))
           .map(x=>x.d);
         wrap.innerHTML=arr.length
-          ?`<div class="status-grid">${arr.map(doctorCard).join("")}</div>`
+          ?`<div class="status-grid compact">${arr.map(doctorCard).join("")}</div>`
           :`<div class="empty">لا نتائج لـ "${esc(query)}"</div>`;
       }else{
         // عرض مقسّم بالتخصص مع ترتيب الحضور
@@ -3411,6 +3446,8 @@ const App = (() => {
         arr=filtered.slice().sort(availSort);
       }
       const list=$("#doc-list");
+      // بطاقات مصغّرة عند وجود بحث (تأثيرها على الجوال فقط عبر CSS)
+      list.classList.toggle("compact", !!rawQ);
       list.innerHTML=arr.length?arr.map(doctorCard).join(""):`<div class="empty">لا نتائج</div>`;
       bindCards(list);
     };
@@ -3429,10 +3466,13 @@ const App = (() => {
   };
 
   // ---------- Doctor form ----------
-  async function doctorForm(doc){
+  async function doctorForm(doc, onDone){
     const {branches}=await api("/branches");
     const {specialties}=await api("/specialties");
     const d=doc||{schedule:{},dayoff:[],gender:"",home_visit:false,status:"active"};
+    // قائمة الأقسام المعتمدة — يُضاف تخصص الممارس الحالي إن لم يكن مسجّلاً (حفاظاً على بياناته)
+    const specList=specialties.slice();
+    if(d.specialty&&!specList.includes(d.specialty)) specList.unshift(d.specialty);
     const sc=d.schedule||{};
     const offSet=new Set(d.dayoff||[]);
     const minToTime=(m)=>{m=((m%1440)+1440)%1440;return `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;};
@@ -3454,8 +3494,19 @@ const App = (() => {
       <div class="grid2">
         <div class="field"><label>الاسم *</label><input name="name" value="${esc(d.name||"")}" required></div>
         <div class="field"><label>الفرع *</label><select name="branch_id" required>${branches.map(b=>`<option value="${b.id}" ${d.branch_id==b.id?"selected":""}>${esc(b.name)}</option>`).join("")}</select></div>
-        <div class="field"><label>التخصص *</label><input name="specialty" list="speclist" value="${esc(d.specialty||"")}" required>
-          <datalist id="speclist">${specialties.map(s=>`<option>${esc(s)}</option>`).join("")}</datalist></div>
+        <div class="field"><label>التخصص *</label>
+          <div class="ss" id="spec-ss">
+            <button type="button" class="ss-trigger" id="spec-trigger">
+              <span class="ss-val ${d.specialty?"":"ss-ph"}" id="spec-val">${d.specialty?esc(d.specialty):"اختر القسم"}</span>
+              <span class="ss-caret">▾</span>
+            </button>
+            <div class="ss-panel" id="spec-panel" hidden>
+              <input type="text" class="ss-search" id="spec-search" placeholder="🔍 ابحث عن القسم..." autocomplete="off">
+              <div class="ss-list" id="spec-list"></div>
+            </div>
+            <input type="hidden" name="specialty" id="spec-input" value="${esc(d.specialty||"")}">
+          </div>
+        </div>
         <div class="field"><label>الدرجة / التخصص الدقيق *</label><input name="rank" value="${esc(d.rank||"")}" placeholder="أخصائي، مقيم..." required></div>
         <div class="field"><label>الجنسية *</label><input name="nationality" value="${esc(d.nationality||"")}" required></div>
         <div class="field"><label>الجنس *</label><select name="gender" required>
@@ -3542,10 +3593,39 @@ const App = (() => {
       }
       const _schedGrid = m.querySelector("#sched-grid");
       buildSchedUI(_schedGrid, schedState);
+      // ── قائمة تخصص منسدلة قابلة للبحث (خانة البحث ضمن القائمة) — من الأقسام المسجّلة فقط ──
+      (function initSpecDD(){
+        const wrap=m.querySelector("#spec-ss"), trigger=m.querySelector("#spec-trigger"),
+              panel=m.querySelector("#spec-panel"), search=m.querySelector("#spec-search"),
+              listEl=m.querySelector("#spec-list"), valEl=m.querySelector("#spec-val"),
+              hidden=m.querySelector("#spec-input");
+        if(!wrap) return;
+        const renderList=()=>{
+          const q=normAr((search.value||"").trim());
+          const matched=q?specList.filter(s=>normAr(s).includes(q)):specList;
+          listEl.innerHTML=matched.length
+            ? matched.map(s=>`<div class="ss-opt${hidden.value===s?" sel":""}" data-v="${esc(s)}">${esc(s)}</div>`).join("")
+            : `<div class="ss-empty">لا قسم مطابق — أضِفه أولاً من إدارة الأقسام</div>`;
+        };
+        const onDocClick=e=>{ if(!wrap.contains(e.target)) close(); };
+        const open=()=>{ panel.hidden=false; wrap.classList.add("open"); search.value=""; renderList();
+          setTimeout(()=>search.focus(),30); document.addEventListener("click",onDocClick); };
+        const close=()=>{ panel.hidden=true; wrap.classList.remove("open"); document.removeEventListener("click",onDocClick); };
+        trigger.onclick=()=>{ panel.hidden?open():close(); };
+        search.addEventListener("input",renderList);
+        listEl.addEventListener("click",e=>{
+          const opt=e.target.closest(".ss-opt"); if(!opt) return;
+          const v=opt.getAttribute("data-v");
+          hidden.value=v; valEl.textContent=v; valEl.classList.remove("ss-ph");
+          close();
+        });
+      })();
       m.querySelector("#save-doc").onclick=async()=>{
         const f=new FormData(m.querySelector("#docf"));
         const payload=Object.fromEntries(f.entries());
         payload.branch_id=+payload.branch_id;
+        // التخصص إلزامي ومن الأقسام المعتمدة فقط
+        if(!payload.specialty||!specList.includes(payload.specialty)){ toast("اختر التخصص من قائمة الأقسام","warn"); return; }
         const schedule={},dayoff=[];
         const grid=m.querySelector("#sched-grid");
         schedState.forEach(({day,off,shifts},idx)=>{
@@ -3575,7 +3655,7 @@ const App = (() => {
           if(doc)await api("/doctors/"+doc.id,{method:"PUT",body:payload});
           else await api("/doctors",{method:"POST",body:payload});
           toast(doc?"✅ تم تحديث بيانات الممارس بنجاح":"✅ تمت إضافة الممارس بنجاح","ok"); closeModal();
-          if(state.route==="control") drawDoctorsMgmtPanel(); else render();
+          if(onDone) onDone(); else if(state.route==="control") drawDoctorsMgmtPanel(); else render();
         }catch(e){toast("❌ "+e.message,"err");}
       };
     }});
@@ -4194,7 +4274,7 @@ const App = (() => {
       el.querySelectorAll("[data-edit-term]").forEach(btn=>{
         const id=+btn.dataset.editTerm;
         const d=termed.find(x=>x.id===id); if(!d)return;
-        btn.onclick=()=>requirePerm("doctor_edit",()=>openDoctorForm(d,()=>drawTerminatedPanel()),d.branch_id,d.specialty);
+        btn.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d,()=>drawTerminatedPanel()),d.branch_id,d.specialty);
       });
       el.querySelectorAll("[data-unterm]").forEach(btn=>{
         const id=+btn.dataset.unterm;
