@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-16">
+<meta name="app-version" content="2026-07-07-19">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1564,6 +1564,7 @@ const LocalDB = (() => {
     const needAuth = () => { if (!sess.auth) throw Object.assign(new Error("auth"),{status:401}); };
     const _hasPerm = (s, perm) => { if(!s.auth) return false; const p=s.permissions||[]; return p.includes("*")||p.includes(perm); };
     const needPerm = (perm) => { needAuth(); if(!_hasPerm(sess,perm)) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); };
+    const needAnyPerm = (...perms) => { needAuth(); if(!perms.some(p=>_hasPerm(sess,p))) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); };
     const _hasBranch = (s, bid) => { const b=s.branches||[]; return b.includes("*")||b.includes(bid)||b.includes(String(bid)); };
     const needBranch = (bid) => { if(!_hasBranch(sess,bid)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا الفرع"),{status:403}); };
     const _hasSpecialty = (s, spec) => { if(!spec) return true; const sp=s.specialties||[]; return sp.includes("*")||sp.includes(spec); };
@@ -1796,15 +1797,26 @@ const LocalDB = (() => {
         return {doctor:doc};
       }
       if (method==="PUT" && !docM[2]) {
-        needPerm("doctor_edit");
+        // تغيير الحالة فقط (إلغاء إجازة يدوية): يُتيحه مديرو الحالة أيضاً — ويحفظ باقي الحقول
+        const _bk=Object.keys(body||{});
+        const _statusOnly=_bk.length===1 && _bk[0]==="status";
+        if(_statusOnly) needAnyPerm("doctor_edit","schedule_edit","leave_manage","status_manage");
+        else needAnyPerm("doctor_edit","schedule_edit"); // تعديل البطاقة بالكامل
         const idx=db.doctors.findIndex(x=>x.id===did); if(idx<0) throw Object.assign(new Error("not found"),{status:404});
         const old=db.doctors[idx];
         needBranch(old.branch_id);
         needSpecialty(old.specialty);
-        const updated={...old,...body,id:did};
-        if(body.schedule) updated.schedule=body.schedule;
-        if(body.dayoff) updated.dayoff=body.dayoff;
-        updated.home_visit=body.home_visit?1:0;
+        let updated;
+        if(_statusOnly){
+          updated={...old, status:body.status, id:did}; // يحدّث الحالة فقط
+        } else {
+          updated={...old,...body,id:did};
+          if(body.schedule) updated.schedule=body.schedule;
+          if(body.dayoff) updated.dayoff=body.dayoff;
+          // حفظ قيمة الزيارة المنزلية كما هي إن لم يرسلها النموذج (بدل تصفيرها)
+          if("home_visit" in body) updated.home_visit=body.home_visit?1:0;
+          else updated.home_visit=old.home_visit?1:0;
+        }
         const changes=_diffDoctor(db,old,updated);
         db.doctors[idx]=updated;
         const bn=(db.branches.find(x=>x.id===updated.branch_id)||{}).name||"";
@@ -1821,7 +1833,7 @@ const LocalDB = (() => {
         log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,`${d.archived?"أرشفة":"استرجاع"} الممارس "${d.name}" (الفرع ${bn||"—"})`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
       if (method==="POST" && docM[2]==="/terminate") {
-        needPerm("doctor_edit");
+        needAnyPerm("doctor_edit","status_manage");
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
         needBranch(d.branch_id);
         needSpecialty(d.specialty);
@@ -1865,7 +1877,7 @@ const LocalDB = (() => {
     }
     const visitM=path.match(/^\/doctors\/(\d+)\/visit$/);
     if(visitM && method==="POST"){
-      needPerm("doctor_edit");
+      needAnyPerm("doctor_edit","schedule_edit");
       const vid=+visitM[1];
       const d=db.doctors.find(x=>x.id===vid); if(!d) throw Object.assign(new Error("not found"),{status:404});
       needBranch(d.branch_id);
@@ -1899,9 +1911,10 @@ const LocalDB = (() => {
       return {leaves:[...realLeaves,...syntheticLeaves].sort((a,b)=>b.start_date.localeCompare(a.start_date))};
     }
     if (method==="POST" && path==="/leaves") {
-      needPerm("leave_manage");
+      needAnyPerm("leave_manage","status_manage");
       const d=db.doctors.find(x=>x.id===+body.doctor_id);
-      if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
+      if(!d) throw Object.assign(new Error("الممارس غير موجود"),{status:404}); // منع إنشاء إجازة لممارس غير موجود
+      needBranch(d.branch_id); needSpecialty(d.specialty);
       const clash=overlapLeaveFn(db.leaves,+body.doctor_id,body.start_date,body.end_date,null);
       if(clash) throw Object.assign(new Error(`⛔ تعارض في التواريخ: يوجد "${clash.type||"إجازة"}" من ${clash.start_date} إلى ${clash.end_date}`),{status:409});
       const id=nextId(db,"leaves");
@@ -1917,7 +1930,7 @@ const LocalDB = (() => {
     }
     const lvM=path.match(/^\/leaves\/(\d+)$/);
     if(lvM&&method==="PUT"){
-      needPerm("leave_manage");
+      needAnyPerm("leave_manage","status_manage");
       const l=db.leaves.find(x=>x.id===+lvM[1]);
       if(!l) throw Object.assign(new Error("not found"),{status:404});
       const d=db.doctors.find(x=>x.id===l.doctor_id);
@@ -1934,7 +1947,7 @@ const LocalDB = (() => {
       log(db,"تعديل إجازة","leave",+lvM[1],editDetail,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {ok:true};
     }
     if(lvM&&method==="DELETE"){
-      needPerm("leave_manage");
+      needAnyPerm("leave_manage","status_manage");
       const l=db.leaves.find(x=>x.id===+lvM[1]);
       if(l){const d=db.doctors.find(x=>x.id===l.doctor_id); if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }}
       db.leaves=db.leaves.filter(lx=>lx.id!==+lvM[1]);
@@ -2503,11 +2516,12 @@ const App = (() => {
     }
   }
   const PERMS_META = [
-    {key:"schedule_edit",label:"تعديل جداول الدوام"},
+    {key:"schedule_edit",label:"تعديل الممارس من بطاقته فقط (بدون صفحة الإدارة)"},
     {key:"doctor_add",label:"إضافة ممارس جديد"},
-    {key:"doctor_edit",label:"تعديل بيانات الممارسين"},
+    {key:"doctor_edit",label:"تعديل بيانات الممارسين (مع صفحة الإدارة)"},
     {key:"doctor_delete",label:"حذف / أرشفة الممارسين"},
-    {key:"leave_manage",label:"إدارة الإجازات"},
+    {key:"status_manage",label:"إدارة حالة الممارس: إجازات/ندب/إنهاء عقد (من البطاقة فقط)"},
+    {key:"leave_manage",label:"إدارة الإجازات (مع صفحة الإدارة)"},
     {key:"branch_manage",label:"إدارة الفروع"},
     {key:"specialty_manage",label:"إدارة الأقسام"},
     {key:"settings_access",label:"الوصول للإعدادات"},
@@ -2603,7 +2617,7 @@ const App = (() => {
       footHTML:`<button class="btn btn-primary" id="et-save">حفظ التعديل</button><button class="btn btn-ghost" data-xet>إلغاء</button>`,
       onMount:(m)=>{
         m.querySelector("[data-xet]").onclick=closeModal;
-        m.querySelector("#et-save").onclick=()=>requirePerm("doctor_edit",async()=>{
+        m.querySelector("#et-save").onclick=()=>requireAny(["doctor_edit","status_manage"],async()=>{
           const nd=m.querySelector("#et-date").value;
           if(!nd){toast("اختر التاريخ","warn");return;}
           if(nd===cur){toast("لم يتغيّر التاريخ","warn");return;}
@@ -2678,13 +2692,13 @@ const App = (() => {
           <div class="lu-info" style="color:#92400e">⏳ إنهاء عقد مجدول</div>
           <div class="lu-dates">بتاريخ ${esc(fmtDate(live.termSched))} · سيصبح "منتهي العقد" تلقائياً</div>
         </div>
-        ${can("doctor_edit")?`<div class="lu-actions">
+        ${canTerm()?`<div class="lu-actions">
           <button class="btn btn-xs btn-ghost" data-edit-sched-term="${d.id}">✎ تعديل</button>
           <button class="btn btn-xs btn-danger" data-cancel-term="${d.id}">حذف</button>
         </div>`:""}
       </div>`:"";
 
-    const visitToggle=can("doctor_edit")&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
+    const visitToggle=canEditCard()&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
     const body=`
       <div class="qd-head">
         <div class="avatar qd-avatar">${d.photo?`<img src="${esc(d.photo)}">`:esc(initials(d.name))}</div>
@@ -2697,9 +2711,9 @@ const App = (() => {
       <div class="qd-rows">${rows.map(([k,v])=>`<div class="qd-row"><div class="k">${k}</div><div class="vv">${v}</div></div>`).join("")}</div>`;
 
     const foot=`
-      ${can("doctor_edit")?`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>`:""}
-      ${can("leave_manage")&&isOnLeave&&!hasLeaveRecord?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`:""}
-      ${can("leave_manage")&&!d.terminated?`<button class="btn btn-ghost" data-leave="${d.id}">＋ جدولة إجازة / ندب</button>`:""}`;
+      ${canEditCard()?`<button class="btn btn-primary" data-edit="${d.id}">✎ تعديل</button>`:""}
+      ${canStatus()&&isOnLeave&&!hasLeaveRecord?`<button class="btn btn-ghost" data-end-leave="${d.id}">إلغاء الإجازة</button>`:""}
+      ${canStatus()&&!d.terminated?`<button class="btn btn-ghost" data-leave="${d.id}">＋ جدولة إجازة / ندب</button>`:""}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
       const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=async()=>{
@@ -2707,26 +2721,26 @@ const App = (() => {
           toast(d.in_visit?"✅ تم إلغاء الزيارة":"✅ تم تفعيل حالة الزيارة","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       };
-      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id,d.specialty);
-      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requirePerm("leave_manage",()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
-      const ctb=m.querySelector("[data-cancel-term]"); if(ctb)ctb.onclick=()=>requirePerm("doctor_edit",async()=>{
+      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requireAny(["doctor_edit","schedule_edit"],()=>doctorForm(d),d.branch_id,d.specialty);
+      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
+      const ctb=m.querySelector("[data-cancel-term]"); if(ctb)ctb.onclick=()=>requireAny(["doctor_edit","status_manage"],async()=>{
         if(!confirm(`حذف جدولة إنهاء عقد "${d.name}"؟\nسيستمر الممارس بالعمل كالمعتاد.`))return;
         try{await api("/doctors/"+d.id+"/terminate",{method:"POST",body:{unterm:true}});
           toast("✅ تم حذف جدولة إنهاء العقد","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       },d.branch_id,d.specialty);
-      const etb=m.querySelector("[data-edit-sched-term]"); if(etb)etb.onclick=()=>requirePerm("doctor_edit",()=>editSchedTerm(d),d.branch_id,d.specialty);
+      const etb=m.querySelector("[data-edit-sched-term]"); if(etb)etb.onclick=()=>requireAny(["doctor_edit","status_manage"],()=>editSchedTerm(d),d.branch_id,d.specialty);
       // Active leave inline buttons
-      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
-      const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requirePerm("leave_manage",async()=>{
+      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
+      const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requireAny(["leave_manage","status_manage"],async()=>{
         if(!confirm("إلغاء الإجازة الحالية؟"))return;
         try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       },d.branch_id,d.specialty);
       // End manual leave (doctor.status="leave" with no leave record)
-      const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requirePerm("leave_manage",async()=>{
+      const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requireAny(["leave_manage","status_manage"],async()=>{
         if(!confirm("إلغاء الإجازة وإعادة الممارس للعمل؟"))return;
-        try{await api("/doctors/"+d.id,{method:"PUT",body:{...d,status:"active"}});
+        try{await api("/doctors/"+d.id,{method:"PUT",body:{status:"active"}});
           toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
       },d.branch_id,d.specialty);
@@ -2805,6 +2819,18 @@ const App = (() => {
     if(specialty!==undefined && !canSpecialty(specialty)){ toast("🔒 لا تملك صلاحية للتعديل على هذا القسم","warn"); return; }
     fn();
   }
+  // يسمح بالإجراء إذا امتلك المستخدم أياً من الصلاحيات المذكورة (لدمج صلاحيات متعددة على نفس الزر)
+  function requireAny(perms, fn, branchId, specialty){
+    if(!state.user) return;
+    if(!perms.some(p=>hasPerm(state.user,p))){ toast("🔒 لا تملك صلاحية لهذا الإجراء","warn"); return; }
+    if(branchId!==undefined && !canBranch(branchId)){ toast("🔒 لا تملك صلاحية للتعديل على هذا الفرع","warn"); return; }
+    if(specialty!==undefined && !canSpecialty(specialty)){ toast("🔒 لا تملك صلاحية للتعديل على هذا القسم","warn"); return; }
+    fn();
+  }
+  // فحوص مجمّعة للعرض (إظهار/إخفاء الأزرار)
+  const canEditCard = () => can("doctor_edit")||can("schedule_edit");   // تعديل بطاقة الممارس بالكامل
+  const canStatus   = () => can("leave_manage")||can("status_manage");  // إجازات/ندب
+  const canTerm     = () => can("doctor_edit")||can("status_manage");   // إنهاء العقد
 
   // ============================================================ ROUTER
   const routes={};
@@ -3466,7 +3492,7 @@ const App = (() => {
   };
 
   // ---------- Doctor form ----------
-  async function doctorForm(doc, onDone){
+  async function doctorForm(doc, onDone, scheduleOnly){
     const {branches}=await api("/branches");
     const {specialties}=await api("/specialties");
     const d=doc||{schedule:{},dayoff:[],gender:"",home_visit:false,status:"active"};
@@ -3491,7 +3517,7 @@ const App = (() => {
       return {day,off:isOff,shifts:ex&&ex.length?ex.map(([s,e])=>({start:minToTime(s),end:minToTime(e)})):[{start:"08:00",end:"16:00"}]};
     });
     const body=`<form id="docf">
-      <div class="grid2">
+      ${scheduleOnly?"":`<div class="grid2">
         <div class="field"><label>الاسم *</label><input name="name" value="${esc(d.name||"")}" required></div>
         <div class="field"><label>الفرع *</label><select name="branch_id" required>${branches.map(b=>`<option value="${b.id}" ${d.branch_id==b.id?"selected":""}>${esc(b.name)}</option>`).join("")}</select></div>
         <div class="field"><label>التخصص *</label>
@@ -3516,18 +3542,18 @@ const App = (() => {
         <div class="field"><label>سنوات الخبرة *</label><input name="experience" value="${esc(d.experience||"")}" required></div>
         <div class="field"><label>المؤهل</label><input name="qualification" value="${esc(d.qualification||"")}"></div>
         <div class="field"><label>رابط الصورة</label><input name="photo" value="${esc(d.photo||"")}" placeholder="https://..."></div>
-      </div>
+      </div>`}
       <div class="field">
         <label>جدول الدوام الأسبوعي</label>
         <div id="sched-grid" class="sched-grid"></div>
       </div>
-      <div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
+      ${scheduleOnly?"":`<div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
       <div class="field"><label>ملاحظات التنسيق</label><textarea name="notes_coord">${esc(d.notes_coord||"")}</textarea></div>
-      <div class="field"><label>ملاحظات إدارية داخلية</label><textarea name="notes_admin">${esc(d.notes_admin||"")}</textarea></div>
+      <div class="field"><label>ملاحظات إدارية داخلية</label><textarea name="notes_admin">${esc(d.notes_admin||"")}</textarea></div>`}
     </form>`;
     const foot=`<button class="btn btn-primary" id="save-doc">${doc?"حفظ التعديلات":"إضافة"}</button>
       <button class="btn btn-ghost" data-x2>إلغاء</button>`;
-    openModal({title:doc?("تعديل: "+doc.name):"إضافة ممارس",bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
+    openModal({title:scheduleOnly?("🗓️ تعديل الدوام: "+(doc?doc.name:"")):(doc?("تعديل: "+doc.name):"إضافة ممارس"),bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
       m.querySelector("[data-x2]").onclick=closeModal;
       function _syncSchedFromDOM(container, ss) {
         ss.forEach((row, idx) => {
@@ -3622,10 +3648,12 @@ const App = (() => {
       })();
       m.querySelector("#save-doc").onclick=async()=>{
         const f=new FormData(m.querySelector("#docf"));
-        const payload=Object.fromEntries(f.entries());
-        payload.branch_id=+payload.branch_id;
-        // التخصص إلزامي ومن الأقسام المعتمدة فقط
-        if(!payload.specialty||!specList.includes(payload.specialty)){ toast("اختر التخصص من قائمة الأقسام","warn"); return; }
+        const payload=scheduleOnly?{}:Object.fromEntries(f.entries());
+        if(!scheduleOnly){
+          payload.branch_id=+payload.branch_id;
+          // التخصص إلزامي ومن الأقسام المعتمدة فقط
+          if(!payload.specialty||!specList.includes(payload.specialty)){ toast("اختر التخصص من قائمة الأقسام","warn"); return; }
+        }
         const schedule={},dayoff=[];
         const grid=m.querySelector("#sched-grid");
         schedState.forEach(({day,off,shifts},idx)=>{
@@ -3654,7 +3682,7 @@ const App = (() => {
         try{
           if(doc)await api("/doctors/"+doc.id,{method:"PUT",body:payload});
           else await api("/doctors",{method:"POST",body:payload});
-          toast(doc?"✅ تم تحديث بيانات الممارس بنجاح":"✅ تمت إضافة الممارس بنجاح","ok"); closeModal();
+          toast(scheduleOnly?"✅ تم تحديث الدوام بنجاح":(doc?"✅ تم تحديث بيانات الممارس بنجاح":"✅ تمت إضافة الممارس بنجاح"),"ok"); closeModal();
           if(onDone) onDone(); else if(state.route==="control") drawDoctorsMgmtPanel(); else render();
         }catch(e){toast("❌ "+e.message,"err");}
       };
