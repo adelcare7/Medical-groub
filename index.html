@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-19">
+<meta name="app-version" content="2026-07-07-20">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -3774,7 +3774,7 @@ const App = (() => {
 
   const LEAVE_TYPES=["إجازة سنوية","إجازة طارئة","إجازة مرضية","ندب","أخرى","إنهاء عقد"];
 
-  async function leaveForm(docId,docName,onDone){
+  async function leaveForm(docId,docName,onDone,presetType){
     const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
     const _n=new Date(),_p=x=>String(x).padStart(2,'0');
     const _today=`${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}`;
@@ -3798,7 +3798,7 @@ const App = (() => {
       ${docFieldHTML}
       <div id="lv-existing" style="margin:-4px 0 12px"></div>
       <div class="field"><label>النوع</label><select name="type" id="lv-type">
-        ${LEAVE_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></div>
+        ${LEAVE_TYPES.map(t=>`<option ${presetType===t?"selected":""}>${t}</option>`).join("")}</select></div>
       <div class="grid2" id="lv-dates-row">
         <div class="field"><label>من تاريخ *</label><input type="date" name="start_date" id="lv-start" value="${_today}"></div>
         <div class="field"><label>إلى تاريخ *</label><input type="date" name="end_date" id="lv-end" value="${_tomorrow}"></div>
@@ -4114,7 +4114,8 @@ const App = (() => {
 
   // ============================================================ LEAVES PANEL
   async function drawLeavesPanel(){
-    const [{leaves},{branches}]=await Promise.all([api("/leaves"),api("/branches")]);
+    const [{leaves:_allLv},{branches}]=await Promise.all([api("/leaves"),api("/branches")]);
+    const leaves=_allLv.filter(l=>l.type!=="ندب"); // الندب في تبويب مستقل
     const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
     const lvStatus=(l)=>{if(l.end_date<today)return"expired";if(l.start_date>today)return"upcoming";return"active";};
     const activeL=leaves.filter(l=>lvStatus(l)==="active");
@@ -4259,6 +4260,112 @@ const App = (() => {
     const alBtn=$("#add-lv-panel"); if(alBtn)alBtn.onclick=()=>requirePerm("leave_manage",()=>leaveForm(null,null,()=>drawLeavesPanel()));
   }
 
+  // ---------- Secondment (الندب) — تبويب مستقل ----------
+  async function drawSecondmentPanel(){
+    const [{leaves:_all},{branches}]=await Promise.all([api("/leaves"),api("/branches")]);
+    const secs=_all.filter(l=>l.type==="ندب");
+    const today=(()=>{const n=new Date();const p=x=>String(x).padStart(2,'0');return `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;})();
+    const stOf=(l)=>{if(l.end_date<today)return"expired";if(l.start_date>today)return"upcoming";return"active";};
+    const activeS=secs.filter(l=>stOf(l)==="active");
+    const upcomingS=secs.filter(l=>stOf(l)==="upcoming");
+    const expiredS=secs.filter(l=>stOf(l)==="expired");
+    let fBranch="",fSearch="",fStatus="";
+    const stBadge=(st)=>st==="active"
+      ?`<span class="sp-leave" style="font-size:11px;padding:2px 8px">نشط</span>`
+      :st==="upcoming"
+        ?`<span class="status-pill sp-upcoming" style="font-size:11px">قادم</span>`
+        :`<span class="status-pill sp-off" style="font-size:11px">منتهٍ</span>`;
+    function drawList(){
+      let list=secs;
+      if(fBranch) list=list.filter(l=>String(l.branch_id)===fBranch);
+      if(fSearch){const q=fSearch.toLowerCase();list=list.filter(l=>(l.doctor_name||"").toLowerCase().includes(q));}
+      if(fStatus) list=list.filter(l=>stOf(l)===fStatus);
+      const el=$("#sec-list"); if(!el)return;
+      if(!list.length){el.innerHTML=`<div class="empty">لا يوجد ندب مطابق</div>`;return;}
+      const isMob=window.innerWidth<=860;
+      if(isMob){
+        el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:10px">${list.length} ندب</div>
+          <div class="leave-cards">
+          ${list.map(l=>`
+            <div class="leave-card" data-lid="${l.id}">
+              <div class="lc-head">
+                <span class="lc-name">${esc(l.doctor_name)}</span>
+                ${stBadge(stOf(l))}
+              </div>
+              <div class="lc-rows">
+                <div class="lc-row"><span class="lc-lbl">🏥 الفرع الأساسي</span><span class="lc-val">${esc(l.branch_name||"—")}</span></div>
+                <div class="lc-row"><span class="lc-lbl">🔄 المنتدب إليه</span><span class="lc-val">${esc(l.secondment_branch_name||"—")}</span></div>
+                <div class="lc-row"><span class="lc-lbl">🩺 التخصص</span><span class="lc-val">${esc(l.specialty||"—")}</span></div>
+                <div class="lc-row"><span class="lc-lbl">📅 الفترة</span><span class="lc-val">${esc(l.start_date)} ← ${esc(l.end_date)}</span></div>
+              </div>
+              <div class="lc-actions">
+                <button class="btn btn-ghost btn-sm" data-el='${esc(JSON.stringify(l))}'>✎ تعديل</button>
+                <button class="btn btn-danger btn-sm" data-dlo="${l.id}">حذف</button>
+              </div>
+            </div>`).join("")}
+          </div>`;
+      } else {
+        el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} ندب</div>
+          <table class="tbl"><thead><tr>
+            <th>الممارس</th><th>الفرع الأساسي</th><th>المنتدب إليه</th><th>التخصص</th><th>من</th><th>إلى</th><th>الحالة</th><th></th>
+          </tr></thead><tbody>
+          ${list.map(l=>`<tr>
+            <td><b>${esc(l.doctor_name)}</b></td>
+            <td>${esc(l.branch_name||"—")}</td>
+            <td>${esc(l.secondment_branch_name||"—")}</td>
+            <td>${esc(l.specialty||"—")}</td>
+            <td>${esc(l.start_date)}</td>
+            <td>${esc(l.end_date)}</td>
+            <td>${stBadge(stOf(l))}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-ghost btn-sm" data-el='${esc(JSON.stringify(l))}'>تعديل</button>
+              <button class="btn btn-danger btn-sm" data-dlo="${l.id}">حذف</button>
+            </td></tr>`).join("")}
+          </tbody></table>`;
+      }
+      el.querySelectorAll("[data-el]").forEach(btn=>btn.onclick=()=>{
+        const lv=JSON.parse(btn.dataset.el);
+        requireAny(["leave_manage","status_manage"],()=>leaveEditForm(lv,()=>{drawSecondmentPanel();}),lv.branch_id,lv.specialty);
+      });
+      el.querySelectorAll("[data-dlo]").forEach(btn=>btn.onclick=()=>{
+        const lid=btn.dataset.dlo; const lv=list.find(l=>String(l.id)===lid);
+        requireAny(["leave_manage","status_manage"],async()=>{
+          if(!confirm("حذف الندب؟"))return;
+          try{await api("/leaves/"+lid,{method:"DELETE"});toast("✅ تم حذف الندب بنجاح","ok");drawSecondmentPanel();}
+          catch(e){toast("❌ "+e.message,"err");}
+        },lv?lv.branch_id:undefined,lv?lv.specialty:undefined);
+      });
+    }
+    $("#ctrl-body").innerHTML=`
+      <div class="mini-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+        <button class="mini-stat s-leave ${fStatus==="active"?"active":""}" data-fst="active">
+          <span class="ms-ico">🔄</span><div><div class="ms-v">${activeS.length}</div><div class="ms-l">نشط الآن</div></div>
+        </button>
+        <button class="mini-stat s-amber ${fStatus==="upcoming"?"active":""}" data-fst="upcoming">
+          <span class="ms-ico">🕐</span><div><div class="ms-v">${upcomingS.length}</div><div class="ms-l">قادم</div></div>
+        </button>
+        <button class="mini-stat s-black ${fStatus==="expired"?"active":""}" data-fst="expired">
+          <span class="ms-ico">✅</span><div><div class="ms-v">${expiredS.length}</div><div class="ms-l">منتهٍ</div></div>
+        </button>
+      </div>
+      <div class="toolbar" style="margin:0 0 14px;flex-wrap:wrap">
+        <input class="search-input" id="sf-search" style="max-width:220px" placeholder="ابحث باسم الممارس...">
+        <select class="select-mini" id="sf-branch"><option value="">كل الفروع</option>${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
+        <button class="btn btn-primary btn-sm" id="add-sec-panel">＋ إضافة ندب</button>
+      </div>
+      <div id="sec-list"></div>`;
+    drawList();
+    const bind=(id,fn)=>{const e=$("#"+id);if(e){e.addEventListener("input",fn);e.addEventListener("change",fn);}};
+    bind("sf-search",()=>{fSearch=$("#sf-search").value.trim();drawList();});
+    bind("sf-branch",()=>{fBranch=$("#sf-branch").value;drawList();});
+    $("#ctrl-body").querySelectorAll("[data-fst]").forEach(btn=>btn.onclick=()=>{
+      fStatus=fStatus===btn.dataset.fst?"":btn.dataset.fst;
+      $("#ctrl-body").querySelectorAll("[data-fst]").forEach(b=>b.classList.toggle("active",b.dataset.fst===fStatus&&!!fStatus));
+      drawList();
+    });
+    const asBtn=$("#add-sec-panel"); if(asBtn)asBtn.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveForm(null,null,()=>drawSecondmentPanel(),"ندب"));
+  }
+
   async function drawTerminatedPanel(){
     const [{doctors},{branches}]=await Promise.all([api("/doctors?terminated=1"),api("/branches")]);
     const bname={}; branches.forEach(b=>bname[b.id]=b.name);
@@ -4323,7 +4430,7 @@ const App = (() => {
     const hasAny=can("doctor_add")||can("doctor_edit")||can("doctor_delete")||can("leave_manage")||can("specialty_manage")||can("audit_view");
     if(!hasAny){ toast("🔒 لا تملك صلاحية لهذا القسم","warn"); go("doctors"); return; }
     shell(`<div class="loader"><div class="spin"></div></div>`);
-    const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🗓️ الإجازات"],["terminated","⛔ منتهو العقد"],["specialties","🩺 الأقسام"]];
+    const tabs=[["doctors","👨‍⚕️ الممارسون"],["leaves","🏖️ الإجازات"],["secondment","🔄 الندب"],["terminated","❌ منتهو العقد"],["specialties","🏥 الأقسام"]];
     if(can("audit_view")) tabs.push(["audit","📋 سجل العمليات"]);
     $("#content").innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
@@ -4340,6 +4447,7 @@ const App = (() => {
     if(mgrTab==="audit") drawAuditPanel();
     else if(mgrTab==="specialties") drawSpecialtiesPanel();
     else if(mgrTab==="leaves") drawLeavesPanel();
+    else if(mgrTab==="secondment") drawSecondmentPanel();
     else if(mgrTab==="terminated") drawTerminatedPanel();
     else drawDoctorsMgmtPanel();
   };
