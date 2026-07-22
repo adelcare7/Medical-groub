@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-21">
+<meta name="app-version" content="2026-07-07-25">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1452,6 +1452,27 @@ const LocalDB = (() => {
       .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه");
   }
 
+  // ── أدوات البحث الذكي ────────────────────────────────────────
+  // اسم مُنظّف للبحث: مُطبَّع + الترقيم مسافات + بلا ألقاب («د.محمد الشرفي» → «محمد الشرفي»)
+  const _HONORIFICS=new Set(["د","دكتور","دكتوره","الدكتور","الدكتوره","استاذ","الاستاذ","طبيب","طبيبه"]);
+  function _cleanName(raw){
+    const s=normalizeAr(raw||"").toLowerCase().replace(/[.,_\-\/\\()،]+/g," ");
+    return s.split(/\s+/).filter(w=>w&&!_HONORIFICS.has(w)).join(" ");
+  }
+  // نقحرة عربي → لاتيني، لدعم البحث بالإنجليزية على الأسماء العربية
+  const _AR2LAT={"ا":"a","ب":"b","ت":"t","ث":"th","ج":"j","ح":"h","خ":"kh",
+    "د":"d","ذ":"th","ر":"r","ز":"z","س":"s","ش":"sh","ص":"s","ض":"d",
+    "ط":"t","ظ":"z","ع":"a","غ":"gh","ف":"f","ق":"q","ك":"k","ل":"l",
+    "م":"m","ن":"n","ه":"h","و":"w","ي":"y","ء":"","ئ":"","ؤ":""};
+  function _translitAr(s){
+    let o=""; for(const c of String(s||"")) o += (_AR2LAT[c]!==undefined?_AR2LAT[c]:c);
+    return o;
+  }
+  // هيكل الحروف الساكنة — يجعل ahmed / ahmad / احمد تتطابق جميعها
+  function _skel(s){
+    return String(s||"").toLowerCase().replace(/[aeiouwy'`]/g,"").replace(/[^a-z0-9]/g,"");
+  }
+
   function activeLeaveFn(leaves, doctorId, dateStr) {
     return leaves.find(l =>
       l.doctor_id == doctorId && l.start_date <= dateStr && l.end_date >= dateStr
@@ -1485,15 +1506,16 @@ const LocalDB = (() => {
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
     if (doc.terminated) return {state:"terminated",label:"منتهي العقد",color:"terminated"};
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
-    if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple"};
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
     const isSecondment = !!(lv && lv.type === "ندب" && lv.secondment_branch_id);
+    const sec = isSecondment ? {isSecondment:true, secondmentBranchId:lv.secondment_branch_id, leave:lv} : {};
+    // الزيارة لا تُلغي الندب — يبقى الممارس تابعاً للفرع المنتدب إليه طوال فترة الزيارة
+    if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple",...sec};
     if (!isSecondment && (lv || doc.status === "leave")) {
       const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
       const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
       return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
     }
-    const sec = isSecondment ? {isSecondment:true, secondmentBranchId:lv.secondment_branch_id, leave:lv} : {};
     const sc = doc.schedule || {};
     // normalise shift: if end < start treat as overnight (end += 1440)
     const norm = ([s,e]) => e < s ? [s, e+1440] : [s, e];
@@ -1532,15 +1554,23 @@ const LocalDB = (() => {
     return {day,nowMin,dateStr};
   }
 
-  function withStatus(doc, db) {
-    const {day,nowMin,dateStr} = nowInfo();
+  // حالة الممارس مُثراة بمعلومات الندب (اسم الفرع المنتدب إليه) — مصدر موحّد لكل المسارات
+  function _liveOf(doc, db, nowMin, day, dateStr) {
     const live = computeStatus(doc, nowMin, day, dateStr, db.leaves);
     if (live.isSecondment && live.secondmentBranchId) {
       const sb = db.branches.find(b=>b.id==live.secondmentBranchId);
-      if (sb) live.secondmentBranchName = sb.name;
+      if (sb) {
+        live.secondmentBranchName = sb.name;
+        // نسخة من سجل الندب مع اسم الفرع (بدون تعديل السجل الأصلي في القاعدة)
+        if (live.leave) live.leave = { ...live.leave, secondment_branch_name: sb.name };
+      }
     }
     if (doc.termination_scheduled) live.termSched = doc.termination_scheduled;
-    return { ...doc, live };
+    return live;
+  }
+  function withStatus(doc, db) {
+    const {day,nowMin,dateStr} = nowInfo();
+    return { ...doc, live: _liveOf(doc, db, nowMin, day, dateStr) };
   }
 
   function getExtra(db) {
@@ -1755,7 +1785,7 @@ const LocalDB = (() => {
         const seconded=db.doctors.filter(d=>d.branch_id!=b.id&&!d.archived&&!d.terminated&&
           db.leaves.some(l=>l.doctor_id==d.id&&l.type==="ندب"&&l.secondment_branch_id==b.id&&l.start_date<=dateStr&&l.end_date>=dateStr));
         const docs=[...baseDocs,...seconded];
-        const present=docs.filter(d=>{ const st=computeStatus(d,nowMin,day,dateStr,db.leaves); return st.state==="present"; }).length;
+        const present=docs.filter(d=>{ const st=_liveOf(d,db,nowMin,day,dateStr); return st.state==="present"; }).length;
         const secCnt=seconded.length;
         return {...b,doctor_count:docs.length,seconded_count:secCnt,present,specialties:[...new Set(docs.map(d=>d.specialty))].sort()};
       })};
@@ -1814,8 +1844,11 @@ const LocalDB = (() => {
         needAuth();
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
         const b=db.branches.find(x=>x.id===d.branch_id);
+        const _bmap={}; db.branches.forEach(x=>_bmap[x.id]=x.name);
         const doc={...withStatus(d,db), branch_name:b?b.name:"",
-          leaves:db.leaves.filter(l=>+l.doctor_id===did).sort((a,b)=>a.start_date.localeCompare(b.start_date))};
+          // إثراء السجلات باسم الفرع المنتدب إليه — ليظهر الندب موحّداً في كل الواجهات
+          leaves:db.leaves.filter(l=>+l.doctor_id===did).sort((a,b)=>a.start_date.localeCompare(b.start_date))
+            .map(l=>({...l, secondment_branch_name:l.secondment_branch_id?(_bmap[l.secondment_branch_id]||""):""}))};
         return {doctor:doc};
       }
       if (method==="PUT" && !docM[2]) {
@@ -1991,7 +2024,7 @@ const LocalDB = (() => {
       const buckets={present:[],upcoming:[],finished:[],leave:[],off:[]};
       const stats={present:0,morning:0,evening:0,leave:0,home_visit_now:0,total:docs.length};
       docs.forEach(d=>{
-        const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+        const st=_liveOf(d,db,nowMin,day,dateStr);
         const doc={...d,live:st};
         const bucket=st.state;
         (buckets[bucket]||buckets.off).push(doc);
@@ -2012,7 +2045,7 @@ const LocalDB = (() => {
       const bmap={};db.branches.forEach(b=>bmap[b.id]=b.name);
       const by_branch={},home=[];
       db.doctors.filter(d=>!d.archived).forEach(d=>{
-        const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+        const st=_liveOf(d,db,nowMin,day,dateStr);
         if(st.state!=="present") return;
         const bn=bmap[d.branch_id]||"";
         const doc={...d,live:st,branch_name:bn};
@@ -2038,47 +2071,54 @@ const LocalDB = (() => {
       const wantMorning= has("صباحي")||has("الشفت الصباحي")||has("شفت صباح");
       const wantEvening= has("مسائي")||has("الشفت المسائي")||has("شفت مساء");
 
-      // ── Tokenise — strip stop words so "طبيب باطنة" → ["باطنه"] ─────────
+      // ── Tokenise — تُحذف كلمات الوصل فقط عند وجود كلمات أخرى ─────────────
+      // مهم: كلمات مثل «من / في / هو» قد تكون جزءاً من اسم (منال، عبدالمنعم)،
+      // فإن لم يتبقَّ شيء بعد الحذف نعيد الكلمات الأصلية ونبحث بها حرفياً.
       const STOP=new Set(["طبيب","طبيبه","طبيبة","دكتور","دكتوره","دكتورة","الدكتور","د",
         "الان","الآن","متاح","متاحين","موجود","حاضر","يوجد","عنده","عندهم",
         "ابحث","ابغا","ابغى","ايش","في","من","هل","هو","هي"]);
-      const tokens=qNorm.split(/\s+/).map(t=>t.trim()).filter(t=>t.length>0&&!STOP.has(t));
+      const rawTokens=qNorm.split(/\s+/).map(t=>t.trim()).filter(t=>t.length>0);
+      const trimmed=rawTokens.filter(t=>!STOP.has(t));
+      const tokens = trimmed.length ? trimmed : rawTokens;
 
-      // ── Scoring helpers ──────────────────────────────────────────────────
-      function scoreName(t,n){
-        if(!n||!t)return 0;
-        const ws=n.split(/\s+/).filter(Boolean);
-        if(n===t)                          return 10000;
-        if(n.startsWith(t))               return  5000;
-        if(ws[0]&&ws[0]===t)              return  4000;
-        if(ws[0]&&ws[0].startsWith(t))    return  3000;
-        if(ws.some(w=>w===t))             return  2000;
-        if(ws.some(w=>w.startsWith(t)))   return  1500;
-        if(n.includes(t))                 return   500;
+      // ── Smart Search: ترتيب صارم حسب الأولوية (الاسم أولاً ثم بقية الحقول) ──
+      // اسم الممارس بعد التنظيف: الألقاب مُزالة والترقيم مسافات (يصلح "د.محمد الشرفي" → "محمد الشرفي")
+      const _searchName=(raw)=>_cleanName(raw);
+      // درجة مطابقة الاسم — تُحسب على العبارة كاملة أولاً ثم على الكلمات
+      function nameScore(nameN){
+        if(!nameN||!qNorm) return 0;
+        const ws=nameN.split(" ").filter(Boolean);
+        if(nameN===qNorm)                                return 100000; // 1) تطابق كامل
+        if(nameN.startsWith(qNorm))                      return  70000; // 2) يبدأ بالمكتوب
+        if(ws.some(w=>w===qNorm))                        return  60000; // كلمة كاملة مطابقة
+        if(nameN.includes(qNorm))                        return  50000; // 3) يحتوي العبارة كاملة
+        if(!tokens.length) return 0;
+        if(tokens.every(t=>ws.some(w=>w===t)))           return  40000; // كل الكلمات مطابقة
+        if(tokens.every(t=>ws.some(w=>w.startsWith(t)))) return  30000; // كل الكلمات بدايات كلمات
+        if(tokens.every(t=>nameN.includes(t)))           return  20000; // كل الكلمات جزئياً
         return 0;
       }
-      function scoreEnName(t,en){
-        if(!en||!t)return 0;
-        const tl=t.toLowerCase(),nl=en.toLowerCase();
-        const ws=nl.split(/\s+/).filter(Boolean);
-        if(nl===tl)                        return 8000;
-        if(nl.startsWith(tl))             return 4000;
-        if(ws[0]&&ws[0]===tl)             return 3500;
-        if(ws[0]&&ws[0].startsWith(tl))   return 2500;
-        if(ws.some(w=>w===tl))            return 1800;
-        if(ws.some(w=>w.startsWith(tl)))  return 1200;
-        if(nl.includes(tl))               return  400;
+      // 4) البحث بالإنجليزية على الاسم العربي عبر النقحرة (ahmed → أحمد)
+      const qHasLatin=/[a-z]/.test(qNorm);
+      const qSkel=qHasLatin?_skel(qNorm):"";
+      function nameScoreLatin(nameN){
+        if(!qHasLatin||!qSkel||!nameN) return 0;
+        const ns=_skel(_translitAr(nameN));
+        if(!ns) return 0;
+        if(ns===qSkel)          return 90000;
+        if(ns.startsWith(qSkel))return 62000;
+        if(ns.includes(qSkel))  return 45000;
         return 0;
       }
-      function scoreField(t,v,w){
-        if(!v||!t)return 0;
-        const vn=normalizeAr(v).toLowerCase();
+      // درجة حقل عام — السقف يحدد أولوية الحقل (تخصص > فرع > جنسية > الباقي)
+      function fieldScore(t,vn,cap){
+        if(!vn||!t)return 0;
         const ws=vn.split(/\s+/).filter(Boolean);
-        if(vn===t)                          return w*100;
-        if(vn.startsWith(t))               return w* 60;
-        if(ws.some(wd=>wd===t))            return w* 50;
-        if(ws.some(wd=>wd.startsWith(t)))  return w* 35;
-        if(vn.includes(t))                 return w* 15;
+        if(vn===t)                        return cap;
+        if(vn.startsWith(t))              return Math.round(cap*0.80);
+        if(ws.some(w=>w===t))             return Math.round(cap*0.70);
+        if(ws.some(w=>w.startsWith(t)))   return Math.round(cap*0.50);
+        if(vn.includes(t))                return Math.round(cap*0.25);
         return 0;
       }
       // Status label matching (e.g. "موجود" → present doctors)
@@ -2115,7 +2155,7 @@ const LocalDB = (() => {
 
       const out=[];
       db.doctors.filter(d=>!d.archived).forEach(d=>{
-        const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+        const st=_liveOf(d,db,nowMin,day,dateStr);
 
         // Intent-level hard filters
         if(wantAvail   && st.state!=="present") return;
@@ -2126,9 +2166,9 @@ const LocalDB = (() => {
 
         if(!tokens.length&&!(wantAvail||wantLeave||wantHome||wantMorning||wantEvening)) return;
 
-        // Pre-normalise fields once per doctor
-        const nameN    = normalizeAr(d.name||"").toLowerCase();
-        const enName   = (d.en_name||d.name_en||"").trim().toLowerCase();
+        // تطبيع الحقول مرة واحدة لكل ممارس (سريع حتى مع تزايد الأعداد)
+        const nameN    = _searchName(d.name);                              // بلا ألقاب
+        const nameSkel = qHasLatin ? _skel(_translitAr(nameN)) : "";
         const specN    = normalizeAr(d.specialty||"").toLowerCase();
         const rankN    = normalizeAr(d.rank||"").toLowerCase();
         const natN     = normalizeAr(d.nationality||"").toLowerCase();
@@ -2140,29 +2180,39 @@ const LocalDB = (() => {
         const coordN   = normalizeAr(d.notes_coord||"").toLowerCase();
         const hoursN   = normalizeAr(d.hours_raw||"").toLowerCase();
 
-        let totalScore=0, allMatch=true;
+        // 1–4) درجة الاسم (عربي أو عبر النقحرة للإنجليزية) — تُحسب على العبارة كاملة
+        const nameSc = Math.max(nameScore(nameN), nameScoreLatin(nameN));
+
+        // كل كلمة في الاستعلام يجب أن تُطابق شيئاً (الاسم أو أحد الحقول)
+        let fieldTotal=0, allMatch=true;
         for(const t of tokens){
-          const s=Math.max(
-            scoreName   (t, nameN),                    // name:      10000
-            scoreEnName (t, enName),                   // en name:    8000
-            scoreField  (t, specN,    10),             // specialty:  1000 max
-            scoreField  (t, rankN,     9),             // rank:        900
-            scoreField  (t, branchN,   8),             // branch:      800
-            scoreField  (t, natN,      7),             // nationality: 700
-            scoreStatus (t, st.state),                 // status:      200
-            scoreField  (t, qualN,     5),             // qualification:500
-            scoreField  (t, genderN,   4),             // gender:       400
-            scoreField  (t, expN,      3),             // experience:   300
-            scoreField  (t, hoursN,    4),             // hours text:   400
-            scoreField  (t, casesN,    2),             // cases:        200
-            scoreField  (t, coordN,    2),             // coord notes:  200
-            scoreShifts (t, d.schedule),               // shift times:   30
-            scoreCode   (t, d.id)                      // doctor code:  480
+          const inName = nameN.includes(t) || (qHasLatin && nameSkel && nameSkel.includes(_skel(t)));
+          const codeSc = scoreCode(t, d.id);
+          // الكلمات القصيرة (حرفان) تُطابق الاسم أو رمز الممارس فقط —
+          // وإلا امتلأت النتائج بضجيج (مثال: «من» موجودة داخل «يمني»)
+          const strong = t.length<3 ? codeSc : Math.max(
+            fieldScore(t, specN,   5000),   // 5) التخصص
+            fieldScore(t, branchN, 4000),   // 6) الفرع
+            fieldScore(t, natN,    3000),   // 7) الجنسية
+            fieldScore(t, rankN,   1500),   // 8) بقية البيانات
+            fieldScore(t, qualN,   1200),
+            fieldScore(t, genderN,  800),
+            fieldScore(t, expN,     800),
+            fieldScore(t, hoursN,   800),
+            fieldScore(t, casesN,   600),
+            fieldScore(t, coordN,   600),
+            codeSc
           );
-          if(!s){allMatch=false;break;}
-          totalScore+=s;
+          // إشارات ضعيفة (الحالة/أوقات الشفت): تُضاف كترجيح فقط ولا تُؤهّل وحدها
+          const weak=Math.max(scoreStatus(t, st.state), scoreShifts(t, d.schedule));
+          if(!inName && !strong){ allMatch=false; break; }
+          fieldTotal+=strong+weak;
         }
         if(tokens.length&&!allMatch) return;
+        if(tokens.length&&!nameSc&&!fieldTotal) return;
+
+        // الاسم يهيمن دائماً على بقية الحقول
+        let totalScore = nameSc*4 + fieldTotal;
 
         // Availability boost — never overrides name quality ranking
         if(st.state==="present")       totalScore+=30;
@@ -2186,7 +2236,7 @@ const LocalDB = (() => {
       if(specialty) docs=docs.filter(d=>d.specialty===specialty);
       if(branch_id) docs=docs.filter(d=>d.branch_id===+branch_id);
       if(gender) docs=docs.filter(d=>d.gender===gender);
-      docs=docs.map(d=>{const st=computeStatus(d,nowMin,day,dateStr,db.leaves);
+      docs=docs.map(d=>{const st=_liveOf(d,db,nowMin,day,dateStr);
         return {...d,live:st,branch_name:bmap[d.branch_id]||""};});
       docs.sort((a,b)=>{const pa=PRIO[a.live.state]??9,pb=PRIO[b.live.state]??9;
         return pa!==pb?pa-pb:a.name.localeCompare(b.name);});
@@ -2684,11 +2734,15 @@ const App = (() => {
     if(can("doctor.edit") && d.notes_admin) rows.push(["ملاحظات إدارية", esc(d.notes_admin)]);
 
     const hasLeaveRecord=!!activeLv;
+    // اسم الفرع المنتدب إليه — من السجل أو من الحالة الحيّة (موحّد لكل طرق فتح البطاقة)
+    const secBranchName=(activeLv&&activeLv.secondment_branch_name)||live.secondmentBranchName||"";
     const leaveSection=(isOnLeave||isSecondmentCard)?`
       <div class="leave-active-row" style="${isSecondmentCard?"border-color:#06b6d4;background:color-mix(in srgb,#cffafe 30%,var(--surface))":""}">
         <div>
-          <div class="la-info">${isSecondmentCard?"🔀":"🔴"} ${esc(activeLv?activeLv.type:live.leaveType||(isSecondmentCard?"ندب":"إجازة"))}</div>
-          ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.secondment_branch_name?` · إلى ${esc(activeLv.secondment_branch_name)}`:""}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
+          <div class="la-info">${isSecondmentCard
+            ?`🔀 منتدب إلى: ${esc(secBranchName||"—")}`
+            :`🔴 ${esc(activeLv?activeLv.type:live.leaveType||"إجازة")}`}</div>
+          ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
         </div>
         ${hasLeaveRecord&&can("leave_manage")?`<div class="la-actions">
           <button class="btn btn-xs btn-ghost" data-edit-leave="${activeLv.id}">تعديل</button>
