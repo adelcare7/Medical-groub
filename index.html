@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-25">
+<meta name="app-version" content="2026-07-07-26">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1932,7 +1932,7 @@ const LocalDB = (() => {
     }
     const visitM=path.match(/^\/doctors\/(\d+)\/visit$/);
     if(visitM && method==="POST"){
-      needAnyPerm("doctor_edit","schedule_edit");
+      needPerm("visit_manage"); // صلاحية مستقلة لزر الزيارة فقط
       const vid=+visitM[1];
       const d=db.doctors.find(x=>x.id===vid); if(!d) throw Object.assign(new Error("not found"),{status:404});
       needBranch(d.branch_id);
@@ -2593,6 +2593,7 @@ const App = (() => {
     {key:"doctor_edit",label:"تعديل بيانات الممارسين (مع صفحة الإدارة)"},
     {key:"doctor_delete",label:"حذف / أرشفة الممارسين"},
     {key:"status_manage",label:"إدارة حالة الممارس: إجازات/ندب/إنهاء عقد (من البطاقة فقط)"},
+    {key:"visit_manage",label:"تفعيل/إلغاء حالة الزيارة (زر الزيارة في البطاقة فقط)"},
     {key:"leave_manage",label:"إدارة الإجازات (مع صفحة الإدارة)"},
     {key:"branch_manage",label:"إدارة الفروع"},
     {key:"specialty_manage",label:"إدارة الأقسام"},
@@ -2774,7 +2775,7 @@ const App = (() => {
         </div>`:""}
       </div>`:"";
 
-    const visitToggle=canEditCard()&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
+    const visitToggle=can("visit_manage")&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
     const body=`
       <div class="qd-head">
         <div class="avatar qd-avatar">${d.photo?`<img src="${esc(d.photo)}">`:esc(initials(d.name))}</div>
@@ -2792,11 +2793,11 @@ const App = (() => {
       ${canStatus()&&!d.terminated?`<button class="btn btn-ghost" data-leave="${d.id}">＋ جدولة إجازة / ندب</button>`:""}`;
 
     openModal({title:d.name, bodyHTML:body, footHTML:foot, onMount:(m)=>{
-      const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=async()=>{
+      const vb=m.querySelector("[data-toggle-visit]"); if(vb)vb.onclick=()=>requirePerm("visit_manage",async()=>{
         try{await api("/doctors/"+d.id+"/visit",{method:"POST",body:{in_visit:!d.in_visit}});
           toast(d.in_visit?"✅ تم إلغاء الزيارة":"✅ تم تفعيل حالة الزيارة","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      };
+      },d.branch_id,d.specialty);
       const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requireAny(["doctor_edit","schedule_edit"],()=>doctorForm(d),d.branch_id,d.specialty);
       const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
       const ctb=m.querySelector("[data-cancel-term]"); if(ctb)ctb.onclick=()=>requireAny(["doctor_edit","status_manage"],async()=>{
