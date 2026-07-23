@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-26">
+<meta name="app-version" content="2026-07-07-27">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1509,8 +1509,7 @@ const LocalDB = (() => {
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
     const isSecondment = !!(lv && lv.type === "ندب" && lv.secondment_branch_id);
     const sec = isSecondment ? {isSecondment:true, secondmentBranchId:lv.secondment_branch_id, leave:lv} : {};
-    // الزيارة لا تُلغي الندب — يبقى الممارس تابعاً للفرع المنتدب إليه طوال فترة الزيارة
-    if (doc.in_visit) return {state:"in_visit",label:"في زيارة الآن",color:"purple",...sec};
+    // الإجازة (غير الندب) تُلغي التواجد — ولا تتأثر بالزيارة
     if (!isSecondment && (lv || doc.status === "leave")) {
       const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
       const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
@@ -1522,27 +1521,30 @@ const LocalDB = (() => {
     const todays = (sc[day] || sc[String(day)] || []).map(norm);
     const yest   = (sc[(day+6)%7] || sc[String((day+6)%7)] || []).map(norm);
 
+    // الزيارة = علامة فوق حالة الدوام الفعلية (لا تُلغي التواجد ولا تغيّر الحالة)
+    const vis = base => doc.in_visit ? {...base, in_visit:true} : base;
+
     // still inside a shift that started today (before midnight portion)
     for (const [s,e] of todays) {
       if (s <= nowMin && nowMin < Math.min(e, 1440))
-        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,shift_end:e,...sec};
+        return vis({state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,shift_end:e,...sec});
     }
     // inside overnight tail from yesterday's shift
     for (const [s,e] of yest) {
       if (e > 1440 && nowMin < e-1440)
-        return {state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e-1440)}`,shift_end:e-1440,...sec};
+        return vis({state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e-1440)}`,shift_end:e-1440,...sec});
     }
     // upcoming shift today
     const starts = todays.filter(([s])=>s>nowMin).map(([s])=>s);
     if (starts.length) {
       const nx = Math.min(...starts);
-      return {state:"upcoming",label:"يبدأ لاحقاً",color:"amber",detail:`يبدأ ${fmtMin(nx)}`,next_start:nx,...sec};
+      return vis({state:"upcoming",label:"يبدأ لاحقاً",color:"amber",detail:`يبدأ ${fmtMin(nx)}`,next_start:nx,...sec});
     }
     // had a shift today but it's done
     if (todays.length) {
-      return {state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم",...sec};
+      return vis({state:"finished",label:"انتهى دوامه",color:"red",detail:"انتهى اليوم",...sec});
     }
-    return {state:"off",label:"إجازة أسبوعية",color:"black",detail:"يوم إجازة",...sec};
+    return vis({state:"off",label:"إجازة أسبوعية",color:"black",detail:"يوم إجازة",...sec});
   }
 
   function nowInfo() {
@@ -2628,7 +2630,10 @@ const App = (() => {
       : `<div class="avatar">${esc(initials(d.name))}</div>`;
   const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit",terminated:"terminated",secondment:"secondment"};
   function statusPill(live){ const s=live.state;
-    return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
+    const base=`<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`;
+    // علامة الزيارة تظهر بجانب حالة الدوام (الممارس متواجد لكن في زيارة خارج الفرع)
+    const visit=live.in_visit?`<span class="status-pill sp-in-visit"><span class="dot" style="background:currentColor"></span>🏠 في زيارة</span>`:"";
+    return base+visit; }
 
   function todayShift(d){
     if(!d.schedule) return "";
@@ -2659,7 +2664,7 @@ const App = (() => {
           ?`<div class="dcard-shift dcard-leave-info"><span>🔴 ${esc(live.leaveType||"إجازة")}${live.leave&&live.leave.end_date?` · حتى ${esc(fmtDate(live.leave.end_date))}`:""}  </span></div>`
           :"";
     const branchRow=d.branch_name?`<div class="dcard-meta" style="margin-top:3px"><span>🏥 ${esc(d.branch_name)}</span></div>`:"";
-    return `<div class="dcard st-${isSecondment?"secondment":(STATE_CLS[live.state]||"off")}" data-doc="${d.id}">
+    return `<div class="dcard st-${live.in_visit?"in-visit":(isSecondment?"secondment":(STATE_CLS[live.state]||"off"))}" data-doc="${d.id}">
       ${avatar(d)}
       <div class="dcard-body">
         <div class="dcard-top">
@@ -3191,7 +3196,7 @@ const App = (() => {
       if(isToday){
         let present=0,leave=0,morning=0,evening=0,inVisit=0;
         branchDocs.forEach(d=>{const s=d.live.state;
-          if(s==="in_visit")inVisit++;
+          if(d.live.in_visit)inVisit++;   // الزيارة علامة — تُحسب مستقلة دون إخراجه من المتواجدين
           if(s==="present")present++;
           if(s==="leave"){leave++;return;}
           const fs=firstStart(d); if(fs!=null){if(fs<14*60)morning++;else evening++;}});
@@ -3212,7 +3217,7 @@ const App = (() => {
         if(!isToday||!dashStat) return true;
         if(dashStat==="present") return d.live.state==="present";
         if(dashStat==="leave")   return d.live.state==="leave";
-        if(dashStat==="in_visit")return d.live.state==="in_visit";
+        if(dashStat==="in_visit")return !!d.live.in_visit;
         const fs=firstStart(d);
         if(dashStat==="morning") return fs!=null&&fs<14*60;
         if(dashStat==="evening") return fs!=null&&fs>=14*60;
