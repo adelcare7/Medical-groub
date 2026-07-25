@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-27">
+<meta name="app-version" content="2026-07-07-29">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -2630,10 +2630,11 @@ const App = (() => {
       : `<div class="avatar">${esc(initials(d.name))}</div>`;
   const STATE_CLS = {present:"present",upcoming:"upcoming",finished:"finished",leave:"leave",off:"off",archived:"off",in_visit:"in-visit",terminated:"terminated",secondment:"secondment"};
   function statusPill(live){ const s=live.state;
-    const base=`<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`;
-    // علامة الزيارة تظهر بجانب حالة الدوام (الممارس متواجد لكن في زيارة خارج الفرع)
-    const visit=live.in_visit?`<span class="status-pill sp-in-visit"><span class="dot" style="background:currentColor"></span>🏠 في زيارة</span>`:"";
-    return base+visit; }
+    // عند الزيارة: تظهر شارة «زيارة» فقط بدل «متواجد الآن» (لوضوح الاسم) —
+    // دون التأثير على العدّادات التي تعتمد على live.state / live.in_visit
+    if(live.in_visit)
+      return `<span class="status-pill sp-in-visit"><span class="dot" style="background:currentColor"></span>🏠 في زيارة الآن</span>`;
+    return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
 
   function todayShift(d){
     if(!d.schedule) return "";
