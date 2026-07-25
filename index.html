@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-29">
+<meta name="app-version" content="2026-07-07-30">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -286,15 +286,18 @@ a{color:inherit;text-decoration:none}
   overflow:hidden!important;
   white-space:normal!important;
 }
-/* "الكل" compact pill — overrides branch-card rules back to pill shape */
+/* "الكل" compact pill — يظهر بجانب عنوان الصفحة في نفس السطر */
 .bchip-all{
-  flex:0 0 auto!important;width:auto!important;height:auto!important;
-  flex-direction:row!important;align-items:center!important;
-  padding:9px 14px!important;gap:7px!important;
-  border-radius:30px!important;white-space:nowrap!important;
-  overflow:visible!important;
+  flex:0 0 auto;width:auto;height:auto;
+  flex-direction:row;align-items:center;
+  padding:8px 14px;gap:7px;
+  border-radius:30px;white-space:nowrap;
+  overflow:visible;
 }
 .bchip-all .bchip-hours{display:none!important}
+/* سطر العنوان: «ممارسو اليوم» + زر الكل */
+.dash-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:2px}
+.dash-head .page-title{margin:0}
 /* name row: name truncates with ellipsis, badge stays */
 .bchip-branch .bchip-top{
   display:flex!important;flex-direction:row!important;
@@ -3167,11 +3170,12 @@ const App = (() => {
     const allSpecs=[...new Set(doctors.map(d=>d.specialty))].filter(Boolean).sort((a,b)=>deptRank(a)-deptRank(b)||a.localeCompare(b));
 
     const totalPresent=doctors.filter(d=>d.live.state==="present").length;
+    // زر «الكل» يظهر بجانب العنوان في نفس السطر
+    const allChip=`<button class="bchip bchip-all ${dashBranch===""?"on":""}" data-bf="">
+        🏥 الكل <span class="bchip-n">${totalPresent}</span>
+      </button>`;
+    // الفروع في صف مستقل أسفل العنوان
     const branchBar=`<div class="branch-bar" id="branch-bar">
-      <button class="bchip bchip-branch bchip-all ${dashBranch===""?"on":""}" data-bf="">
-        <span class="bchip-top">🏥 الكل <span class="bchip-n">${totalPresent}</span></span>
-        <span class="bchip-hours">جميع الممارسين والفروع</span>
-      </button>
       ${branches.map(b=>`
         <button class="bchip bchip-branch ${String(dashBranch)===String(b.id)?"on":""}" data-bf="${b.id}">
           <span class="bchip-top"><span class="bc-info-btn bchip-info" role="button" data-binfo="${b.id}" title="بيانات الفرع"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="5.5" r=".8" fill="currentColor" stroke="none"/><line x1="8" y1="8" x2="8" y2="12"/></svg></span><span class="bchip-name">${esc(b.name)}</span><span class="bchip-n">${presentInBranch(b.id)}</span></span>
@@ -3278,10 +3282,15 @@ const App = (() => {
       requestAnimationFrame(()=>body.classList.remove("fade"));
     }
     $("#content").innerHTML=`
-      <div class="page-title">ممارسو اليوم</div>
+      <div class="dash-head">
+        <div class="page-title">ممارسو اليوم</div>
+        ${allChip}
+      </div>
       ${branchBar}
       <div id="dash-body"></div>`;
-    $("#branch-bar").querySelectorAll("[data-bf]").forEach(b=>b.onclick=(e)=>{
+    // زر «الكل» + أزرار الفروع تعمل معاً كمجموعة فلترة واحدة
+    const _filterBtns=()=>[...document.querySelectorAll('.dash-head [data-bf], #branch-bar [data-bf]')];
+    _filterBtns().forEach(b=>b.onclick=(e)=>{
       const info=e.target.closest("[data-binfo]");
       if(info){
         e.stopPropagation();
@@ -3290,7 +3299,7 @@ const App = (() => {
         return;
       }
       dashBranch=b.dataset.bf;
-      $("#branch-bar").querySelectorAll(".bchip").forEach(x=>x.classList.toggle("on",x===b));
+      _filterBtns().forEach(x=>x.classList.toggle("on",x===b));
       drawBody();
     });
     drawBody();
