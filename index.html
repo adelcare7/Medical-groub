@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-30">
+<meta name="app-version" content="2026-07-07-32">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -2639,21 +2639,23 @@ const App = (() => {
       return `<span class="status-pill sp-in-visit"><span class="dot" style="background:currentColor"></span>🏠 في زيارة الآن</span>`;
     return `<span class="status-pill sp-${STATE_CLS[s]}"><span class="dot" style="background:currentColor"></span>${esc(live.label)}</span>`; }
 
-  function todayShift(d){
+  // دوام يوم معيّن (أو اليوم الحالي إن لم يُحدَّد)
+  function todayShift(d, dayIdx){
     if(!d.schedule) return "";
-    const day=_riyadhNow().getUTCDay();
+    const day=(dayIdx===undefined||dayIdx===null||dayIdx<0)?_riyadhNow().getUTCDay():dayIdx;
     const sh=d.schedule[day]||d.schedule[String(day)];
     if(!sh||!sh.length) return "";
     return sh.map(([s,e])=>fmtRange(s,e)).join(" ، ");
   }
-  function doctorCard(d){
+  // viewDay اختياري: عند تمريره تُعرض ورديات ذلك اليوم مع بقاء كل الشارات كما هي
+  function doctorCard(d, viewDay){
     const live=d.live||{state:"off",label:""};
     const isLeave=live.state==="leave";
     const isTerminated=live.state==="terminated";
     const isSecondment=!!live.isSecondment;
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
-    const shift=(isLeave||isTerminated)?"":todayShift(d);
+    const shift=(isLeave||isTerminated)?"":todayShift(d, viewDay);
     // ملاحظة: إنهاء العقد المجدول لا يظهر على البطاقة الخارجية — يُرى فقط داخل تفاصيل البطاقة (quickCard)، كالإجازات القادمة
     const infoRow=isTerminated
       ?`<div class="dcard-shift" style="color:#475569">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
@@ -3159,10 +3161,46 @@ const App = (() => {
   let dashDay=-1;      // -1 = today (live), 0-6 = specific JS weekday
   routes.dashboard=async()=>{
     shell(`<div class="loader"><div class="spin"></div></div>`);
-    const [{doctors},{branches}]=await Promise.all([api("/doctors"),api("/branches")]);
+    const [{doctors},{branches},lvRes]=await Promise.all([api("/doctors"),api("/branches"),api("/leaves").catch(()=>({leaves:[]}))]);
+    const allLeaves=(lvRes&&lvRes.leaves)||[];
     const bname={}; branches.forEach(b=>bname[b.id]=b.name);
     doctors.forEach(d=>d.branch_name=bname[d.branch_id]||"");
     const dayIdx=_riyadhNow().getUTCDay();
+
+    // ── حالة الممارس في يوم مختار من الأسبوع (وليس اليوم الحالي) ──
+    // تعتمد على تاريخ ذلك اليوم: الإجازة/الندب/إنهاء العقد + فترة دوامه
+    const _dateOfWeekday=(jsDay)=>{               // أقرب تاريخ قادم لذلك اليوم (يشمل اليوم)
+      const base=_riyadhNow();
+      const diff=(jsDay-base.getUTCDay()+7)%7;
+      base.setUTCDate(base.getUTCDate()+diff);
+      const p=x=>String(x).padStart(2,'0');
+      return `${base.getUTCFullYear()}-${p(base.getUTCMonth()+1)}-${p(base.getUTCDate())}`;
+    };
+    const liveForDay=(d,jsDay)=>{
+      const ds=_dateOfWeekday(jsDay);
+      // منتهي العقد بحلول ذلك التاريخ
+      const termDate=d.terminated_date||d.termination_scheduled;
+      if(d.terminated||(termDate&&termDate<=ds))
+        return {state:"terminated",label:"منتهي العقد",color:"terminated"};
+      const lv=allLeaves.find(l=>!l.synthetic&&String(l.doctor_id)===String(d.id)&&l.start_date<=ds&&l.end_date>=ds);
+      const isSec=!!(lv&&lv.type==="ندب"&&lv.secondment_branch_id);
+      const sec=isSec?{isSecondment:true,secondmentBranchId:lv.secondment_branch_id,
+        secondmentBranchName:bname[lv.secondment_branch_id]||"",leave:lv}:{};
+      if(!isSec&&lv){
+        const t=lv.type||"إجازة";
+        return {state:"leave",label:"إجازة",color:"leave",leaveType:t,detail:`${t} · حتى ${lv.end_date}`,leave:lv};
+      }
+      const sh=(d.schedule&&(d.schedule[jsDay]||d.schedule[String(jsDay)]))||[];
+      if(!sh.length) return {state:"off",label:"إجازة أسبوعية",color:"black",detail:"يوم إجازة",...sec};
+      // فترة الدوام: صباحي / مسائي (حسب أول وردية)
+      const first=Math.min(...sh.map(x=>x[0]));
+      const isMorning=first<14*60;
+      const rangeTxt=sh.map(([s,e])=>fmtRange(s,e)).join(" ، ");
+      return {state:isMorning?"upcoming":"present",
+        label:`${isMorning?"صباحي":"مسائي"} (${rangeTxt})`,
+        color:isMorning?"amber":"green", dayShift:true,
+        ...(d.in_visit?{in_visit:true}:{}), ...sec};
+    };
     const firstStart=(d)=>{const sh=(d.schedule&&(d.schedule[dayIdx]||d.schedule[String(dayIdx)]))||[];
       return sh.length?Math.min(...sh.map(x=>x[0])):null;};
     const effBranch=(d)=>d.live.isSecondment?d.live.secondmentBranchId:d.branch_id;
@@ -3185,9 +3223,6 @@ const App = (() => {
 
     // helper: does doctor have shifts on given JS weekday?
     const hasShiftOn=(d,jsDay)=>{const sh=d.schedule&&(d.schedule[jsDay]||d.schedule[String(jsDay)]);return sh&&sh.length>0;};
-    // shifts for a given day as formatted string
-    const shiftsForDay=(d,jsDay)=>{const sh=(d.schedule&&(d.schedule[jsDay]||d.schedule[String(jsDay)]))||[];
-      return sh.map(([s,e])=>fmtRange(s,e)).join(" ، ");};
 
     function drawBody(){
       const body=$("#dash-body"); body.classList.add("fade");
@@ -3245,17 +3280,10 @@ const App = (() => {
           const sb=(b.schedule&&(b.schedule[viewDay]||b.schedule[String(viewDay)])||[])[0]?.[0]??9999;
           return sa-sb||a.name.localeCompare(b.name);
         });
-        const cards=isToday?arr.map(doctorCard).join(""):arr.map(d=>{
-          const shStr=shiftsForDay(d,viewDay);
-          const live=d.live||{state:"off"};
-          return `<div class="dcard" data-doc="${d.id}">
-            ${avatar(d)}
-            <div class="dcard-body">
-              <div class="dcard-top"><div class="dcard-name">${esc(d.name)}</div></div>
-              <div class="dcard-meta"><span class="spec-tag">${esc(d.specialty||"")}</span>${d.nationality?`<span>${esc(d.nationality)}</span>`:""}${d.branch_name?`<span>🏥 ${esc(d.branch_name)}</span>`:""}</div>
-              ${shStr?`<div class="dcard-meta"><span>🕐 ${esc(shStr)}</span></div>`:""}
-            </div></div>`;
-        }).join("");
+        // نفس بطاقة العرض الرئيسي في كل الأيام — تُحسب الحالة والدوام حسب اليوم المعروض
+        const cards=arr.map(d=>isToday
+          ? doctorCard(d)
+          : doctorCard({...d, live:liveForDay(d,viewDay)}, viewDay)).join("");
         return `<div class="section-head"><h2>${esc(sp)}</h2><span class="count">${arr.length}</span></div>
           <div class="status-grid">${cards}</div>`;
       }).join("")||`<div class="empty" style="padding:34px">لا يوجد ممارسون في هذا اليوم</div>`;
