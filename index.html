@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-33">
+<meta name="app-version" content="2026-07-07-37">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1057,6 +1057,161 @@ body.modal-open{overflow:hidden}
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="data.js"></script>
   <script>
+/* ============ SmartSearch — محرك البحث الموحّد (الرئيسي + الممارسين) ============ */
+const SmartSearch = (() => {
+  const HONORIFICS = new Set(["د","دكتور","دكتوره","الدكتور","الدكتوره","استاذ","الاستاذ","طبيب","طبيبه"]);
+  // كلمات وصل تُحذف فقط إذا بقيت كلمات أخرى (فقد تكون جزءاً من اسم: «منال»)
+  const STOP = new Set(["الان","متاح","متاحين","موجود","حاضر","يوجد","عنده","عندهم",
+    "ابحث","ابغا","ابغى","ايش","في","من","هل","هو","هي"]);
+  const AR2LAT = {"ا":"a","ب":"b","ت":"t","ث":"th","ج":"j","ح":"h","خ":"kh",
+    "د":"d","ذ":"th","ر":"r","ز":"z","س":"s","ش":"sh","ص":"s","ض":"d",
+    "ط":"t","ظ":"z","ع":"a","غ":"gh","ف":"f","ق":"q","ك":"k","ل":"l",
+    "م":"m","ن":"n","ه":"h","و":"w","ي":"y","ء":"","ئ":"","ؤ":""};
+
+  // تطبيع عربي: تشكيل، همزات (ا أ إ آ)، ة/ه، ى/ي
+  const norm = s => (s||"").trim()
+    .replace(/[ً-ٰٟـ]/g,"")
+    .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه")
+    .toLowerCase().replace(/\s+/g," ");
+  // اسم مُنظّف: بلا ألقاب، الترقيم مسافات («د.محمد الشرفي» → «محمد الشرفي»)
+  const cleanName = raw => norm(raw).replace(/[.,_\-\/\\()،]+/g," ")
+    .split(/\s+/).filter(w=>w&&!HONORIFICS.has(w)).join(" ");
+  const translit = s => { let o=""; for(const c of String(s||"")) o+=(AR2LAT[c]!==undefined?AR2LAT[c]:c); return o; };
+  // هيكل السواكن: يجعل ahmed / ahmad / احمد تتطابق
+  const skel = s => String(s||"").toLowerCase().replace(/[aeiouwy'`]/g,"").replace(/[^a-z0-9]/g,"");
+
+  function tokenize(q){
+    const raw=norm(q).split(/\s+/).filter(Boolean);
+    const trimmed=raw.filter(t=>!STOP.has(t));
+    return trimmed.length?trimmed:raw;   // لا نُفرِغ الاستعلام أبداً
+  }
+  // نص حالة الممارس للبحث (إجازة/ندب/زيارة/منتهي عقد/متواجد…)
+  function statusText(live){
+    const l=live||{}; const out=[];
+    if(l.state==="terminated") out.push("منتهي العقد","منتهي عقد","منتهى");
+    if(l.state==="leave")      out.push("اجازه","اجازة","مجاز","في اجازه");
+    if(l.state==="off")        out.push("اجازه اسبوعيه","يوم اجازه");
+    if(l.state==="present")    out.push("موجود","متواجد","حاضر","موجود الان");
+    if(l.state==="upcoming")   out.push("يبدا لاحقا","قريبا");
+    if(l.state==="finished")   out.push("انتهي دوامه","انتهي");
+    if(l.isSecondment)         out.push("ندب","منتدب","منتدب الي");
+    if(l.in_visit)             out.push("زياره","في زياره","زيارة");
+    if(l.leaveType)            out.push(l.leaveType);
+    if(l.label)                out.push(l.label);
+    return norm(out.join(" "));
+  }
+
+  // درجة مطابقة الاسم — على العبارة كاملة أولاً ثم على الكلمات
+  function nameScore(nameN, qNorm, tokens){
+    if(!nameN||!qNorm) return 0;
+    const ws=nameN.split(" ").filter(Boolean);
+    if(nameN===qNorm)                                return 100000; // 1) تطابق كامل
+    if(nameN.startsWith(qNorm))                      return  70000; // 2) يبدأ بالمكتوب
+    if(ws.some(w=>w===qNorm))                        return  60000;
+    if(nameN.includes(qNorm))                        return  50000; // 3) أي جزء من الاسم
+    if(!tokens.length) return 0;
+    if(tokens.every(t=>ws.some(w=>w===t)))           return  40000;
+    if(tokens.every(t=>ws.some(w=>w.startsWith(t)))) return  30000;
+    if(tokens.every(t=>nameN.includes(t)))           return  20000;
+    return 0;
+  }
+  // حذف أداة التعريف «ال» من بداية الكلمات — ليتطابق «التشقير» مع «تشقير» والعكس
+  const stripAl = s => String(s||"").replace(/(^|[\s\-.,\/()،])ال/g, "$1");
+  function _fs(t, vn, cap){
+    if(!vn||!t) return 0;
+    const ws=vn.split(/\s+/).filter(Boolean);
+    if(vn===t)                      return cap;
+    if(vn.startsWith(t))            return Math.round(cap*0.80);
+    if(ws.some(w=>w===t))           return Math.round(cap*0.70);
+    if(ws.some(w=>w.startsWith(t))) return Math.round(cap*0.50);
+    if(vn.includes(t))              return Math.round(cap*0.25);
+    return 0;
+  }
+  function fieldScore(t, vn, cap){
+    if(!vn||!t) return 0;
+    const direct=_fs(t,vn,cap);
+    if(direct) return direct;
+    // محاولة ثانية بعد تجريد «ال» من الطرفين (بدرجة أقل قليلاً)
+    const tA=stripAl(t), vA=stripAl(vn);
+    if((tA!==t||vA!==vn)&&tA) return Math.round(_fs(tA,vA,cap)*0.95);
+    return 0;
+  }
+  function codeScore(t, id){
+    if(!/^\d+$/.test(t)) return 0;
+    const ids=String(id);
+    if(ids===t)           return 480;
+    if(ids.startsWith(t)) return 250;
+    if(ids.includes(t))   return 120;
+    return 0;
+  }
+
+  /**
+   * التقييم الموحّد. f = {name, specialty, branch, nationality, status,
+   *   rank, qualification, gender, experience, hours, cases, coord, languages, id}
+   * يُعيد 0 إذا لم يُطابق.
+   */
+  function score(query, f){
+    const qNorm=norm(query);
+    if(!qNorm) return 1;
+    const tokens=tokenize(query);
+    if(!tokens.length) return 1;
+
+    const nameN=cleanName(f.name);
+    const hasLatin=/[a-z]/.test(qNorm);
+    const qSkel=hasLatin?skel(qNorm):"";
+    const nameSkel=hasLatin?skel(translit(nameN)):"";
+    // اسم إنجليزي مُخزَّن (إن وُجد) + نقحرة الاسم العربي
+    const enName=norm(f.en_name||"");
+
+    let nameSc=nameScore(nameN,qNorm,tokens);
+    if(enName) nameSc=Math.max(nameSc, nameScore(enName,qNorm,tokens));
+    if(hasLatin&&qSkel&&nameSkel){
+      if(nameSkel===qSkel)               nameSc=Math.max(nameSc,90000);
+      else if(nameSkel.startsWith(qSkel))nameSc=Math.max(nameSc,62000);
+      else if(nameSkel.includes(qSkel))  nameSc=Math.max(nameSc,45000);
+    }
+
+    const F={
+      specialty:norm(f.specialty), branch:norm(f.branch), nationality:norm(f.nationality),
+      status:norm(f.status), rank:norm(f.rank), qualification:norm(f.qualification),
+      gender:norm(f.gender), experience:norm(f.experience), hours:norm(f.hours),
+      cases:norm(f.cases), coord:norm(f.coord), languages:norm(f.languages)
+    };
+
+    // استعلام قصير جداً (حرفان مثل «تش» أو «من»): يُطابق الاسم والرمز
+    // والتخصص/القسم فقط — دون الحقول النصية الطويلة (جنسية/حالات/ملاحظات) تفادياً للضجيج.
+    const shortQuery = qNorm.replace(/\s/g,"").length < 3;
+
+    let fieldTotal=0;
+    for(const t of tokens){
+      const inName = nameN.includes(t) || (enName&&enName.includes(t)) ||
+                     (hasLatin&&nameSkel&&nameSkel.includes(skel(t)));
+      const code=codeScore(t,f.id);
+      const s = shortQuery ? Math.max(code, fieldScore(t,F.specialty,5000)) : Math.max(
+        fieldScore(t,F.specialty,   5000),  // 4/5) التخصص والقسم
+        fieldScore(t,F.branch,      4000),  // 6) الفرع
+        fieldScore(t,F.nationality, 3000),  // 7) الجنسية
+        fieldScore(t,F.status,      2500),  // الحالة (إجازة/ندب/زيارة/منتهي عقد)
+        fieldScore(t,F.rank,        1500),  // 8) بقية البيانات
+        fieldScore(t,F.qualification,1200),
+        fieldScore(t,F.gender,       800),
+        fieldScore(t,F.experience,   800),
+        fieldScore(t,F.hours,        800),
+        fieldScore(t,F.cases,        600),
+        fieldScore(t,F.coord,        600),
+        fieldScore(t,F.languages,    600),
+        code
+      );
+      if(!inName && !s) return 0;   // كل كلمة يجب أن تُطابق شيئاً
+      fieldTotal+=s;
+    }
+    if(!nameSc && !fieldTotal) return 0;
+    return nameSc*4 + fieldTotal;   // الاسم يهيمن دائماً
+  }
+
+  return {norm, cleanName, translit, skel, tokenize, statusText, score, fieldScore, codeScore};
+})();
+
 /* ============ Adelcare API — Firebase Firestore ============ */
 const LocalDB = (() => {
   const SESS = 'adelcare_sess';
@@ -1455,26 +1610,6 @@ const LocalDB = (() => {
       .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه");
   }
 
-  // ── أدوات البحث الذكي ────────────────────────────────────────
-  // اسم مُنظّف للبحث: مُطبَّع + الترقيم مسافات + بلا ألقاب («د.محمد الشرفي» → «محمد الشرفي»)
-  const _HONORIFICS=new Set(["د","دكتور","دكتوره","الدكتور","الدكتوره","استاذ","الاستاذ","طبيب","طبيبه"]);
-  function _cleanName(raw){
-    const s=normalizeAr(raw||"").toLowerCase().replace(/[.,_\-\/\\()،]+/g," ");
-    return s.split(/\s+/).filter(w=>w&&!_HONORIFICS.has(w)).join(" ");
-  }
-  // نقحرة عربي → لاتيني، لدعم البحث بالإنجليزية على الأسماء العربية
-  const _AR2LAT={"ا":"a","ب":"b","ت":"t","ث":"th","ج":"j","ح":"h","خ":"kh",
-    "د":"d","ذ":"th","ر":"r","ز":"z","س":"s","ش":"sh","ص":"s","ض":"d",
-    "ط":"t","ظ":"z","ع":"a","غ":"gh","ف":"f","ق":"q","ك":"k","ل":"l",
-    "م":"m","ن":"n","ه":"h","و":"w","ي":"y","ء":"","ئ":"","ؤ":""};
-  function _translitAr(s){
-    let o=""; for(const c of String(s||"")) o += (_AR2LAT[c]!==undefined?_AR2LAT[c]:c);
-    return o;
-  }
-  // هيكل الحروف الساكنة — يجعل ahmed / ahmad / احمد تتطابق جميعها
-  function _skel(s){
-    return String(s||"").toLowerCase().replace(/[aeiouwy'`]/g,"").replace(/[^a-z0-9]/g,"");
-  }
 
   function activeLeaveFn(leaves, doctorId, dateStr) {
     return leaves.find(l =>
@@ -2076,81 +2211,7 @@ const LocalDB = (() => {
       const wantMorning= has("صباحي")||has("الشفت الصباحي")||has("شفت صباح");
       const wantEvening= has("مسائي")||has("الشفت المسائي")||has("شفت مساء");
 
-      // ── Tokenise — تُحذف كلمات الوصل فقط عند وجود كلمات أخرى ─────────────
-      // مهم: كلمات مثل «من / في / هو» قد تكون جزءاً من اسم (منال، عبدالمنعم)،
-      // فإن لم يتبقَّ شيء بعد الحذف نعيد الكلمات الأصلية ونبحث بها حرفياً.
-      const STOP=new Set(["طبيب","طبيبه","طبيبة","دكتور","دكتوره","دكتورة","الدكتور","د",
-        "الان","الآن","متاح","متاحين","موجود","حاضر","يوجد","عنده","عندهم",
-        "ابحث","ابغا","ابغى","ايش","في","من","هل","هو","هي"]);
-      const rawTokens=qNorm.split(/\s+/).map(t=>t.trim()).filter(t=>t.length>0);
-      const trimmed=rawTokens.filter(t=>!STOP.has(t));
-      const tokens = trimmed.length ? trimmed : rawTokens;
-
-      // ── Smart Search: ترتيب صارم حسب الأولوية (الاسم أولاً ثم بقية الحقول) ──
-      // اسم الممارس بعد التنظيف: الألقاب مُزالة والترقيم مسافات (يصلح "د.محمد الشرفي" → "محمد الشرفي")
-      const _searchName=(raw)=>_cleanName(raw);
-      // درجة مطابقة الاسم — تُحسب على العبارة كاملة أولاً ثم على الكلمات
-      function nameScore(nameN){
-        if(!nameN||!qNorm) return 0;
-        const ws=nameN.split(" ").filter(Boolean);
-        if(nameN===qNorm)                                return 100000; // 1) تطابق كامل
-        if(nameN.startsWith(qNorm))                      return  70000; // 2) يبدأ بالمكتوب
-        if(ws.some(w=>w===qNorm))                        return  60000; // كلمة كاملة مطابقة
-        if(nameN.includes(qNorm))                        return  50000; // 3) يحتوي العبارة كاملة
-        if(!tokens.length) return 0;
-        if(tokens.every(t=>ws.some(w=>w===t)))           return  40000; // كل الكلمات مطابقة
-        if(tokens.every(t=>ws.some(w=>w.startsWith(t)))) return  30000; // كل الكلمات بدايات كلمات
-        if(tokens.every(t=>nameN.includes(t)))           return  20000; // كل الكلمات جزئياً
-        return 0;
-      }
-      // 4) البحث بالإنجليزية على الاسم العربي عبر النقحرة (ahmed → أحمد)
-      const qHasLatin=/[a-z]/.test(qNorm);
-      const qSkel=qHasLatin?_skel(qNorm):"";
-      function nameScoreLatin(nameN){
-        if(!qHasLatin||!qSkel||!nameN) return 0;
-        const ns=_skel(_translitAr(nameN));
-        if(!ns) return 0;
-        if(ns===qSkel)          return 90000;
-        if(ns.startsWith(qSkel))return 62000;
-        if(ns.includes(qSkel))  return 45000;
-        return 0;
-      }
-      // درجة حقل عام — السقف يحدد أولوية الحقل (تخصص > فرع > جنسية > الباقي)
-      function fieldScore(t,vn,cap){
-        if(!vn||!t)return 0;
-        const ws=vn.split(/\s+/).filter(Boolean);
-        if(vn===t)                        return cap;
-        if(vn.startsWith(t))              return Math.round(cap*0.80);
-        if(ws.some(w=>w===t))             return Math.round(cap*0.70);
-        if(ws.some(w=>w.startsWith(t)))   return Math.round(cap*0.50);
-        if(vn.includes(t))                return Math.round(cap*0.25);
-        return 0;
-      }
-      // Status label matching (e.g. "موجود" → present doctors)
-      const STATUS_LABELS={present:["موجود الان","موجود","حاضر","متواجد"],
-        upcoming:["يبدا لاحقا","يبدا","قريبا"],finished:["انتهي","انتهي دوامه"],
-        leave:["اجازه","اجازة","مجازه","في اجازه"],off:["اجازه اسبوعيه","يوم اجازه"]};
-      function scoreStatus(t,state){
-        const labels=STATUS_LABELS[state]||[];
-        return labels.some(l=>l.includes(t)||t.includes(l.split(" ")[0]))?200:0;
-      }
-      // Shift-time text matching: "8" / "4م" / "10ص"
-      function scoreShifts(t,sc){
-        if(!sc)return 0;
-        const shiftStr=Object.values(sc).flat().map(([s,e])=>fmtMin(s)+"–"+fmtMin(e)).join(" ");
-        const shiftNorm=shiftStr.replace(/\s/g,"").toLowerCase();
-        return shiftStr.includes(t)||shiftNorm.includes(t)?30:0;
-      }
-      // Doctor code (id) matching — priority 4 (below name-contains=500)
-      function scoreCode(t,id){
-        if(!/^\d+$/.test(t))return 0;   // only numeric tokens
-        const ids=String(id);
-        if(ids===t)             return 480;  // exact code
-        if(ids.startsWith(t))   return 250;  // code prefix
-        if(ids.includes(t))     return 120;  // code contains
-        return 0;
-      }
-      // ────────────────────────────────────────────────────────────────────
+      const tokens=SmartSearch.tokenize(rawQ);
 
       // Pre-compute first-shift hour for morning/evening filter
       const firstShiftMin=(d)=>{
@@ -2171,53 +2232,16 @@ const LocalDB = (() => {
 
         if(!tokens.length&&!(wantAvail||wantLeave||wantHome||wantMorning||wantEvening)) return;
 
-        // تطبيع الحقول مرة واحدة لكل ممارس (سريع حتى مع تزايد الأعداد)
-        const nameN    = _searchName(d.name);                              // بلا ألقاب
-        const nameSkel = qHasLatin ? _skel(_translitAr(nameN)) : "";
-        const specN    = normalizeAr(d.specialty||"").toLowerCase();
-        const rankN    = normalizeAr(d.rank||"").toLowerCase();
-        const natN     = normalizeAr(d.nationality||"").toLowerCase();
-        const branchN  = normalizeAr(bmap[d.branch_id]||"").toLowerCase();
-        const qualN    = normalizeAr(d.qualification||"").toLowerCase();
-        const genderN  = normalizeAr(d.gender||"").toLowerCase();
-        const expN     = normalizeAr(d.experience||"").toLowerCase();
-        const casesN   = normalizeAr(d.cases||"").toLowerCase();
-        const coordN   = normalizeAr(d.notes_coord||"").toLowerCase();
-        const hoursN   = normalizeAr(d.hours_raw||"").toLowerCase();
-
-        // 1–4) درجة الاسم (عربي أو عبر النقحرة للإنجليزية) — تُحسب على العبارة كاملة
-        const nameSc = Math.max(nameScore(nameN), nameScoreLatin(nameN));
-
-        // كل كلمة في الاستعلام يجب أن تُطابق شيئاً (الاسم أو أحد الحقول)
-        let fieldTotal=0, allMatch=true;
-        for(const t of tokens){
-          const inName = nameN.includes(t) || (qHasLatin && nameSkel && nameSkel.includes(_skel(t)));
-          const codeSc = scoreCode(t, d.id);
-          // الكلمات القصيرة (حرفان) تُطابق الاسم أو رمز الممارس فقط —
-          // وإلا امتلأت النتائج بضجيج (مثال: «من» موجودة داخل «يمني»)
-          const strong = t.length<3 ? codeSc : Math.max(
-            fieldScore(t, specN,   5000),   // 5) التخصص
-            fieldScore(t, branchN, 4000),   // 6) الفرع
-            fieldScore(t, natN,    3000),   // 7) الجنسية
-            fieldScore(t, rankN,   1500),   // 8) بقية البيانات
-            fieldScore(t, qualN,   1200),
-            fieldScore(t, genderN,  800),
-            fieldScore(t, expN,     800),
-            fieldScore(t, hoursN,   800),
-            fieldScore(t, casesN,   600),
-            fieldScore(t, coordN,   600),
-            codeSc
-          );
-          // إشارات ضعيفة (الحالة/أوقات الشفت): تُضاف كترجيح فقط ولا تُؤهّل وحدها
-          const weak=Math.max(scoreStatus(t, st.state), scoreShifts(t, d.schedule));
-          if(!inName && !strong){ allMatch=false; break; }
-          fieldTotal+=strong+weak;
-        }
-        if(tokens.length&&!allMatch) return;
-        if(tokens.length&&!nameSc&&!fieldTotal) return;
-
-        // الاسم يهيمن دائماً على بقية الحقول
-        let totalScore = nameSc*4 + fieldTotal;
+        // ── نفس محرك SmartSearch المستخدم في بحث الممارسين (نتائج موحّدة) ──
+        let totalScore = SmartSearch.score(rawQ, {
+          name:d.name, en_name:d.en_name||d.name_en||"",
+          specialty:d.specialty, branch:bmap[d.branch_id]||"",
+          nationality:d.nationality, status:SmartSearch.statusText(st),
+          rank:d.rank, qualification:d.qualification, gender:d.gender,
+          experience:d.experience, hours:d.hours_raw, cases:d.cases,
+          coord:d.notes_coord, languages:d.languages, id:d.id
+        });
+        if(tokens.length && !totalScore) return;
 
         // Availability boost — never overrides name quality ranking
         if(st.state==="present")       totalScore+=30;
@@ -2474,108 +2498,19 @@ const App = (() => {
   const normAr = s=>(s||"").trim().replace(/[ً-ٰٟـ]/g,"")
     .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").toLowerCase();
 
-  // ── Shared scoring helpers ────────────────────────────────────────────────
-  const _STOP=new Set(["طبيب","طبيبه","طبيبة","دكتور","دكتوره","دكتورة","الدكتور","د"]);
-  function scoreNameFn(t,n){
-    if(!n||!t)return 0;
-    const ws=n.split(/\s+/).filter(Boolean);
-    if(n===t)                          return 10000;
-    if(n.startsWith(t))               return  5000;
-    if(ws[0]&&ws[0]===t)              return  4000;
-    if(ws[0]&&ws[0].startsWith(t))    return  3000;
-    if(ws.some(w=>w===t))             return  2000;
-    if(ws.some(w=>w.startsWith(t)))   return  1500;
-    if(n.includes(t))                 return   500;
-    return 0;
-  }
-  function scoreEnNameFn(t,en){
-    if(!en||!t)return 0;
-    const tl=t,nl=en.toLowerCase();
-    const ws=nl.split(/\s+/).filter(Boolean);
-    if(nl===tl)                        return 8000;
-    if(nl.startsWith(tl))             return 4000;
-    if(ws[0]&&ws[0]===tl)             return 3500;
-    if(ws[0]&&ws[0].startsWith(tl))   return 2500;
-    if(ws.some(w=>w===tl))            return 1800;
-    if(ws.some(w=>w.startsWith(tl)))  return 1200;
-    if(nl.includes(tl))               return  400;
-    return 0;
-  }
-  function scoreFieldFn(t,v,w){
-    if(!v||!t)return 0;
-    const vn=normAr(v);
-    const ws=vn.split(/\s+/).filter(Boolean);
-    if(vn===t)                          return w*100;
-    if(vn.startsWith(t))               return w* 60;
-    if(ws.some(wd=>wd===t))            return w* 50;
-    if(ws.some(wd=>wd.startsWith(t)))  return w* 35;
-    if(vn.includes(t))                 return w* 15;
-    return 0;
-  }
-  // fuzzy: يسمح بفرق حرف واحد للرموز التي طولها 3+ أحرف (يعالج الأخطاء الإملائية البسيطة)
-  function _fuzzyMatch(t,hay){
-    if(hay.includes(t))return true;
-    if(t.length<3)return false;
-    for(let i=0;i<t.length;i++){
-      const r=t.slice(0,i)+t.slice(i+1);
-      if(r.length>=2&&hay.includes(r))return true;
-    }
-    return false;
-  }
-  function _scoreIdCode(t,id){
-    if(!/^\d+$/.test(t))return 0;
-    const ids=String(id);
-    if(ids===t)           return 480;
-    if(ids.startsWith(t)) return 250;
-    if(ids.includes(t))   return 120;
-    return 0;
-  }
-  // دالة تسجيل النقاط المركزية — مستخدمة في جميع سياقات البحث
+  // ── البحث الموحّد — نفس محرك SmartSearch المستخدم في البحث الرئيسي ──
   function scoreDoctorMgmt(q,d,bname){
-    if(!q)return 1;
-    const qNorm=normAr(q);
-    const tokens=qNorm.split(/\s+/).filter(t=>t.length>0&&!_STOP.has(t));
-    if(!tokens.length)return 1;
-    const nameN  =normAr(d.name||"");
-    const enName =(d.en_name||d.name_en||"").toLowerCase();
-    const specN  =normAr(d.specialty||"");
-    const rankN  =normAr(d.rank||"");
-    const natN   =normAr(d.nationality||"");
-    const branchN=normAr((bname&&bname[d.branch_id])||d.branch_name||"");
-    const qualN  =normAr(d.qualification||"");
-    const genderN=normAr(d.gender||"");
-    const expN   =normAr(d.experience||"");
-    const casesN =normAr(d.cases||"");
-    const coordN =normAr(d.notes_coord||"");
-    const statusN=normAr(d.live?.label||"");
-    const hoursN =normAr(d.hours_raw||"");
-    const langN  =normAr(d.languages||"");
-    const allHay =nameN+" "+enName+" "+specN+" "+rankN+" "+natN+" "+branchN+" "+qualN+" "+genderN+" "+expN+" "+casesN+" "+coordN+" "+statusN+" "+hoursN+" "+langN;
-    let total=0;
-    for(const t of tokens){
-      let s=Math.max(
-        scoreNameFn(t,nameN),
-        scoreEnNameFn(t,enName),
-        scoreFieldFn(t,specN,10),
-        scoreFieldFn(t,rankN,9),
-        scoreFieldFn(t,branchN,8),
-        scoreFieldFn(t,natN,7),
-        scoreFieldFn(t,statusN,6),
-        scoreFieldFn(t,qualN,5),
-        scoreFieldFn(t,genderN,4),
-        scoreFieldFn(t,langN,3),
-        scoreFieldFn(t,expN,3),
-        scoreFieldFn(t,casesN,2),
-        scoreFieldFn(t,coordN,2),
-        scoreFieldFn(t,hoursN,1),
-        _scoreIdCode(t,d.id)
-      );
-      // fuzzy للأخطاء الإملائية البسيطة (أقل أولوية)
-      if(!s&&_fuzzyMatch(t,allHay))s=40;
-      if(!s)return 0;
-      total+=s;
-    }
-    return total;
+    if(!q) return 1;
+    return SmartSearch.score(q,{
+      name:d.name, en_name:d.en_name||d.name_en||"",
+      specialty:d.specialty,
+      branch:(bname&&bname[d.branch_id])||d.branch_name||"",
+      nationality:d.nationality,
+      status:SmartSearch.statusText(d.live),
+      rank:d.rank, qualification:d.qualification, gender:d.gender,
+      experience:d.experience, hours:d.hours_raw, cases:d.cases,
+      coord:d.notes_coord, languages:d.languages, id:d.id
+    });
   }
   // ─────────────────────────────────────────────────────────────────────────
 
