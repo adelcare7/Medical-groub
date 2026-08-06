@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-07-07-37">
+<meta name="app-version" content="2026-08-06-38">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1232,6 +1232,8 @@ const LocalDB = (() => {
   // Restore persisted lockout on boot
   const _fails = (()=>{ try{return JSON.parse(localStorage.getItem(FAIL_KEY)||"{}");}catch(e){return {};} })();
   let _fsDB, _fsColl, _initPromise, _lastWriteTs = 0;
+  // _baseMain = نص مستند main كما هو على الخادم حسب علمنا — أساس المقارنة قبل أي كتابة
+  let _baseMain = null, _casBusy = false, _casPending = false;
   // مستند واحد (main) لكل البيانات + مستند منفصل للسجل (audit) — نفس صيغة الموقع الحي
   let _lastMain = null, _lastAudit = null; // آخر قيمة مكتوبة/مقروءة — لتجنب الكتابة غير الضرورية
 
@@ -1262,21 +1264,64 @@ const LocalDB = (() => {
   // بنية main = كل شيء عدا السجل (audit)
   function _mainObj(db) { const {audit, ...main} = db; return main; }
 
+  // ── كتابة محمية بقفل تفاؤلي: ترفض الحفظ إن تغيّرت البيانات على الخادم ──
+  // تمنع جهازاً ببيانات قديمة من الكتابة فوق عمل جهاز آخر (Lost Update).
+  async function _casSave() {
+    if (!_fsColl || !_fsDB || !_memDB) return;
+    if (_casBusy) { _casPending = true; return; }   // تسلسل الكتابات
+    _casBusy = true;
+    try {
+      const mainStr  = JSON.stringify(_mainObj(_memDB));
+      const auditStr = JSON.stringify(_memDB.audit || []);
+      if (mainStr !== _baseMain) {
+        _lastWriteTs = Date.now();
+        await _fsDB.runTransaction(async tx => {
+          const ref = _fsColl.doc('main');
+          const snap = await tx.get(ref);
+          const server = snap.exists ? (snap.data() || {}).data : null;
+          // تعارض: الخادم يحمل نسخة لا نعرفها ⇒ لا نكتب فوقها
+          if (_baseMain !== null && typeof server === 'string' && server !== _baseMain) {
+            const err = new Error('CONFLICT'); err.__conflict = true; throw err;
+          }
+          tx.set(ref, { data: mainStr });
+        });
+        _baseMain = mainStr; _lastMain = mainStr;
+      }
+      if (_lastAudit !== auditStr) {
+        await _fsColl.doc('audit').set({ data: auditStr });
+        _lastAudit = auditStr;
+      }
+    } catch (e) {
+      if (e && e.__conflict) {
+        // اسحب أحدث نسخة من الخادم حتى لا نبقى على بيانات قديمة
+        try {
+          const s = await _fsColl.doc('main').get();
+          const raw = s.exists ? (s.data() || {}).data : null;
+          if (typeof raw === 'string') {
+            const m = JSON.parse(raw);
+            _memDB.doctors  = m.doctors  || [];
+            _memDB.branches = m.branches || [];
+            _memDB.leaves   = m.leaves   || [];
+            _memDB.settings = m.settings || {};
+            _memDB._seq     = m._seq     || _memDB._seq;
+            _baseMain = raw; _lastMain = raw;
+          }
+        } catch (_) {}
+        document.dispatchEvent(new CustomEvent('adelcare:conflict'));
+        document.dispatchEvent(new CustomEvent('adelcare:sync'));
+      } else {
+        console.error('[Adelcare] save:', e);
+        document.dispatchEvent(new CustomEvent('adelcare:saveerror', {detail: String((e && e.message) || e)}));
+      }
+    } finally {
+      _casBusy = false;
+      if (_casPending) { _casPending = false; _casSave(); }
+    }
+  }
+
   function save(db) {
     _memDB = db;
-    if (_fsColl) {
-      _lastWriteTs = Date.now();
-      const mainStr = JSON.stringify(_mainObj(db));
-      if (_lastMain !== mainStr) {
-        _lastMain = mainStr;
-        _fsColl.doc('main').set({ data: mainStr }).catch(e => console.error('[Adelcare] Firestore write (main):', e));
-      }
-      const auditStr = JSON.stringify(db.audit || []);
-      if (_lastAudit !== auditStr) {
-        _lastAudit = auditStr;
-        _fsColl.doc('audit').set({ data: auditStr }).catch(e => console.error('[Adelcare] Firestore write (audit):', e));
-      }
-    }
+    if (_fsColl) _casSave();
     try{
       // Strip PINs from local backup to avoid sensitive data in plaintext browser storage
       const safeDb=JSON.parse(JSON.stringify(db));
@@ -1411,7 +1456,7 @@ const LocalDB = (() => {
     _lastWriteTs = Date.now();
     const mainStr = JSON.stringify(_mainObj(db));
     const auditStr = JSON.stringify(db.audit || []);
-    _lastMain = mainStr; _lastAudit = auditStr;
+    _lastMain = mainStr; _lastAudit = auditStr; _baseMain = mainStr;
     await Promise.all([
       _fsColl.doc('main').set({ data: mainStr }),
       _fsColl.doc('audit').set({ data: auditStr })
@@ -1445,6 +1490,8 @@ const LocalDB = (() => {
       };
       _lastMain  = JSON.stringify(_mainObj(_memDB));
       _lastAudit = JSON.stringify(_memDB.audit);
+      // النص الخام كما هو على الخادم — أساس المقارنة في القفل التفاؤلي
+      _baseMain  = (mainSnap.data() || {}).data || null;
     } else {
       // أول تشغيل على الإطلاق — تهيئة من البذرة
       _memDB = JSON.parse(JSON.stringify({
@@ -1460,7 +1507,8 @@ const LocalDB = (() => {
 
     _fsColl.onSnapshot(snap => {
       if (snap.metadata.hasPendingWrites) return;
-      if (Date.now() - _lastWriteTs < 3000) return;
+      // ملاحظة: أُزيلت مهلة الـ3 ثوانٍ — كانت تُسقط تحديثات الأجهزة الأخرى فتُنتج بيانات قديمة.
+      // مقارنة النص أدناه تكفي لتجاهل صدى كتابتنا نحن.
       if (!_memDB) return;
       let changed = false;
       snap.docChanges().forEach(ch => {
@@ -1478,7 +1526,7 @@ const LocalDB = (() => {
             _memDB.leaves   = m.leaves   || [];
             _memDB.settings = m.settings || {};
             _memDB._seq     = m._seq     || _memDB._seq;
-            _lastMain = raw.data;
+            _lastMain = raw.data; _baseMain = raw.data;   // أحدث نسخة معروفة على الخادم
             changed = true;
           } catch(e) {}
         } else { // audit
@@ -2547,11 +2595,11 @@ const App = (() => {
   const canSpecialty = (spec) => { if(!spec||!state.user||!state.user.auth) return true; const sp=state.user.specialties||[]; return sp.includes("*")||sp.includes(spec); };
 
   // ---------- Toast ----------
-  function toast(msg,type=""){
+  function toast(msg,type="",ms){
     const cls=type==="ok"?" toast-ok":type==="err"?" toast-err":type==="warn"?" toast-warn":type==="info"?" toast-info":"";
     const t=el(`<div class="toast${cls}">${esc(msg)}</div>`);
     $("#toast-root").appendChild(t);
-    const dur=type==="err"?3500:2400;
+    const dur=ms||(type==="err"?3500:2400);
     setTimeout(()=>{t.classList.add("toast-out");t.addEventListener("animationend",()=>t.remove());},dur);
   }
 
@@ -5392,6 +5440,13 @@ const App = (() => {
     maybeAutoExport();
     // تحديث ناعم يحافظ على الفلاتر والبحث والتمرير والقسم المفتوح
     document.addEventListener('adelcare:sync', ()=>softRender());
+    // تعارض: جهاز آخر حفظ قبلنا — رُفض حفظنا حمايةً لبياناته، ونُبلّغ المستخدم بوضوح
+    document.addEventListener('adelcare:conflict', ()=>{
+      toast("⚠️ تم تعديل البيانات من جهاز آخر — لم يُحفظ تعديلك الأخير. تم تحديث الشاشة، أعد إدخاله من فضلك.","warn",9000);
+    });
+    document.addEventListener('adelcare:saveerror', (e)=>{
+      toast("❌ تعذّر الحفظ: "+((e&&e.detail)||"تحقق من الاتصال")+" — أعد المحاولة.","err",9000);
+    });
     setInterval(()=>{
       if(state.route==="dashboard"||state.route==="doctors") softRender();
     },60000);
