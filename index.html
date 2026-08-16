@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-08-06-38">
+<meta name="app-version" content="2026-08-16-39">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1233,7 +1233,7 @@ const LocalDB = (() => {
   const _fails = (()=>{ try{return JSON.parse(localStorage.getItem(FAIL_KEY)||"{}");}catch(e){return {};} })();
   let _fsDB, _fsColl, _initPromise, _lastWriteTs = 0;
   // _baseMain = نص مستند main كما هو على الخادم حسب علمنا — أساس المقارنة قبل أي كتابة
-  let _baseMain = null, _casBusy = false, _casPending = false;
+  let _baseMain = null, _baseAudit = null, _casBusy = false, _casPending = false;
   // مستند واحد (main) لكل البيانات + مستند منفصل للسجل (audit) — نفس صيغة الموقع الحي
   let _lastMain = null, _lastAudit = null; // آخر قيمة مكتوبة/مقروءة — لتجنب الكتابة غير الضرورية
 
@@ -1273,23 +1273,25 @@ const LocalDB = (() => {
     try {
       const mainStr  = JSON.stringify(_mainObj(_memDB));
       const auditStr = JSON.stringify(_memDB.audit || []);
-      if (mainStr !== _baseMain) {
+      const mainChanged  = (mainStr  !== _baseMain);
+      const auditChanged = (auditStr !== _baseAudit);
+      if (mainChanged || auditChanged) {
         _lastWriteTs = Date.now();
+        // المستندان في معاملة واحدة — والسجل محمي بنفس القفل مثل البيانات
         await _fsDB.runTransaction(async tx => {
-          const ref = _fsColl.doc('main');
-          const snap = await tx.get(ref);
-          const server = snap.exists ? (snap.data() || {}).data : null;
+          const mRef = _fsColl.doc('main'), aRef = _fsColl.doc('audit');
+          const mSnap = await tx.get(mRef);
+          const aSnap = await tx.get(aRef);
+          const mServer = mSnap.exists ? (mSnap.data() || {}).data : null;
+          const aServer = aSnap.exists ? (aSnap.data() || {}).data : null;
           // تعارض: الخادم يحمل نسخة لا نعرفها ⇒ لا نكتب فوقها
-          if (_baseMain !== null && typeof server === 'string' && server !== _baseMain) {
-            const err = new Error('CONFLICT'); err.__conflict = true; throw err;
-          }
-          tx.set(ref, { data: mainStr });
+          if (_baseMain  !== null && typeof mServer === 'string' && mServer !== _baseMain)  { const e=new Error('CONFLICT'); e.__conflict=true; throw e; }
+          if (_baseAudit !== null && typeof aServer === 'string' && aServer !== _baseAudit) { const e=new Error('CONFLICT'); e.__conflict=true; throw e; }
+          if (mainChanged)  tx.set(mRef, { data: mainStr });
+          if (auditChanged) tx.set(aRef, { data: auditStr });
         });
-        _baseMain = mainStr; _lastMain = mainStr;
-      }
-      if (_lastAudit !== auditStr) {
-        await _fsColl.doc('audit').set({ data: auditStr });
-        _lastAudit = auditStr;
+        if (mainChanged)  { _baseMain  = mainStr;  _lastMain  = mainStr; }
+        if (auditChanged) { _baseAudit = auditStr; _lastAudit = auditStr; }
       }
     } catch (e) {
       if (e && e.__conflict) {
@@ -1307,6 +1309,11 @@ const LocalDB = (() => {
             _baseMain = raw; _lastMain = raw;
           }
         } catch (_) {}
+        try {
+          const a = await _fsColl.doc('audit').get();
+          const araw = a.exists ? (a.data() || {}).data : null;
+          if (typeof araw === 'string') { _memDB.audit = JSON.parse(araw); _baseAudit = araw; _lastAudit = araw; }
+        } catch (_) {}
         document.dispatchEvent(new CustomEvent('adelcare:conflict'));
         document.dispatchEvent(new CustomEvent('adelcare:sync'));
       } else {
@@ -1317,6 +1324,31 @@ const LocalDB = (() => {
       _casBusy = false;
       if (_casPending) { _casPending = false; _casSave(); }
     }
+  }
+
+  // إعادة مزامنة إجبارية من الخادم — تُستدعى عند عودة الجهاز للواجهة.
+  // تمنع تراكم بيانات قديمة في جهاز بقي مفتوحاً/نائماً لفترة طويلة.
+  async function _forceResync() {
+    if (!_fsColl || !_memDB || _casBusy) return;
+    try {
+      const [mS, aS] = await Promise.all([_fsColl.doc('main').get(), _fsColl.doc('audit').get()]);
+      const mRaw = mS.exists ? (mS.data() || {}).data : null;
+      const aRaw = aS.exists ? (aS.data() || {}).data : null;
+      let changed = false;
+      if (typeof mRaw === 'string' && mRaw !== _baseMain) {
+        const m = JSON.parse(mRaw);
+        _memDB.doctors  = m.doctors  || [];
+        _memDB.branches = m.branches || [];
+        _memDB.leaves   = m.leaves   || [];
+        _memDB.settings = m.settings || {};
+        _memDB._seq     = m._seq     || _memDB._seq;
+        _baseMain = mRaw; _lastMain = mRaw; changed = true;
+      }
+      if (typeof aRaw === 'string' && aRaw !== _baseAudit) {
+        _memDB.audit = JSON.parse(aRaw); _baseAudit = aRaw; _lastAudit = aRaw;
+      }
+      if (changed) document.dispatchEvent(new CustomEvent('adelcare:sync'));
+    } catch (e) { /* الشبكة غير متاحة — onSnapshot سيلحق لاحقاً */ }
   }
 
   function save(db) {
@@ -1456,7 +1488,7 @@ const LocalDB = (() => {
     _lastWriteTs = Date.now();
     const mainStr = JSON.stringify(_mainObj(db));
     const auditStr = JSON.stringify(db.audit || []);
-    _lastMain = mainStr; _lastAudit = auditStr; _baseMain = mainStr;
+    _lastMain = mainStr; _lastAudit = auditStr; _baseMain = mainStr; _baseAudit = auditStr;
     await Promise.all([
       _fsColl.doc('main').set({ data: mainStr }),
       _fsColl.doc('audit').set({ data: auditStr })
@@ -1492,6 +1524,7 @@ const LocalDB = (() => {
       _lastAudit = JSON.stringify(_memDB.audit);
       // النص الخام كما هو على الخادم — أساس المقارنة في القفل التفاؤلي
       _baseMain  = (mainSnap.data() || {}).data || null;
+      _baseAudit = auditSnap.exists ? ((auditSnap.data() || {}).data || null) : null;
     } else {
       // أول تشغيل على الإطلاق — تهيئة من البذرة
       _memDB = JSON.parse(JSON.stringify({
@@ -1531,7 +1564,7 @@ const LocalDB = (() => {
           } catch(e) {}
         } else { // audit
           if (_lastAudit === raw.data) return;
-          try { _memDB.audit = JSON.parse(raw.data); _lastAudit = raw.data; } catch(e) {}
+          try { _memDB.audit = JSON.parse(raw.data); _lastAudit = raw.data; _baseAudit = raw.data; } catch(e) {}
         }
       });
       if (changed) document.dispatchEvent(new CustomEvent('adelcare:sync'));
@@ -1788,7 +1821,13 @@ const LocalDB = (() => {
     const _hasSpecialty = (s, spec) => { if(!spec) return true; const sp=s.specialties||[]; return sp.includes("*")||sp.includes(spec); };
     const needSpecialty = (spec) => { if(!_hasSpecialty(sess,spec)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا القسم"),{status:403}); };
 
-    // ensure users array exists (migration)
+    // ── الترحيل والصيانة التلقائية ──────────────────────────────────────
+    // مهم: تُطبَّق في الذاكرة دائماً (ليصحّ العرض)، لكن لا تُحفظ إلا مع عملية
+    // تعديل حقيقية. الحفظ عند مجرد القراءة كان يجعل أي جهاز — بمجرد فتحه —
+    // يكتب حالته القديمة فوق بيانات الجميع (السبب الرئيسي لفقدان البيانات).
+    const _isWrite = method !== "GET";
+    let _needSave = false;
+
     if (!db.settings.users || !db.settings.users.length) {
       db.settings.users = [{
         id:"super", name:"المدير الرئيسي",
@@ -1797,14 +1836,14 @@ const LocalDB = (() => {
         permissions:["*"], branches:["*"], specialties:["*"],
         created: new Date().toISOString()
       }];
-      save(db);
+      _needSave = true;
     }
     // patch users missing branches/specialties field
-    let _patched=false;
-    (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_patched=true;}if(!u.specialties){u.specialties=["*"];_patched=true;}});
-    if(_patched) save(db);
+    (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_needSave=true;}if(!u.specialties){u.specialties=["*"];_needSave=true;}});
     // تفعيل أي إنهاء عقد مجدول حان تاريخه (حالة دائمة)
-    if(applyDueTerminations(db)) save(db);
+    if(applyDueTerminations(db)) _needSave = true;
+    // يُحفظ فقط ضمن طلب تعديل — لا كتابة إطلاقاً عند القراءة
+    if(_needSave && _isWrite) save(db);
 
     // AUTH
     if (method==="POST" && path==="/login") {
@@ -2360,7 +2399,7 @@ const LocalDB = (() => {
     save(db);
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); } };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); }, resync: ()=>_forceResync() };
 })();
 
   </script>
@@ -5453,10 +5492,16 @@ const App = (() => {
     // فحص وجود إصدار أحدث: عند الإقلاع + كل 30 ثانية + عند العودة بأي طريقة
     checkForUpdate();
     setInterval(checkForUpdate,30*1000);
-    document.addEventListener('visibilitychange',()=>{ if(!document.hidden) checkForUpdate(); });
-    window.addEventListener('focus',checkForUpdate);
+    // إعادة مزامنة إجبارية عند عودة الجهاز — تمنع تراكم بيانات قديمة
+    // في جهاز بقي مفتوحاً أو نائماً لفترة طويلة (بلا حاجة لإغلاقه يدوياً)
+    const _wake=()=>{ checkForUpdate(); LocalDB.resync(); };
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden) _wake(); });
+    window.addEventListener('focus',_wake);
+    window.addEventListener('online',_wake);
     // pageshow يُعالج الرجوع من bfcache (الضغط على زر الرجوع)
-    window.addEventListener('pageshow',(e)=>{ if(e.persisted) checkForUpdate(); });
+    window.addEventListener('pageshow',(e)=>{ if(e.persisted) _wake(); });
+    // مزامنة دورية احتياطية كل 5 دقائق (شبكة أمان لو تعطّل onSnapshot)
+    setInterval(()=>{ if(!document.hidden) LocalDB.resync(); }, 5*60*1000);
   }
   return { boot };
 })();
