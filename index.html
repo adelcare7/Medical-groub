@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-08-16-39">
+<meta name="app-version" content="2026-08-17-40">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1234,6 +1234,40 @@ const LocalDB = (() => {
   let _fsDB, _fsColl, _initPromise, _lastWriteTs = 0;
   // _baseMain = نص مستند main كما هو على الخادم حسب علمنا — أساس المقارنة قبل أي كتابة
   let _baseMain = null, _baseAudit = null, _casBusy = false, _casPending = false;
+
+  // ── قفل الإصدار: يمنع جهازاً يعمل بنسخة قديمة من الكتابة ────────────
+  // الخلفية: جهاز بنسخة قديمة (بلا حماية القفل التفاؤلي) استطاع في 16/8
+  // أن يمسح عمل ثمانية أيام.
+  // مهم: كود العميل وحده لا يكفي — الأجهزة القديمة لا تملك هذا الحاجز أصلاً.
+  // لذلك يُرفق رقم الإصدار في حقل `ver` مع كل كتابة، وقاعدة Firestore على
+  // الخادم ترفض أي كتابة بلا `ver` أو بـ `ver` أقدم. الكود هنا يوفّر التجربة
+  // (حجب الواجهة مبكراً)، والقاعدة توفّر الضمان.
+  const _APP_VER = (function(){
+    const m = document.querySelector('meta[name="app-version"]');
+    return m ? (m.getAttribute('content') || '') : '';
+  })();
+  let _serverVer = null, _isStale = false;
+
+  // مقارنة رقمية جزءاً جزءاً — لا تعتمد على ترتيب النصوص
+  function _verCmp(a, b) {
+    const pa = String(a||'').split('-').map(n => parseInt(n, 10) || 0);
+    const pb = String(b||'').split('-').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const x = pa[i] || 0, y = pb[i] || 0;
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  }
+
+  // يُستدعى كلما وصلنا رقم إصدار من الخادم
+  function _noteServerVer(v) {
+    if (!v || !_APP_VER) return;
+    _serverVer = v;
+    if (_verCmp(_APP_VER, v) < 0 && !_isStale) {
+      _isStale = true;
+      document.dispatchEvent(new CustomEvent('adelcare:stale', { detail: { mine: _APP_VER, server: v } }));
+    }
+  }
   // مستند واحد (main) لكل البيانات + مستند منفصل للسجل (audit) — نفس صيغة الموقع الحي
   let _lastMain = null, _lastAudit = null; // آخر قيمة مكتوبة/مقروءة — لتجنب الكتابة غير الضرورية
 
@@ -1282,19 +1316,28 @@ const LocalDB = (() => {
           const mRef = _fsColl.doc('main'), aRef = _fsColl.doc('audit');
           const mSnap = await tx.get(mRef);
           const aSnap = await tx.get(aRef);
+          // بوابة الإصدار: نسختنا أقدم مما على الخادم ⇒ نُمنع من الكتابة نهائياً
+          const vServer = mSnap.exists ? (mSnap.data() || {}).ver : null;
+          if (_APP_VER && vServer && _verCmp(_APP_VER, vServer) < 0) {
+            const e = new Error('STALE'); e.__stale = true; e.__server = vServer; throw e;
+          }
           const mServer = mSnap.exists ? (mSnap.data() || {}).data : null;
           const aServer = aSnap.exists ? (aSnap.data() || {}).data : null;
           // تعارض: الخادم يحمل نسخة لا نعرفها ⇒ لا نكتب فوقها
           if (_baseMain  !== null && typeof mServer === 'string' && mServer !== _baseMain)  { const e=new Error('CONFLICT'); e.__conflict=true; throw e; }
           if (_baseAudit !== null && typeof aServer === 'string' && aServer !== _baseAudit) { const e=new Error('CONFLICT'); e.__conflict=true; throw e; }
-          if (mainChanged)  tx.set(mRef, { data: mainStr });
-          if (auditChanged) tx.set(aRef, { data: auditStr });
+          // `ver` مرفق مع كل كتابة — عليه تعتمد قاعدة الخادم في رفض النسخ القديمة
+          if (mainChanged)  tx.set(mRef, { data: mainStr,  ver: _APP_VER });
+          if (auditChanged) tx.set(aRef, { data: auditStr, ver: _APP_VER });
         });
         if (mainChanged)  { _baseMain  = mainStr;  _lastMain  = mainStr; }
         if (auditChanged) { _baseAudit = auditStr; _lastAudit = auditStr; }
       }
     } catch (e) {
-      if (e && e.__conflict) {
+      if (e && e.__stale) {
+        // نسخة قديمة — لا نلمس البيانات إطلاقاً، ونُجبر الجهاز على التحديث
+        _noteServerVer(e.__server);
+      } else if (e && e.__conflict) {
         // اسحب أحدث نسخة من الخادم حتى لا نبقى على بيانات قديمة
         try {
           const s = await _fsColl.doc('main').get();
@@ -1332,6 +1375,7 @@ const LocalDB = (() => {
     if (!_fsColl || !_memDB || _casBusy) return;
     try {
       const [mS, aS] = await Promise.all([_fsColl.doc('main').get(), _fsColl.doc('audit').get()]);
+      if (mS.exists) _noteServerVer((mS.data() || {}).ver);
       const mRaw = mS.exists ? (mS.data() || {}).data : null;
       const aRaw = aS.exists ? (aS.data() || {}).data : null;
       let changed = false;
@@ -1490,8 +1534,8 @@ const LocalDB = (() => {
     const auditStr = JSON.stringify(db.audit || []);
     _lastMain = mainStr; _lastAudit = auditStr; _baseMain = mainStr; _baseAudit = auditStr;
     await Promise.all([
-      _fsColl.doc('main').set({ data: mainStr }),
-      _fsColl.doc('audit').set({ data: auditStr })
+      _fsColl.doc('main').set({ data: mainStr,  ver: _APP_VER }),
+      _fsColl.doc('audit').set({ data: auditStr, ver: _APP_VER })
     ]);
   }
 
@@ -1508,6 +1552,8 @@ const LocalDB = (() => {
 
     const defSeq = {doctors:200, branches:10, leaves:50, audit:100};
     const mainSnap  = await _fsColl.doc('main').get();
+    // بوابة الإصدار عند الإقلاع — رقم الإصدار مرافق لمستند البيانات نفسه
+    if (mainSnap.exists) _noteServerVer((mainSnap.data() || {}).ver);
     const auditSnap = await _fsColl.doc('audit').get();
     if (mainSnap.exists) {
       // الصيغة الحية — مستند main واحد + audit منفصل
@@ -1550,6 +1596,8 @@ const LocalDB = (() => {
         if (id !== 'main' && id !== 'audit') return; // يتجاهل أي مستندات مقسّمة قديمة
         const raw = ch.doc.data();
         if (!raw || typeof raw.data !== 'string') return;
+        // كتابة من جهاز بنسخة أحدث ⇒ نعرف فوراً أننا قديمون
+        if (id === 'main') _noteServerVer(raw.ver);
         if (id === 'main') {
           if (_lastMain === raw.data) return;
           try {
@@ -5482,6 +5530,34 @@ const App = (() => {
     // تعارض: جهاز آخر حفظ قبلنا — رُفض حفظنا حمايةً لبياناته، ونُبلّغ المستخدم بوضوح
     document.addEventListener('adelcare:conflict', ()=>{
       toast("⚠️ تم تعديل البيانات من جهاز آخر — لم يُحفظ تعديلك الأخير. تم تحديث الشاشة، أعد إدخاله من فضلك.","warn",9000);
+    });
+    // نسخة قديمة: نحجب الواجهة فوراً — الحفظ مرفوض على الخادم أصلاً،
+    // فالأفضل منع المستخدم من العمل بدل أن يكتشف الرفض بعد إدخال بياناته.
+    document.addEventListener('adelcare:stale', (e)=>{
+      if(document.getElementById('staleGate')) return;
+      const d=(e&&e.detail)||{};
+      const el=document.createElement('div');
+      el.id='staleGate';
+      el.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.96);display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px)';
+      el.innerHTML=`<div style="max-width:440px;text-align:center;color:#fff;font-family:inherit">
+        <div style="font-size:52px;margin-bottom:14px">🔄</div>
+        <h2 style="margin:0 0 12px;font-size:22px">يلزم تحديث الصفحة</h2>
+        <p style="margin:0 0 10px;line-height:1.9;opacity:.92">
+          هذا الجهاز يعمل بنسخة قديمة من الموقع، ولحماية البيانات تم إيقاف الحفظ منه.
+        </p>
+        <p style="margin:0 0 20px;font-size:13px;opacity:.6">
+          نسختك ${d.mine||'—'} · النسخة المطلوبة ${d.server||'—'}
+        </p>
+        <button id="staleGateBtn" style="background:#22c55e;color:#062;border:0;border-radius:10px;padding:13px 30px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit">
+          تحديث الآن
+        </button>
+      </div>`;
+      document.body.appendChild(el);
+      const go=()=>{ try{sessionStorage.removeItem('adelcare_reloaded_for');}catch(_){}
+                     location.replace(location.pathname+'?_v='+Date.now()+location.hash); };
+      el.querySelector('#staleGateBtn').addEventListener('click',go);
+      // تحديث تلقائي مرة واحدة فقط لكل جلسة — تفادياً لحلقة إعادة تحميل
+      try{ if(!sessionStorage.getItem('adelcare_stale_auto')){ sessionStorage.setItem('adelcare_stale_auto','1'); setTimeout(go,2500); } }catch(_){}
     });
     document.addEventListener('adelcare:saveerror', (e)=>{
       toast("❌ تعذّر الحفظ: "+((e&&e.detail)||"تحقق من الاتصال")+" — أعد المحاولة.","err",9000);
