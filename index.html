@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-08-17-40">
+<meta name="app-version" content="2026-08-17-43">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1285,6 +1285,12 @@ const LocalDB = (() => {
         const blank={auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]};
         _memSess=blank; localStorage.removeItem(SESS); return blank;
       }
+      // جلسة تدّعي صلاحية تعديل بلا حساب حقيقي خلفها (انتهت أو عُبث بالتخزين):
+      // نخفضها إلى مشاهدة فقط، فلا تُعرض أزرار سيرفضها الخادم على أي حال.
+      if(parsed.userId && _fsColl && !_isRealAuth()){
+        const ro={auth:true, edit:false, userId:null, name:"زائر", permissions:[], branches:[], specialties:[]};
+        _memSess=ro; try{localStorage.setItem(SESS,JSON.stringify(ro));}catch(e){} return ro;
+      }
       return parsed;
     } catch(e) { return _memSess; }
   }
@@ -1297,6 +1303,82 @@ const LocalDB = (() => {
 
   // بنية main = كل شيء عدا السجل (audit)
   function _mainObj(db) { const {audit, ...main} = db; return main; }
+
+  // ── المصادقة الحقيقية (Firebase Authentication) ────────────────────
+  // الصلاحيات داخل الواجهة تبقى من سجل المستخدم في settings.users،
+  // أما حقّ الكتابة على قاعدة البيانات فتفرضه قواعد Firestore على الخادم:
+  // لا يكتب إلا من سجّل دخوله ببريد وكلمة مرور (لا الحساب المجهول).
+  function _authUser() { try { return firebase.auth().currentUser; } catch(e) { return null; } }
+  function _isRealAuth() { const u = _authUser(); return !!(u && !u.isAnonymous); }
+
+  // رسائل Firebase الإنجليزية غير مفهومة للمستخدم — نترجم الشائع منها
+  function _authErrAr(code) {
+    switch (code) {
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+      case 'auth/invalid-login-credentials': return 'كلمة المرور غير صحيحة';
+      case 'auth/user-not-found':            return 'لا يوجد حساب لهذا المستخدم — راجع المدير الرئيسي';
+      case 'auth/user-disabled':             return 'هذا الحساب موقوف';
+      case 'auth/too-many-requests':         return 'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة';
+      case 'auth/network-request-failed':    return 'تعذّر الاتصال بالشبكة';
+      case 'auth/operation-not-allowed':     return 'الدخول بالبريد غير مفعّل في Firebase — راجع المدير الرئيسي';
+      case 'auth/invalid-email':             return 'البريد المرتبط بهذا المستخدم غير صحيح';
+      default: return 'تعذّر تسجيل الدخول';
+    }
+  }
+
+  const STAFF_EMAIL = 'staff@adelcare.local';   // حساب الموظفين المشترك — مشاهدة فقط
+  const MAIL_DOMAIN = '@adelcare.local';
+
+  // يقبل اسم المستخدم القصير (amer) أو البريد الكامل
+  function _toEmail(idOrEmail) {
+    const v = (idOrEmail || '').trim().toLowerCase();
+    return v.includes('@') ? v : (v ? v + MAIL_DOMAIN : '');
+  }
+
+  // تُبنى الجلسة من الحساب المسجَّل — لا من مدخلات المستخدم
+  function _sessionFromAuth() {
+    const au = _authUser();
+    if (!au || au.isAnonymous) {
+      setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]});
+      return getSession();
+    }
+    const email = (au.email || '').toLowerCase();
+    const db = load();
+    const usr = db ? (db.settings.users || []).find(u => (u.email||'').toLowerCase() === email && u.active) : null;
+    if (usr) {
+      setSession({ auth:true, edit:true, userId:usr.id, name:usr.name,
+        permissions: usr.permissions || [], branches: usr.branches || ["*"],
+        specialties: usr.specialties || ["*"] });
+    } else {
+      // حساب صحيح بلا سجل صلاحيات (حساب الموظفين مثلاً) ⇒ مشاهدة فقط
+      setSession({ auth:true, edit:false, userId:null,
+        name: email === STAFF_EMAIL ? "موظف" : "زائر",
+        permissions:[], branches:[], specialties:[] });
+    }
+    return getSession();
+  }
+
+  async function _signInUser(idOrEmail, password) {
+    const email = _toEmail(idOrEmail);
+    if (!email) throw Object.assign(new Error('أدخل اسم المستخدم'), {status:401});
+    await _ensureFirebase();
+    try {
+      await firebase.auth().signInWithEmailAndPassword(email, password);
+    } catch (e) {
+      throw Object.assign(new Error(_authErrAr(e && e.code)), {status:401});
+    }
+    await ensureInit();      // الآن فقط تُقرأ البيانات
+    return _sessionFromAuth();
+  }
+
+  // الخروج ينهي الجلسة تماماً — لا قراءة بعده حتى دخول جديد
+  async function _signOutUser() {
+    try { await firebase.auth().signOut(); } catch (e) {}
+    _initPromise = null; _fsDB = null; _fsColl = null; _memDB = null;
+    _baseMain = null; _baseAudit = null; _lastMain = null; _lastAudit = null;
+    setSession({auth:false, edit:false, userId:null, name:null, permissions:[], branches:[], specialties:[]});
+  }
 
   // ── كتابة محمية بقفل تفاؤلي: ترفض الحفظ إن تغيّرت البيانات على الخادم ──
   // تمنع جهازاً ببيانات قديمة من الكتابة فوق عمل جهاز آخر (Lost Update).
@@ -1475,8 +1557,11 @@ const LocalDB = (() => {
     const ts=new Date().toISOString(); const m=meta||{};
     const entry={ id, ts, action:m.action||"", user:m.user||"", kind:m.kind||_snapKind(id),
       n:{ doctors:(main.doctors||[]).length, branches:(main.branches||[]).length, leaves:(main.leaves||[]).length } };
-    // 1) مستند البيانات (blob) — منفصل عن الفهرس
-    await coll.doc(id).set({ data: JSON.stringify(main), ts });
+    // 1) مستند البيانات (blob) — منفصل عن الفهرس.
+    //    السجل (audit) يُحفظ داخل النسخة أيضاً: كان يُستثنى، فإذا مُحي السجل
+    //    ضاع للأبد (فجوة 9–15 أغسطس مثال). حفظه هنا يجعله قابلاً للاسترجاع.
+    //    ملاحظة: الاستعادة لا تكتب السجل فوق الحالي — يُستخدم عند الحاجة فقط.
+    await coll.doc(id).set({ data: JSON.stringify({ ...main, audit: audit || [] }), ts });
     // 2) تحديث الفهرس بمعاملة آمنة + تحديد النسخ الزائدة للحذف
     const idxRef=_snapIndexRef(); let toDelete=[];
     try{
@@ -1539,9 +1624,25 @@ const LocalDB = (() => {
     ]);
   }
 
+  // تهيئة Firebase وانتظار استعادة الجلسة المحفوظة — بلا أي قراءة للبيانات
+  let _fbReady = null;
+  function _ensureFirebase() {
+    if (!_fbReady) _fbReady = (async () => {
+      firebase.initializeApp(_FB_CFG);
+      await new Promise(res => { const un = firebase.auth().onAuthStateChanged(() => { un(); res(); }); });
+    })();
+    return _fbReady;
+  }
+
   async function _doInit() {
-    firebase.initializeApp(_FB_CFG);
-    await firebase.auth().signInAnonymously();
+    await _ensureFirebase();
+    // لا قراءة قبل تسجيل الدخول — القواعد على الخادم تمنعها أصلاً،
+    // ونمنعها هنا أيضاً حتى لا تظهر شاشة فارغة أو أخطاء صلاحيات.
+    // حساب مجهول لا يكفي — قد يكون بقيّة جلسة قديمة، والقواعد سترفضه
+    if (!_isRealAuth()) {
+      try { if (firebase.auth().currentUser) await firebase.auth().signOut(); } catch (e) {}
+      const e = new Error('NEEDS_LOGIN'); e.__needsLogin = true; throw e;
+    }
     _fsDB   = firebase.firestore();
     _fsColl = _fsDB.collection('adelcare');
 
@@ -1621,7 +1722,9 @@ const LocalDB = (() => {
   }
 
   function ensureInit() {
-    if (!_initPromise) _initPromise = _doInit();
+    // عند الفشل نُفرغ الوعد المخزَّن، وإلا بقيت التهيئة فاشلة للأبد
+    // فلا تنجح القراءة حتى بعد تسجيل دخول صحيح.
+    if (!_initPromise) _initPromise = _doInit().catch(e => { _initPromise = null; throw e; });
     return _initPromise;
   }
 
@@ -1893,18 +1996,11 @@ const LocalDB = (() => {
     // يُحفظ فقط ضمن طلب تعديل — لا كتابة إطلاقاً عند القراءة
     if(_needSave && _isWrite) save(db);
 
-    // AUTH
+    // AUTH — الدخول صار عبر Firebase Authentication (LocalDB.signIn).
+    // أُزيل مسار /login القديم: كان يقبل رمزاً مشتركاً ورموز PIN مخزَّنة
+    // نصّاً مكشوفاً داخل قاعدة بيانات يقرأها الجميع.
     if (method==="POST" && path==="/login") {
-      const fk="login"; const fl=_fails[fk]||{count:0,until:0};
-      if(fl.until>Date.now()) throw Object.assign(new Error(`حاول مرة أخرى بعد ${Math.ceil((fl.until-Date.now())/1000)} ثانية`),{status:429});
-      const code = (body.code||"").trim();
-      const ac = db.settings.access_code||"123";
-      if (code===ac) { _fails[fk]={count:0,until:0}; try{localStorage.setItem(FAIL_KEY,JSON.stringify(_fails));}catch(e){} setSession({auth:true,edit:false,userId:null,name:"زائر",permissions:[],branches:[],specialties:[]}); return getSession(); }
-      const usr = (db.settings.users||[]).find(u=>u.pin===code&&u.active);
-      if (usr) { _fails[fk]={count:0,until:0}; try{localStorage.setItem(FAIL_KEY,JSON.stringify(_fails));}catch(e){} setSession({auth:true,edit:true,userId:usr.id,name:usr.name,permissions:usr.permissions||[],branches:usr.branches||["*"],specialties:usr.specialties||["*"]}); return getSession(); }
-      const nc=fl.count+1; _fails[fk]={count:nc,until:nc>=5?Date.now()+60000:0};
-      try{localStorage.setItem(FAIL_KEY,JSON.stringify(_fails));}catch(e){}
-      throw Object.assign(new Error("رمز الدخول غير صحيح"),{status:401});
+      throw Object.assign(new Error("طريقة الدخول تغيّرت — حدّث الصفحة"),{status:410});
     }
     if (method==="POST" && path==="/logout") { setSession({auth:false,edit:false,userId:null,name:null,permissions:[],branches:[],specialties:[]}); return {ok:true}; }
     if (method==="GET"  && path==="/me") {
@@ -1924,11 +2020,18 @@ const LocalDB = (() => {
     if (method==="POST" && path==="/users") {
       needPerm("users_manage");
       const name=(body.name||"").trim(); if(!name) throw new Error("اسم المستخدم مطلوب");
-      const pin=(body.pin||"").trim(); if(!pin) throw new Error("رمز الدخول مطلوب");
-      if((db.settings.users||[]).some(u=>u.pin===pin)) throw new Error("هذا الرمز مستخدم بالفعل");
-      if(pin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
+      const pin=(body.pin||"").trim();
+      const email=(body.email||"").trim().toLowerCase();
+      if(!pin&&!email) throw new Error("أدخل البريد أو رمز الدخول");
+      if(pin){
+        if((db.settings.users||[]).some(u=>u.pin===pin)) throw new Error("هذا الرمز مستخدم بالفعل");
+        if(pin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
+      }
+      if(email&&(db.settings.users||[]).some(u=>(u.email||"").toLowerCase()===email)) throw new Error("هذا البريد مرتبط بمستخدم آخر");
       const id="u"+Date.now();
-      const u={id,name,pin,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],specialties:body.specialties||["*"],created:new Date().toISOString()};
+      const u={id,name,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],specialties:body.specialties||["*"],created:new Date().toISOString()};
+      if(pin) u.pin=pin;
+      if(email) u.email=email;
       db.settings.users.push(u);
       log(db,"إضافة مستخدم","user",id,`إضافة مستخدم "${name}" (${(u.permissions||[]).length} صلاحية)`); save(db);
       return {id};
@@ -1942,6 +2045,12 @@ const LocalDB = (() => {
         if(u.role==="super_admin"&&sess.userId!==u.id) throw new Error("لا يمكن تعديل المدير الرئيسي");
         const _uBefore={name:u.name,active:u.active,pin:u.pin,permissions:(u.permissions||[]).slice(),branches:(u.branches||[]).slice(),specialties:(u.specialties||[]).slice()};
         if(body.name) u.name=body.name.trim();
+        if(body.email!==undefined){
+          const em=(body.email||"").trim().toLowerCase();
+          if(em&&(db.settings.users||[]).some(x=>x.id!==uid&&(x.email||"").toLowerCase()===em))
+            throw new Error("هذا البريد مرتبط بمستخدم آخر");
+          if(em) u.email=em; else delete u.email;
+        }
         if(body.pin){
           const newPin=body.pin.trim();
           if((db.settings.users||[]).some(x=>x.id!==uid&&x.pin===newPin)) throw new Error("هذا الرمز مستخدم بالفعل");
@@ -2410,7 +2519,9 @@ const LocalDB = (() => {
     // AUDIT
     if (method==="GET" && path==="/audit") {
       needPerm("audit_view");
-      return {audit:db.audit.slice(0,300)};
+      // السقف هنا كان 300 بينما التخزين 500 — فكانت 180 عملية موجودة وغير مرئية،
+      // ويبدو للمستخدم أنها حُذفت. الآن يُعرض كل ما هو محفوظ فعلاً.
+      return {audit:db.audit.slice(0,500)};
     }
 
     throw Object.assign(new Error("not found"),{status:404});
@@ -2447,7 +2558,16 @@ const LocalDB = (() => {
     save(db);
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); }, resync: ()=>_forceResync() };
+  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); }, resync: ()=>_forceResync(),
+    signIn: (userId,password)=>_signInUser(userId,password),
+    // يعيد بناء الجلسة من حساب Firebase المسجَّل — يُستدعى عند الإقلاع
+    // ليستعيد المستخدم جلسته بعد إعادة التحميل بلا دخول جديد.
+    restoreSession: async()=>{ try{ await ensureInit(); }catch(e){ return null; } return _sessionFromAuth(); },
+    signOut: ()=>_signOutUser(),
+    isRealAuth: ()=>_isRealAuth(),
+    // قائمة الأسماء لشاشة الدخول — بلا أي بيانات حسّاسة
+    loginUsers: ()=>{ const db=load(); if(!db) return [];
+      return (db.settings.users||[]).filter(u=>u.active&&u.email).map(u=>({id:u.id,name:u.name})); } };
 })();
 
   </script>
@@ -3005,34 +3125,42 @@ const App = (() => {
     if(r&&routes[r]&&(r!==state.route||id!=state.params.id)){state.route=r;state.params=id?{id}:{};render();}
   });
 
-  // ============================================================ LOGIN (code via keyboard)
+  // ============================================================ LOGIN
+  // لا قائمة أسماء ولا رمز مشترك — اسم مستخدم/بريد وكلمة مرور فقط.
   function renderLogin(){
     const root=$("#app");
     root.innerHTML=`<div class="login-wrap"><div class="login-card pin-card">
       <div class="brand" style="justify-content:center"><div class="brand-logo">ع</div>
         <div><div class="brand-name">مجموعة عادل الطبية</div><div class="brand-sub">إدارة الممارسين والفروع</div></div></div>
-      <div class="pin-title">أدخل رمز الدخول</div>
-      <form id="lf">
-        <input id="pin-input" class="pin-input" type="password" inputmode="numeric"
-          autocomplete="off" autofocus placeholder="• • • •">
+      <div class="pin-title">تسجيل الدخول</div>
+      <form id="lf" autocomplete="on">
+        <input id="lu" class="inp" type="text" autocomplete="username" autocapitalize="off"
+          spellcheck="false" dir="ltr" placeholder="اسم المستخدم أو البريد"
+          style="width:100%;margin-bottom:10px">
+        <input id="lp" class="inp" type="password" autocomplete="current-password"
+          placeholder="كلمة المرور" style="width:100%">
         <button class="btn btn-primary btn-block" type="submit" style="margin-top:14px">دخول</button>
       </form>
     </div></div>`;
-    const inp=$("#pin-input");
-    setTimeout(()=>inp.focus(),60);
+    const uu=$("#lu"), pw=$("#lp");
+    try{ const last=localStorage.getItem("adelcare_last_user"); if(last) uu.value=last; }catch(e){}
+    setTimeout(()=>(uu.value?pw:uu).focus(),60);
     $("#lf").onsubmit=async(e)=>{e.preventDefault();
-      const code=inp.value.trim();
-      if(!code){toast("أدخل الرمز","warn");return;}
-      try{ const u=await api("/login",{method:"POST",body:{code}});
+      if(!uu.value.trim()){toast("أدخل اسم المستخدم","warn");return;}
+      if(!pw.value){toast("أدخل كلمة المرور","warn");return;}
+      const btn=e.target.querySelector("button"); btn.disabled=true; btn.textContent="جارٍ الدخول...";
+      try{
+        const u=await LocalDB.signIn(uu.value,pw.value);
+        try{ localStorage.setItem("adelcare_last_user",uu.value.trim()); }catch(_){}
         state.user=u;
-        if(u.userId) toast("مرحباً "+u.name,"ok");
-        else toast("مرحباً — وضع القراءة فقط","info");
-        startNotifPolling();
-        go("dashboard");
-      }catch(err){ toast(err.message); inp.value=""; inp.focus(); }
+        toast(u.userId?("مرحباً "+u.name):"مرحباً — وضع المشاهدة","ok");
+        startNotifPolling(); go("dashboard");
+      }catch(err){
+        toast(err.message,"err"); pw.value=""; pw.focus();
+        btn.disabled=false; btn.textContent="دخول";
+      }
     };
   }
-
   // ============================================================ SHELL
   const NAV=[
     {id:"dashboard",ico:"🏠",label:"دوام الفروع"},
@@ -3091,7 +3219,8 @@ const App = (() => {
     </div>`;
     $("#app").querySelectorAll("[data-nav]").forEach(a=>a.onclick=()=>go(a.dataset.nav));
     const doLogout=async()=>{
-      await api("/logout",{method:"POST"});
+      // يُنهي جلسة Firebase أيضاً — لا يكفي مسح الجلسة المحلية
+      try{ await LocalDB.signOut(); }catch(_){ await api("/logout",{method:"POST"}); }
       state.user=null;
       if(_notifInterval){clearInterval(_notifInterval);_notifInterval=null;}
       _prevPresent=null; _notifs=[]; _notifSeen=new Set(); _closePanel();
@@ -4128,7 +4257,7 @@ const App = (() => {
     shell(`<div class="loader"><div class="spin"></div></div>`);
     const {audit}=await api("/audit");
     $("#content").innerHTML=`<div class="page-title">📋 سجل التعديلات</div>
-      <div class="page-sub">آخر ${audit.length} عملية</div>
+      <div class="page-sub">${audit.length} عملية محفوظة — الأحدث أولاً</div>
       <table class="tbl" style="margin-top:16px"><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead>
       <tbody>${audit.map(a=>`<tr><td style="white-space:nowrap">${esc(a.ts.replace("T"," "))}</td>
         <td>${esc(a.user)}</td><td>${esc(a.action)}</td><td style="white-space:pre-line">${esc(a.detail||"")}</td></tr>`).join("")}</tbody></table>`;
@@ -5173,7 +5302,14 @@ const App = (() => {
 
     const body=`<form id="userf">
       <div class="field"><label>اسم المستخدم</label><input name="name" value="${isEdit?esc(existing.name):""}" required></div>
-      ${!isEdit?'<div class="field"><label>رمز الدخول (PIN)</label><input name="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="رمز فريد" required></div>':""}
+      <div class="field"><label>البريد المرتبط بحساب Firebase</label>
+        <input name="email" type="email" autocomplete="off" placeholder="name@adelcare.local"
+          value="${isEdit&&existing.email?esc(existing.email):""}">
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">
+          يجب أن يطابق البريد المُنشأ في Firebase Console. كلمة المرور تُدار هناك ولا تُحفظ هنا.
+        </div>
+      </div>
+
       <div class="field"><label>الصلاحيات</label>
         <div class="perms-grid">${permsHTML}</div>
         <div style="margin-top:6px"><label class="perm-check perm-select-all"><input type="checkbox" id="perm-all"> تحديد الكل</label></div>
@@ -5213,18 +5349,20 @@ const App = (() => {
         m.querySelector("#save-user").onclick=async()=>{
           const fd=new FormData(m.querySelector("#userf"));
           const name=fd.get("name")||"";
-          const pin=fd.get("pin")||"";
+          const pin="";
           const permissions=[...m.querySelectorAll('input[name="perm"]:checked')].map(c=>c.value);
           const branches=brAllCb.checked?["*"]:[...m.querySelectorAll('input[name="ubranch"]:checked')].map(c=>+c.value);
           const specialties=spAllCb.checked?["*"]:[...m.querySelectorAll('input[name="uspec"]:checked')].map(c=>c.value);
+          const email=(fd.get("email")||"").trim().toLowerCase();
           if(!name.trim()){toast("أدخل اسم المستخدم","warn");return;}
-          if(!isEdit&&!pin.trim()){toast("أدخل رمز الدخول","warn");return;}
+          if(!email){toast("أدخل البريد المرتبط بالحساب","warn");return;}
+          if(email&&!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast("صيغة البريد غير صحيحة","warn");return;}
 
           try{
             if(isEdit){
-              await api("/users/"+existing.id,{method:"PUT",body:{name:name.trim(),permissions,branches,specialties}});
+              await api("/users/"+existing.id,{method:"PUT",body:{name:name.trim(),email,permissions,branches,specialties}});
             } else {
-              await api("/users",{method:"POST",body:{name:name.trim(),pin:pin.trim(),permissions,branches,specialties}});
+              await api("/users",{method:"POST",body:{name:name.trim(),pin:pin.trim(),email,permissions,branches,specialties}});
             }
             toast("✅ تم الحفظ","ok"); closeModal(); drawUsersPanel();
           }catch(e){toast("❌ "+e.message,"err");}
@@ -5297,54 +5435,33 @@ const App = (() => {
     drawList();
   }
 
-  // ---- Security (access code only) ----
+  // ---- الأمان ----
+  // لم يعد هنا رمز عرض ولا رمز مدير: الدخول صار عبر Firebase Authentication،
+  // وكلمات المرور تُدار في Firebase Console ولا تُخزَّن في قاعدة البيانات.
   async function drawSecurityPanel(){
     if(!can("settings_access")){ $("#ctrl-body").innerHTML=`<div class="empty-msg">🔒 لا تملك صلاحية لهذا القسم</div>`; return; }
-    const s=await api("/settings");
+    const me=(state.user&&state.user.name)||"";
     $("#ctrl-body").innerHTML=`
-      <div class="cal" style="max-width:520px;margin-top:6px">
-        <form id="secf">
-          <div class="field"><label>رمز العرض (للقراءة فقط)</label>
-            <input name="access_code" type="password" inputmode="numeric" value="${esc(s.access_code)}" required>
-            <div class="page-sub" style="font-size:11px;margin-top:4px">يُدخله أي شخص لفتح النظام بوضع القراءة فقط بدون هوية مستخدم.</div></div>
-          <button class="btn btn-primary btn-block" id="save-sec" type="button">حفظ</button>
-        </form>
-        <div class="page-sub" style="margin-top:16px;font-size:12px">لإدارة رموز المستخدمين وصلاحياتهم، انتقل إلى تبويب <b>المستخدمين</b>.</div>
-      </div>
-      ${s.is_master?`
-      <div class="cal" style="max-width:520px;margin-top:16px;border:1px solid var(--amber)">
-        <div style="font-weight:700;font-size:14px;margin-bottom:4px">🔑 رمز المدير الرئيسي</div>
-        <div class="page-sub" style="font-size:11.5px;margin-bottom:12px">هذا الخيار متاح لك وحدك بصفتك المدير الرئيسي.</div>
-        <form id="mcf" autocomplete="off">
-          <div class="field"><label>الرمز الحالي *</label>
-            <input name="current" type="password" inputmode="numeric" autocomplete="off" required></div>
-          <div class="field"><label>الرمز الجديد *</label>
-            <input name="next" type="password" inputmode="numeric" autocomplete="off" required></div>
-          <div class="field"><label>تأكيد الرمز الجديد *</label>
-            <input name="confirm" type="password" inputmode="numeric" autocomplete="off" required></div>
-          <button class="btn btn-primary btn-block" id="save-mc" type="button">تغيير رمز المدير الرئيسي</button>
-        </form>
-        <div class="page-sub" style="font-size:11px;margin-top:8px">يُعتمد الرمز الجديد فوراً في تسجيل الدخول. لا تُسجَّل قيمة الرمز في سجل العمليات.</div>
-      </div>`:""}`;
-    $("#save-sec").onclick=async()=>{
-      const p=Object.fromEntries(new FormData($("#secf")).entries());
-      try{ await api("/settings",{method:"PUT",body:p}); toast("✅ تم حفظ رمز العرض","ok"); }
-      catch(e){toast("❌ "+e.message,"err");}
-    };
-    const mcBtn=$("#save-mc");
-    if(mcBtn) mcBtn.onclick=async()=>{
-      const form=$("#mcf");
-      const p=Object.fromEntries(new FormData(form).entries());
-      if(!p.current||!p.next||!p.confirm){ toast("أدخل جميع الحقول","warn"); return; }
-      if(p.next!==p.confirm){ toast("❌ الرمز الجديد وتأكيده غير متطابقين","err"); return; }
-      mcBtn.disabled=true;
-      try{
-        await api("/master-code",{method:"POST",body:p});
-        toast("✅ تم تغيير رمز المدير الرئيسي — استخدمه في الدخول القادم","ok");
-        form.reset();
-      }catch(e){ toast("❌ "+e.message,"err"); }
-      finally{ mcBtn.disabled=false; }
-    };
+      <div class="cal" style="max-width:560px;margin-top:6px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:10px">🔐 الدخول والحسابات</div>
+        <div class="page-sub" style="font-size:12.5px;line-height:2">
+          الدخول محمي بحسابات <b>Firebase Authentication</b>. لا يقرأ البيانات ولا يكتبها
+          إلا من سجّل دخوله بحساب حقيقي، والتحقق يتم على الخادم لا في المتصفح.
+        </div>
+        <div style="margin-top:14px;padding:12px;border-radius:10px;background:var(--card-2)">
+          <div style="font-size:13px;line-height:2">
+            • <b>الموظفون</b> — حساب مشترك للمشاهدة فقط<br>
+            • <b>المديرون</b> — حساب خاص بكل واحد، بصلاحياته<br>
+            • <b>كلمات المرور</b> — تُدار من Firebase Console وتُحفظ مشفّرة
+          </div>
+        </div>
+        <div class="page-sub" style="margin-top:14px;font-size:12px">
+          لتغيير كلمة مرور أو إضافة حساب أو إيقافه:
+          <b>Firebase Console ← Authentication ← Users</b>.<br>
+          ولربط الحساب بالصلاحيات داخل النظام، انتقل إلى تبويب <b>المستخدمين</b>.
+        </div>
+        ${me?`<div class="page-sub" style="margin-top:10px;font-size:12px">أنت مسجَّل الدخول باسم <b>${esc(me)}</b>.</div>`:""}
+      </div>`;
   }
 
   // ---- Specialties (sections) ----
@@ -5519,7 +5636,9 @@ const App = (() => {
     initTheme();
     // Show spinner while Firebase initializes
     document.getElementById("app").innerHTML=`<div class="loader" style="height:100vh"><div class="spin"></div></div>`;
-    try{ const {user}=await api("/me"); state.user=user; }catch(e){}
+    // الجلسة تُبنى من حساب Firebase المحفوظ — فإن لم يوجد حساب ظهرت شاشة الدخول
+    const _sess=await LocalDB.restoreSession();
+    state.user=(_sess&&_sess.auth)?_sess:null;
     state.route="dashboard"; state.params={};
     if(location.hash) history.replaceState(null,"","#dashboard");
     render();
