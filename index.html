@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-08-23-50">
+<meta name="app-version" content="2026-08-23-52">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1825,6 +1825,19 @@ const LocalDB = (() => {
     if(field==="dayoff"){ const a=Array.isArray(v)?v:[]; return a.length?a.slice().sort((x,y)=>x-y).map(i=>_DAY_AR[i]||i).join("، "):"—"; }
     return String(v);
   }
+  // حقول إلزامية على بطاقة الممارس — كانت مكتوبة required في HTML فقط بلا
+  // إنفاذ فعلي (زر الحفظ عادي لا submit، فلا يُفعِّل تحقق HTML5). النتيجة:
+  // كان يمكن حفظ ممارس باسم فارغ يظهر ببطاقة شبه فارغة بلا أي تنبيه.
+  const DOCTOR_REQUIRED_FIELDS = [
+    ["name","الاسم"], ["rank","الرتبة / التخصص الدقيق"],
+    ["nationality","الجنسية"], ["gender","الجنس"], ["experience","سنوات الخبرة"]
+  ];
+  function _validateDoctorFields(d){
+    for(const [key,label] of DOCTOR_REQUIRED_FIELDS){
+      if(!d[key] || !String(d[key]).trim()) throw new Error(`${label} مطلوب`);
+    }
+  }
+
   // يقارن ممارساً قبل/بعد ويُرجع قائمة تغييرات مقروءة
   function _diffDoctor(db,o,n){
     const ch=[];
@@ -2319,6 +2332,7 @@ const LocalDB = (() => {
           // حفظ قيمة الزيارة المنزلية كما هي إن لم يرسلها النموذج (بدل تصفيرها)
           if("home_visit" in body) updated.home_visit=body.home_visit?1:0;
           else updated.home_visit=old.home_visit?1:0;
+          _validateDoctorFields(updated);
         }
         const changes=_diffDoctor(db,old,updated);
         db.doctors[idx]=updated;
@@ -2374,6 +2388,7 @@ const LocalDB = (() => {
       needSpecialty(body.specialty);
       const id=nextId(db,"doctors");
       const d={id,...body,home_visit:body.home_visit?1:0,archived:0,status:body.status||"active"};
+      _validateDoctorFields(d);
       db.doctors.push(d);
       const bn=(db.branches.find(x=>x.id===+body.branch_id)||{}).name||"";
       log(db,"إضافة طبيب","doctor",id,`إضافة ممارس جديد "${d.name}" · ${d.specialty||"—"} · الفرع ${bn||"—"}`,{branch:bn,branch_id:d.branch_id}); save(db); return {id};
@@ -4108,6 +4123,13 @@ const App = (() => {
           payload.branch_id=+payload.branch_id;
           // التخصص إلزامي ومن الأقسام المعتمدة فقط
           if(!payload.specialty||!specList.includes(payload.specialty)){ toast("اختر التخصص من قائمة الأقسام","warn"); return; }
+          // زر الحفظ عادي (بلا submit) فلا يُفعِّل تحقق required الخاص بالمتصفح —
+          // تحقق يدوي هنا يمنع حفظ بطاقة ناقصة بصمت (الخادم يرفضها أيضاً كخط دفاع أخير).
+          for(const [key,label] of [["name","الاسم"],["rank","الرتبة / التخصص الدقيق"],
+              ["nationality","الجنسية"],["gender","الجنس"],["experience","سنوات الخبرة"]]){
+            if(!payload[key]||!String(payload[key]).trim()){ toast(`أدخل ${label}`,"warn"); return; }
+          }
+          payload.name=payload.name.trim();
         }
         const schedule={},dayoff=[];
         const grid=m.querySelector("#sched-grid");
@@ -4132,10 +4154,15 @@ const App = (() => {
           const lines=longShifts.map(([day,s,e])=>`• ${dayNames[day]}: ${fmtMin(s%1440)} ← ${fmtMin(e%1440)} (${((e-s)/60).toFixed(1)} ساعة)`).join("\n");
           if(!confirm(`⚠️ لديك ورديات طويلة جداً (أكثر من 16 ساعة):\n\n${lines}\n\nقد يكون السبب خطأ في ص/م (مثلاً 4:30م بدل 4:30ص).\nتأكد من أوقات البداية والنهاية.\n\nهل تريد الحفظ رغم ذلك؟`)) return;
         }
-        // تحذير تكرار الاسم — ممارس بنفس الاسم (بصرف النظر عن الهمزات/التاء المربوطة) في نفس الفرع
+        // تحذير تكرار الاسم — ممارس بنفس الاسم (بصرف النظر عن الهمزات/التاء المربوطة) في نفس الفرع.
+        // ملاحظة: normalizeAr مُعرَّفة داخل LocalDB وغير مُصدَّرة، فلا تراها App —
+        // استدعاؤها هنا كان يرمي ReferenceError خارج try فيتوقف الحفظ بصمت.
+        const _normName=(v)=>(v||"").trim()
+          .replace(/[\u064B-\u065F\u0670\u0640]/g,"")
+          .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه");
         if(!doc && !scheduleOnly && payload.name){
-          const nName=normalizeAr(payload.name);
-          const dup=existingDoctors.find(x=>x.branch_id===payload.branch_id && normalizeAr(x.name)===nName);
+          const nName=_normName(payload.name);
+          const dup=existingDoctors.find(x=>x.branch_id===payload.branch_id && _normName(x.name)===nName);
           if(dup && !confirm(`⚠️ يوجد ممارس بنفس الاسم "${dup.name}" في هذا الفرع بالفعل.\n\nهل تريد المتابعة والإضافة كممارس جديد رغم ذلك؟`)) return;
         }
         payload.schedule=schedule; payload.dayoff=dayoff;
