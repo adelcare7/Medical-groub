@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-08-17-45">
+<meta name="app-version" content="2026-08-23-50">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -188,7 +188,12 @@ a{color:inherit;text-decoration:none}
 
 /* ---------- Notifications ---------- */
 .notif-wrap{position:relative}
-.notif-btn{position:relative}
+.notif-btn{position:relative;transition:transform .1s ease}
+.notif-btn:active{transform:scale(.9)}
+@media(max-width:700px){
+  /* هدف لمسي أوضح على الجوال دون تغيير حجم بقية أزرار الشريط */
+  #notif-btn{width:44px;height:44px}
+}
 .notif-badge{position:absolute;top:-5px;inset-inline-end:-5px;background:#e53e3e;color:#fff;
   font-size:10px;font-weight:700;min-width:17px;height:17px;border-radius:20px;
   display:flex;align-items:center;justify-content:center;padding:0 4px;pointer-events:none;
@@ -208,8 +213,11 @@ a{color:inherit;text-decoration:none}
 .notif-panel{position:fixed;top:56px;inset-inline-end:8px;width:340px;max-width:calc(100vw - 16px);
   background:var(--surface);border:1px solid var(--line);border-radius:14px;
   box-shadow:0 8px 32px rgba(0,0,0,.14);z-index:3000;overflow:hidden;
-  animation:slideDown .15s ease}
-@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+  transform-origin:top left;will-change:transform,opacity;
+  animation:slideDown .16s cubic-bezier(.16,1,.3,1)}
+.notif-panel.closing{animation:slideUp .12s cubic-bezier(.4,0,1,1) forwards;pointer-events:none}
+@keyframes slideDown{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes slideUp{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-6px) scale(.97)}}
 .notif-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;
   border-bottom:1px solid var(--line)}
 .notif-head-title{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
@@ -219,7 +227,8 @@ a{color:inherit;text-decoration:none}
 .notif-empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px;display:flex;flex-direction:column;align-items:center;gap:10px}
 .notif-empty svg{opacity:.3;width:40px;height:40px}
 .notif-footer{padding:8px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center}
-.notif-item{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);cursor:default;transition:.12s}
+.notif-item{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);cursor:default;
+  transition:background-color .5s ease}
 .notif-item:last-child{border-bottom:none}
 .notif-item.unread{background:var(--brand-soft)}
 .notif-item:hover{background:var(--surface2)}
@@ -1791,7 +1800,10 @@ const LocalDB = (() => {
     };
     if(extra) Object.assign(entry,extra);
     db.audit.unshift(entry);
-    if (db.audit.length > 500) db.audit.length = 500;
+    // الحد رُفع من 500 إلى 2500: بمعدل ~288 بايت/إدخال هذا ~720KB — دون
+    // حد Firestore للمستند (1MB) بأمان. يمدّد نافذة السجل الحي من شهر إلى
+    // نحو 4 أشهر بمعدل النشاط الحالي، بلا مساس بآلية الحفظ المحمية (CAS).
+    if (db.audit.length > 2500) db.audit.length = 2500;
     _lastAction = { action, user:(s.name||"زائر") };
   }
 
@@ -1913,17 +1925,35 @@ const LocalDB = (() => {
     const lv = activeLeaveFn(leaves, doc.id, dateStr);
     const isSecondment = !!(lv && lv.type === "ندب" && lv.secondment_branch_id);
     const sec = isSecondment ? {isSecondment:true, secondmentBranchId:lv.secondment_branch_id, leave:lv} : {};
-    // الإجازة (غير الندب) تُلغي التواجد — ولا تتأثر بالزيارة
-    if (!isSecondment && (lv || doc.status === "leave")) {
-      const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
-      const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
-      return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
-    }
+
     const sc = doc.schedule || {};
     // normalise shift: if end < start treat as overnight (end += 1440)
     const norm = ([s,e]) => e < s ? [s, e+1440] : [s, e];
     const todays = (sc[day] || sc[String(day)] || []).map(norm);
     const yest   = (sc[(day+6)%7] || sc[String((day+6)%7)] || []).map(norm);
+
+    // ما بعد منتصف الليل جزء من دوام أمس لا من اليوم الجديد.
+    // الوردية الممتدة كاملة إن كنا داخلها الآن، وإلا null. نحتفظ بـ s,e
+    // الخام (بلا %1440) لعرض المدى الكامل "6:00م–1:00ص" في البطاقة —
+    // بطاقة الممارس كانت تبحث عن دوام اليوم الحالي فقط فتراه فارغاً.
+    const tail = (() => {
+      for (const [s,e] of yest) if (e > 1440 && nowMin < e - 1440) return [s,e];
+      return null;
+    })();
+    const tailEnd = tail ? tail[1]-1440 : null;
+
+    // الإجازة (غير الندب) تُلغي التواجد — ولا تتأثر بالزيارة.
+    // استثناء: إجازة تبدأ *اليوم* لا تقطع وردية بدأت أمس وامتدت بعد منتصف
+    // الليل؛ الممارس ما زال على دوام الأمس حتى ينتهي. أما إجازة بدأت قبل
+    // اليوم فتعني أنه لم يداوم أمس أصلاً، فلا امتداد.
+    if (!isSecondment && (lv || doc.status === "leave")) {
+      const startsToday = !!(lv && lv.start_date === dateStr);
+      if (!(startsToday && tailEnd !== null)) {
+        const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
+        const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
+        return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
+      }
+    }
 
     // الزيارة = علامة فوق حالة الدوام الفعلية (لا تُلغي التواجد ولا تغيّر الحالة)
     const vis = base => doc.in_visit ? {...base, in_visit:true} : base;
@@ -1931,13 +1961,13 @@ const LocalDB = (() => {
     // still inside a shift that started today (before midnight portion)
     for (const [s,e] of todays) {
       if (s <= nowMin && nowMin < Math.min(e, 1440))
-        return vis({state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,shift_end:e,...sec});
+        return vis({state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e%1440)}`,
+                    shift_end:e, disp_start:s, disp_end:e, ...sec});
     }
     // inside overnight tail from yesterday's shift
-    for (const [s,e] of yest) {
-      if (e > 1440 && nowMin < e-1440)
-        return vis({state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(e-1440)}`,shift_end:e-1440,...sec});
-    }
+    if (tail !== null)
+      return vis({state:"present",label:"موجود الآن",color:"green",detail:`حتى ${fmtMin(tailEnd)}`,
+                  shift_end:tailEnd, disp_start:tail[0], disp_end:tail[1], ...sec});
     // upcoming shift today
     const starts = todays.filter(([s])=>s>nowMin).map(([s])=>s);
     if (starts.length) {
@@ -2555,7 +2585,7 @@ const LocalDB = (() => {
       needPerm("audit_view");
       // السقف هنا كان 300 بينما التخزين 500 — فكانت 180 عملية موجودة وغير مرئية،
       // ويبدو للمستخدم أنها حُذفت. الآن يُعرض كل ما هو محفوظ فعلاً.
-      return {audit:db.audit.slice(0,500)};
+      return {audit:db.audit.slice(0,2500)};
     }
 
     throw Object.assign(new Error("not found"),{status:404});
@@ -2644,6 +2674,7 @@ const App = (() => {
   let _notifSeen = new Set();// ids of already-triggered one-time notifs
   let _notifInterval = null;
   let _notifDateKey = "";    // tracks date to reset daily notifs
+  let _notifFadeTimer = null;// مؤقّت واحد لتلاشي تمييز "غير مقروء" — لا حلقة تكرار
 
   // دوال الوقت — ثابتة على توقيت الرياض UTC+3
   function _riyadhNow(){return new Date(Date.now()+3*3600000);}
@@ -2680,18 +2711,28 @@ const App = (() => {
     }
   }
 
+  // تحديث الشارة وحدها — عملية رخيصة لا تلمس اللوحة، آمنة الاستدعاء بأي وقت
+  function _updateBadge(){
+    const wrap=document.getElementById("notif-wrap"); if(!wrap) return;
+    const badge=wrap.querySelector(".notif-badge");
+    if(!badge) return;
+    const unread=_notifs.filter(n=>!n.read).length;
+    badge.textContent=unread>0?unread:""; badge.style.display=unread>0?"flex":"none";
+  }
+
   function _renderBell(ring=false){
     const wrap=document.getElementById("notif-wrap"); if(!wrap) return;
-    const btn=wrap.querySelector(".notif-btn");
-    const unread=_notifs.filter(n=>!n.read).length;
-    const badge=wrap.querySelector(".notif-badge");
-    if(badge) badge.textContent=unread>0?unread:"", badge.style.display=unread>0?"flex":"none";
-    if(ring&&btn){
-      btn.classList.remove("ringing");
-      void btn.offsetWidth; // reflow to restart animation
-      btn.classList.add("ringing");
-      setTimeout(()=>btn.classList.remove("ringing"),700);
+    _updateBadge();
+    if(ring){
+      const btn=wrap.querySelector(".notif-btn");
+      if(btn){
+        btn.classList.remove("ringing");
+        void btn.offsetWidth; // reflow لإعادة تشغيل الحركة — يحدث فقط عند وصول إشعار فعلي (نادر)
+        btn.classList.add("ringing");
+        setTimeout(()=>btn.classList.remove("ringing"),700);
+      }
     }
+    // إشعار جديد وصل واللوحة مفتوحة ⇒ أظهره فوراً. نداء واحد غير متكرر.
     if(_notifOpen) _renderPanel();
   }
 
@@ -2725,14 +2766,33 @@ const App = (() => {
     </div>
     <div class="notif-list">${itemsHTML}</div>
     ${_notifs.length?`<div class="notif-footer">آخر تحديث: ${_timeLabel()}</div>`:""}`;
-    panel.querySelector("#notif-clr")?.addEventListener("click",()=>{_notifs=[];_notifSeen=new Set();_notifOpen=false;panel.remove();_renderBell();});
+    panel.querySelector("#notif-clr")?.addEventListener("click",()=>{
+      clearTimeout(_notifFadeTimer);
+      _notifs=[];_notifSeen=new Set();_notifOpen=false;panel.remove();_updateBadge();
+    });
+    // نفس سلوك السابق تماماً: تُعلَّم كمقروءة فور الفتح — لكن بلا إعادة بناء متكررة.
     _notifs.forEach(n=>n.read=true);
-    setTimeout(_renderBell,50);
+    _updateBadge();
+    // تمييز "غير مقروء" يتلاشى بسلاسة بعد لحظة قصيرة (تبديل صنف + انتقال CSS)
+    // بدل اختفاء مفاجئ أو إعادة بناء اللوحة بالكامل — نداء واحد محدود لا حلقة.
+    clearTimeout(_notifFadeTimer);
+    if(unread>0){
+      _notifFadeTimer=setTimeout(()=>{
+        if(!document.body.contains(panel)) return;
+        panel.querySelectorAll(".notif-item.unread").forEach(el=>el.classList.remove("unread"));
+      }, 900);
+    }
   }
 
   function _closePanel(){
     _notifOpen=false;
-    const p=document.getElementById("notif-panel"); if(p) p.remove();
+    clearTimeout(_notifFadeTimer);
+    const p=document.getElementById("notif-panel");
+    if(!p || p.classList.contains("closing")) return;
+    p.classList.add("closing");
+    const done=()=>{ if(p.parentNode) p.remove(); };
+    p.addEventListener("animationend", done, {once:true});
+    setTimeout(done, 200); // شبكة أمان لو لم يُطلَق الحدث (تبويب غير مرئي مثلاً)
   }
 
   // أول يوم عمل فعلي بعد نهاية الإجازة — يتخطى الإجازات الأسبوعية والإجازات المتداخلة
@@ -2907,7 +2967,14 @@ const App = (() => {
     const isSecondment=!!live.isSecondment;
     const meta=[d.rank&&d.rank!==d.specialty?d.rank:null, d.nationality, d.experience?fmtExp(d.experience):null]
       .filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('<span class="shift-sep">·</span>');
-    const shift=(isLeave||isTerminated)?"":todayShift(d, viewDay);
+    let shift=(isLeave||isTerminated)?"":todayShift(d, viewDay);
+    // العرض الحي (viewDay غير مُمرَّر): إن كانت الحالة "موجود الآن" بسبب
+    // امتداد دوام الأمس بعد منتصف الليل، فجدول اليوم الحالي فارغ ولن
+    // يُعيد todayShift شيئاً — نعرض مدى الوردية الممتدة بدل تركه فارغاً.
+    if(!shift && !isLeave && !isTerminated && viewDay===undefined &&
+       live.state==="present" && live.disp_start!=null && live.disp_end!=null){
+      shift=fmtRange(live.disp_start, live.disp_end);
+    }
     // ملاحظة: إنهاء العقد المجدول لا يظهر على البطاقة الخارجية — يُرى فقط داخل تفاصيل البطاقة (quickCard)، كالإجازات القادمة
     const infoRow=isTerminated
       ?`<div class="dcard-shift" style="color:#475569">⛔ منتهي العقد${d.terminated_date?` · ${esc(d.terminated_date)}`:""}  </div>`
@@ -3882,6 +3949,8 @@ const App = (() => {
   async function doctorForm(doc, onDone, scheduleOnly){
     const {branches}=await api("/branches");
     const {specialties}=await api("/specialties");
+    // لتحذير تكرار الاسم عند الإضافة فقط — لا حاجة لها عند تعديل ممارس موجود
+    const existingDoctors = doc ? [] : (await api("/doctors")).doctors || [];
     const d=doc||{schedule:{},dayoff:[],gender:"",home_visit:false,status:"active"};
     // قائمة الأقسام المعتمدة — يُضاف تخصص الممارس الحالي إن لم يكن مسجّلاً (حفاظاً على بياناته)
     const specList=specialties.slice();
@@ -4062,6 +4131,12 @@ const App = (() => {
           const dayNames=["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
           const lines=longShifts.map(([day,s,e])=>`• ${dayNames[day]}: ${fmtMin(s%1440)} ← ${fmtMin(e%1440)} (${((e-s)/60).toFixed(1)} ساعة)`).join("\n");
           if(!confirm(`⚠️ لديك ورديات طويلة جداً (أكثر من 16 ساعة):\n\n${lines}\n\nقد يكون السبب خطأ في ص/م (مثلاً 4:30م بدل 4:30ص).\nتأكد من أوقات البداية والنهاية.\n\nهل تريد الحفظ رغم ذلك؟`)) return;
+        }
+        // تحذير تكرار الاسم — ممارس بنفس الاسم (بصرف النظر عن الهمزات/التاء المربوطة) في نفس الفرع
+        if(!doc && !scheduleOnly && payload.name){
+          const nName=normalizeAr(payload.name);
+          const dup=existingDoctors.find(x=>x.branch_id===payload.branch_id && normalizeAr(x.name)===nName);
+          if(dup && !confirm(`⚠️ يوجد ممارس بنفس الاسم "${dup.name}" في هذا الفرع بالفعل.\n\nهل تريد المتابعة والإضافة كممارس جديد رغم ذلك؟`)) return;
         }
         payload.schedule=schedule; payload.dayoff=dayoff;
         delete payload.hours_raw;
@@ -4861,10 +4936,18 @@ const App = (() => {
   };
 
   async function drawStatsPanel(){
-    const [{leaves},{branches},{doctors}]=await Promise.all([api("/leaves"),api("/branches"),api("/doctors")]);
+    const canAudit=can("audit_view");
+    const [{leaves},{branches},{doctors},auditData,allDocsData]=await Promise.all([
+      api("/leaves"),api("/branches"),api("/doctors"),
+      canAudit?api("/audit"):Promise.resolve({audit:[]}),
+      canAudit?api("/doctors?archived=1&terminated=1"):Promise.resolve({doctors:[]})
+    ]);
     const bmap={};branches.forEach(b=>bmap[b.id]=b.name);
     const activeDocs=doctors.filter(d=>!d.archived);
     activeDocs.forEach(d=>d.branch_name=bmap[d.branch_id]||"");
+    // بيانات «الأكثر تعديلاً» — يعتمد سجل التعديلات (audit_view)، مستقل عن قائمة الإجازات أعلاه
+    const auditAll=auditData.audit||[];
+    const nameById={}; (allDocsData.doctors||[]).forEach(d=>{ nameById[d.id]=d.name; });
     const now=new Date();
     let selYear=now.getFullYear(), selMonth=now.getMonth(), viewMode="month";
     const monthNames=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -4923,6 +5006,22 @@ const App = (() => {
       const typeRows=Object.entries(typeTotals).sort((a,b)=>b[1]-a[1]);
       const specRows=Object.entries(specTotals).sort((a,b)=>b[1]-a[1]);
       const maxDays=topDoc?topDoc.days:1;
+
+      // الأكثر تعديلاً في نفس الفترة المختارة — من سجل العمليات (entity="doctor")
+      const editCounts={};
+      auditAll.forEach(a=>{
+        if(a.entity!=="doctor"||!a.entity_id) return;
+        const ds=(a.ts||"").slice(0,10);
+        if(ds<rStart||ds>rEnd) return;
+        const c=editCounts[a.entity_id]||{count:0,last:null,lastUser:""};
+        c.count++;
+        if(!c.last||a.ts>c.last){ c.last=a.ts; c.lastUser=a.user||""; }
+        editCounts[a.entity_id]=c;
+      });
+      const editRows=Object.entries(editCounts)
+        .map(([id,v])=>({id, name:nameById[id]||("ممارس #"+id), ...v}))
+        .sort((a,b)=>b.count-a.count).slice(0,10);
+      const maxEdits=editRows.length?editRows[0].count:1;
 
       const colors=["#0ea5a4","#6366f1","#f59e0b","#ef4444","#22c55e","#8b5cf6","#ec4899","#14b8a6"];
 
@@ -5008,6 +5107,33 @@ const App = (() => {
             </tbody></table>
             </div>
           </div>`:`<div class="empty" style="margin-top:30px">لا توجد إجازات في هذه الفترة</div>`}
+
+          ${canAudit?(editRows.length?`
+          <div class="card" style="padding:16px;margin-top:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <div style="font-weight:700;font-size:14px">🔥 الأكثر تعديلاً</div>
+              <div style="font-size:12px;color:var(--muted)">${label}</div>
+            </div>
+            <div style="overflow-x:auto">
+            <table class="tbl"><thead><tr>
+              <th>#</th><th>الممارس</th><th>عدد التعديلات</th><th>آخر تعديل</th>
+            </tr></thead><tbody>
+            ${editRows.map((r,i)=>`<tr>
+              <td style="color:var(--muted);font-weight:700">${i+1}</td>
+              <td><b>${esc(r.name)}</b></td>
+              <td style="min-width:120px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <div style="flex:1;background:var(--bg);border-radius:4px;height:16px;overflow:hidden">
+                    <div style="height:100%;background:var(--brand);border-radius:4px;width:${Math.round(r.count/maxEdits*100)}%;transition:width .3s"></div>
+                  </div>
+                  <span style="font-weight:700;font-size:13px;min-width:20px">${r.count}</span>
+                </div>
+              </td>
+              <td style="font-size:11.5px;color:var(--muted);white-space:nowrap">${esc((r.last||"").replace("T"," ").slice(0,16))}${r.lastUser?" · "+esc(r.lastUser):""}</td>
+            </tr>`).join("")}
+            </tbody></table>
+            </div>
+          </div>`:`<div class="card" style="padding:16px;margin-top:14px"><div style="font-weight:700;font-size:14px;margin-bottom:6px">🔥 الأكثر تعديلاً</div><div class="empty" style="padding:14px 0">لا توجد تعديلات مسجَّلة في هذه الفترة</div></div>`):""}
         </div>`;
 
       $("#st-prev").onclick=()=>{if(viewMode==="month"){selMonth--;if(selMonth<0){selMonth=11;selYear--;}}else selYear--;draw();};
