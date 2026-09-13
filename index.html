@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-08-23-52">
+<meta name="app-version" content="2026-09-13-53">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1103,7 +1103,9 @@ const SmartSearch = (() => {
     if(l.state==="present")    out.push("موجود","متواجد","حاضر","موجود الان");
     if(l.state==="upcoming")   out.push("يبدا لاحقا","قريبا");
     if(l.state==="finished")   out.push("انتهي دوامه","انتهي");
-    if(l.isSecondment)         out.push("ندب","منتدب","منتدب الي");
+    if(l.isSecondment){        out.push("ندب","منتدب","منتدب الي");
+      if(l.secondmentBranchName) out.push(l.secondmentBranchName);
+      if(l.secondmentShiftLabel) out.push("ندب شفت", l.secondmentShiftLabel); }
     if(l.in_visit)             out.push("زياره","في زياره","زيارة");
     if(l.leaveType)            out.push(l.leaveType);
     if(l.label)                out.push(l.label);
@@ -1881,6 +1883,8 @@ const LocalDB = (() => {
     if((o.type||"")!==(n.type||"")) ch.push(`النوع: ${o.type||"—"} ← ${n.type||"—"}`);
     if((o.start_date||"")!==(n.start_date||"")) ch.push(`من تاريخ: ${_fmtD(o.start_date)} ← ${_fmtD(n.start_date)}`);
     if((o.end_date||"")!==(n.end_date||"")) ch.push(`إلى تاريخ: ${_fmtD(o.end_date)} ← ${_fmtD(n.end_date)}`);
+    if(String(o.shift||"")!==String(n.shift||""))
+      ch.push(`نوع الندب: ${o.shift?("شفت "+SHIFT_LABEL[o.shift]):"ندب كامل"} ← ${n.shift?("شفت "+SHIFT_LABEL[n.shift]):"ندب كامل"}`);
     if(String(o.secondment_branch_id||"")!==String(n.secondment_branch_id||""))
       ch.push(`فرع الندب: ${_auditVal(db,'secondment_branch_id',o.secondment_branch_id)} ← ${_auditVal(db,'secondment_branch_id',n.secondment_branch_id)}`);
     if((o.reason||"")!==(n.reason||"")) ch.push(`الملاحظات: ${o.reason||"—"} ← ${n.reason||"—"}`);
@@ -1908,12 +1912,62 @@ const LocalDB = (() => {
     );
   }
 
-  // يبحث عن سجل إجازة/ندب متداخل مع الفترة [start,end] لنفس الممارس (عدا السجل المستثنى)
-  function overlapLeaveFn(leaves, doctorId, start, end, excludeId) {
-    return leaves.find(l =>
-      l.doctor_id == doctorId && l.id !== excludeId && !l.synthetic &&
-      start <= l.end_date && l.start_date <= end
-    );
+  // ── ندب الشفت ──────────────────────────────────────────────────────
+  // حقل اختياري واحد على سجل الندب: shift = "morning" | "evening".
+  // غيابه = ندب كامل (السلوك القديم حرفياً) ⇒ توافق رجعي تام مع كل السجلات الحالية.
+  const SHIFT_LABEL = { morning:"صباحي", evening:"مسائي" };
+  const SHIFT_SPLIT = 12*60;   // وردية تبدأ قبل الظهر = صباحية، وإلا مسائية
+
+  const _isSecRec = (l) => !!(l && l.type === "ندب" && l.secondment_branch_id);
+  const _shiftOfMin = (startMin) => (((startMin % 1440) + 1440) % 1440) < SHIFT_SPLIT ? "morning" : "evening";
+
+  // الفترة التي يقع فيها الممارس الآن: من الوردية التي يعمل بها فعلياً إن وُجدت،
+  // وإلا من الساعة نفسها — حتى تُحسم الفترة حتى في يوم إجازته الأسبوعية.
+  function _currentShiftKind(doc, nowMin, day) {
+    const sc = (doc && doc.schedule) || {};
+    const todays = (sc[day] || sc[String(day)] || []);
+    for (const [st, en] of todays) {
+      const e = en < st ? en + 1440 : en;
+      if (st <= nowMin && nowMin < Math.min(e, 1440)) return _shiftOfMin(st);
+    }
+    const yest = (sc[(day+6)%7] || sc[String((day+6)%7)] || []);
+    for (const [st, en] of yest) {           // امتداد وردية الأمس بعد منتصف الليل
+      const e = en < st ? en + 1440 : en;
+      if (e > 1440 && nowMin < e - 1440) return _shiftOfMin(st);
+    }
+    return _shiftOfMin(nowMin);
+  }
+
+  // يفصل سجلات اليوم: إجازة حقيقية / ندب الشفت المطابق / ندب كامل.
+  // الأولوية: إجازة حقيقية ← ندب شفت مطابق ← ندب كامل ← الفرع الأساسي.
+  function _resolveDayRecords(leaves, doctorId, dateStr, shiftKind) {
+    const all = (leaves || []).filter(l =>
+      l.doctor_id == doctorId && l.start_date <= dateStr && l.end_date >= dateStr);
+    const realLeave = all.find(l => !_isSecRec(l));
+    const shiftSecs = all.filter(l => _isSecRec(l) && l.shift);
+    const fullSec   = all.find(l => _isSecRec(l) && !l.shift);
+    const matchedSec = (shiftKind ? shiftSecs.find(l => l.shift === shiftKind) : null) || fullSec || null;
+    return { realLeave: realLeave || null, sec: matchedSec, shiftSecs, fullSec: fullSec || null };
+  }
+
+  // يبحث عن سجل إجازة/ندب متداخل مع الفترة [start,end] لنفس الممارس (عدا السجل المستثنى).
+  // isSec/shift يصفان السجل الجديد. القاعدة:
+  //   • شفتان مختلفان (صباحي/مسائي)         ← لا تعارض (جوهر الميزة)
+  //   • نفس الشفت في تواريخ متداخلة          ← تعارض
+  //   • ندب شفت مع ندب كامل                  ← لا تعارض (الشفت يغلب في فترته)
+  //   • أي إجازة حقيقية مع أي ندب أو إجازة   ← تعارض (السلوك القديم)
+  function overlapLeaveFn(leaves, doctorId, start, end, excludeId, isSec, shift) {
+    return leaves.find(l => {
+      if (l.doctor_id != doctorId || l.id === excludeId || l.synthetic) return false;
+      if (!(start <= l.end_date && l.start_date <= end)) return false;
+      const oldSec = _isSecRec(l);
+      // أحد الطرفين إجازة حقيقية ⇒ تعارض دائماً
+      if (!isSec || !oldSec) return true;
+      // الطرفان ندب:
+      if (shift && l.shift) return l.shift === shift;   // شفتان: تعارض فقط إن تطابقا
+      if (!shift && !l.shift) return true;               // ندبان كاملان ⇒ تعارض (كالسابق)
+      return false;                                      // كامل مع شفت، أو العكس ⇒ يتعايشان
+    });
   }
 
   // تفعيل إنهاء العقد المجدول تلقائياً عند وصول تاريخه — يحوّله إلى حالة دائمة
@@ -1935,9 +1989,20 @@ const LocalDB = (() => {
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
     if (doc.terminated) return {state:"terminated",label:"منتهي العقد",color:"terminated"};
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
-    const lv = activeLeaveFn(leaves, doc.id, dateStr);
-    const isSecondment = !!(lv && lv.type === "ندب" && lv.secondment_branch_id);
-    const sec = isSecondment ? {isSecondment:true, secondmentBranchId:lv.secondment_branch_id, leave:lv} : {};
+    // الفترة الحالية (صباحي/مسائي) ثم حلّ سجلات اليوم حسبها.
+    // بلا ندب شفت: النتيجة مطابقة تماماً للسلوك السابق.
+    const _shiftKind = _currentShiftKind(doc, nowMin, day);
+    const _rec = _resolveDayRecords(leaves, doc.id, dateStr, _shiftKind);
+    // بلا رجوع إلى activeLeaveFn: كان يلتقط ندب شفت غير مطابق للفترة الحالية
+    // فيُحوّل الممارس إلى "إجازة" في فترة هو فيها بفرعه الأساسي فعلاً.
+    const lv = _rec.realLeave || _rec.sec;
+    const isSecondment = !_rec.realLeave && !!_rec.sec;
+    const sec = isSecondment ? {
+      isSecondment:true, secondmentBranchId:_rec.sec.secondment_branch_id, leave:_rec.sec,
+      ...(_rec.sec.shift ? {secondmentShift:_rec.sec.shift, secondmentShiftLabel:SHIFT_LABEL[_rec.sec.shift]} : {})
+    } : {};
+    // كل ندبات الشفت لهذا اليوم — لعرضها مجتمعة في البطاقة
+    const _shiftSecList = _rec.shiftSecs.length ? {shiftSecondments:_rec.shiftSecs} : {};
 
     const sc = doc.schedule || {};
     // normalise shift: if end < start treat as overnight (end += 1440)
@@ -1969,7 +2034,7 @@ const LocalDB = (() => {
     }
 
     // الزيارة = علامة فوق حالة الدوام الفعلية (لا تُلغي التواجد ولا تغيّر الحالة)
-    const vis = base => doc.in_visit ? {...base, in_visit:true} : base;
+    const vis = base => ({ ..._shiftSecList, ...(doc.in_visit ? {...base, in_visit:true} : base) });
 
     // still inside a shift that started today (before midnight portion)
     for (const [s,e] of todays) {
@@ -2013,6 +2078,14 @@ const LocalDB = (() => {
         // نسخة من سجل الندب مع اسم الفرع (بدون تعديل السجل الأصلي في القاعدة)
         if (live.leave) live.leave = { ...live.leave, secondment_branch_name: sb.name };
       }
+    }
+    // إثراء ندبات الشفت بأسماء الفروع — لتُعرض جاهزة في البطاقة والبحث
+    if (Array.isArray(live.shiftSecondments) && live.shiftSecondments.length) {
+      live.shiftSecondments = live.shiftSecondments.map(l => ({
+        ...l,
+        secondment_branch_name: (db.branches.find(b=>b.id==l.secondment_branch_id)||{}).name || "",
+        shift_label: SHIFT_LABEL[l.shift] || ""
+      }));
     }
     if (doc.termination_scheduled) live.termSched = doc.termination_scheduled;
     return live;
@@ -2240,11 +2313,13 @@ const LocalDB = (() => {
     if (method==="GET" && path==="/branches") {
       needAuth();
       const {day,nowMin,dateStr}=nowInfo();
-      const secondedAwayIds=new Set(db.leaves.filter(l=>l.type==="ندب"&&l.secondment_branch_id&&l.start_date<=dateStr&&l.end_date>=dateStr).map(l=>l.doctor_id));
+      // الفرع الفعلي الآن = فرع الندب السارية فترته (شفت أو كامل)، وإلا الفرع الأساسي.
+      // يُشتق من _liveOf فيراعي ندب الشفت تلقائياً بدل إخراج الممارس طوال اليوم.
+      const _effBranchNow=(d)=>{ const st=_liveOf(d,db,nowMin,day,dateStr);
+        return (st.isSecondment&&st.secondmentBranchId)?st.secondmentBranchId:d.branch_id; };
       return {branches: db.branches.map(b=>{
-        const baseDocs=db.doctors.filter(d=>d.branch_id==b.id&&!d.archived&&!d.terminated&&!secondedAwayIds.has(d.id));
-        const seconded=db.doctors.filter(d=>d.branch_id!=b.id&&!d.archived&&!d.terminated&&
-          db.leaves.some(l=>l.doctor_id==d.id&&l.type==="ندب"&&l.secondment_branch_id==b.id&&l.start_date<=dateStr&&l.end_date>=dateStr));
+        const baseDocs=db.doctors.filter(d=>!d.archived&&!d.terminated&&_effBranchNow(d)==b.id&&d.branch_id==b.id);
+        const seconded=db.doctors.filter(d=>!d.archived&&!d.terminated&&d.branch_id!=b.id&&_effBranchNow(d)==b.id);
         const docs=[...baseDocs,...seconded];
         const present=docs.filter(d=>{ const st=_liveOf(d,db,nowMin,day,dateStr); return st.state==="present"; }).length;
         const secCnt=seconded.length;
@@ -2258,10 +2333,11 @@ const LocalDB = (() => {
         needAuth();
         const b=db.branches.find(x=>x.id===bid); if(!b) throw Object.assign(new Error("not found"),{status:404});
         const {dateStr:dStr}=nowInfo();
-        const secAwayIds=new Set(db.leaves.filter(l=>l.type==="ندب"&&l.secondment_branch_id&&l.start_date<=dStr&&l.end_date>=dStr).map(l=>l.doctor_id));
-        const baseDocs=db.doctors.filter(d=>d.branch_id===bid&&!d.archived&&!d.terminated&&!secAwayIds.has(d.id));
-        const seconded=db.doctors.filter(d=>d.branch_id!==bid&&!d.archived&&!d.terminated&&
-          db.leaves.some(l=>l.doctor_id==d.id&&l.type==="ندب"&&l.secondment_branch_id==bid&&l.start_date<=dStr&&l.end_date>=dStr));
+        const {day:_bd,nowMin:_bn}=nowInfo();
+        const _effB=(d)=>{ const st=_liveOf(d,db,_bn,_bd,dStr);
+          return (st.isSecondment&&st.secondmentBranchId)?st.secondmentBranchId:d.branch_id; };
+        const baseDocs=db.doctors.filter(d=>!d.archived&&!d.terminated&&d.branch_id===bid&&_effB(d)==bid);
+        const seconded=db.doctors.filter(d=>!d.archived&&!d.terminated&&d.branch_id!==bid&&_effB(d)==bid);
         const allDocs=[...baseDocs,...seconded].sort((a,b2)=>a.name.localeCompare(b2.name));
         return {branch:b,doctors:allDocs.map(d=>({...withStatus(d,db),branch_name:(db.branches.find(x=>x.id===d.branch_id)||{}).name||""})),specialties:[...new Set(allDocs.map(d=>d.specialty))].sort()};
       }
@@ -2418,7 +2494,8 @@ const LocalDB = (() => {
       const realLeaves=db.leaves.filter(l=>{const doc=dmap[l.doctor_id];return !doc||(!doc.terminated&&!doc.archived);}).map(l=>{
         const doc=dmap[l.doctor_id]||{};
         return {...l,doctor_name:doc.name||"",branch_id:doc.branch_id||null,branch_name:bmap[doc.branch_id]||"",specialty:doc.specialty||"",
-          work_days:doc.work_days||[],secondment_branch_name:l.secondment_branch_id?bmap[l.secondment_branch_id]||"":""};
+          work_days:doc.work_days||[],secondment_branch_name:l.secondment_branch_id?bmap[l.secondment_branch_id]||"":"",
+          shift_label:l.shift?(SHIFT_LABEL[l.shift]||""):""};
       });
       // Include doctors manually set to leave status with no active leave record
       const docIdsWithActiveLeave=new Set(db.leaves.filter(l=>l.start_date<=today&&l.end_date>=today).map(l=>l.doctor_id));
@@ -2433,16 +2510,19 @@ const LocalDB = (() => {
       const d=db.doctors.find(x=>x.id===+body.doctor_id);
       if(!d) throw Object.assign(new Error("الممارس غير موجود"),{status:404}); // منع إنشاء إجازة لممارس غير موجود
       needBranch(d.branch_id); needSpecialty(d.specialty);
-      const clash=overlapLeaveFn(db.leaves,+body.doctor_id,body.start_date,body.end_date,null);
+      const _newIsSec=(body.type==="ندب"&&!!body.secondment_branch_id);
+      const _newShift=(_newIsSec&&(body.shift==="morning"||body.shift==="evening"))?body.shift:null;
+      const clash=overlapLeaveFn(db.leaves,+body.doctor_id,body.start_date,body.end_date,null,_newIsSec,_newShift);
       if(clash) throw Object.assign(new Error(`⛔ تعارض في التواريخ: يوجد "${clash.type||"إجازة"}" من ${clash.start_date} إلى ${clash.end_date}`),{status:409});
       const id=nextId(db,"leaves");
       const lv={id,doctor_id:+body.doctor_id,start_date:body.start_date,end_date:body.end_date,type:body.type||"إجازة",reason:body.reason||"",
         secondment_branch_id:(body.type==="ندب"&&body.secondment_branch_id)?+body.secondment_branch_id:null};
+      if(_newShift) lv.shift=_newShift;   // ندب شفت — غيابه يعني ندباً كاملاً
       db.leaves.push(lv);
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
       const dNm=d?d.name:"";
       const lvDetail=(lv.type==="ندب")
-        ?`إنشاء ندب لـ"${dNm}" إلى فرع ${_auditVal(db,'secondment_branch_id',lv.secondment_branch_id)} من ${_fmtD(lv.start_date)} إلى ${_fmtD(lv.end_date)}`
+        ?`إنشاء ${lv.shift?("ندب شفت ("+SHIFT_LABEL[lv.shift]+")"):"ندب"} لـ"${dNm}" إلى فرع ${_auditVal(db,'secondment_branch_id',lv.secondment_branch_id)} من ${_fmtD(lv.start_date)} إلى ${_fmtD(lv.end_date)}`
         :`إضافة ${lv.type} لـ"${dNm}" من ${_fmtD(lv.start_date)} إلى ${_fmtD(lv.end_date)}`;
       log(db,"إضافة إجازة","leave",id,lvDetail,{branch:bn,branch_id:d?d.branch_id:null}); save(db); return {id};
     }
@@ -2454,11 +2534,16 @@ const LocalDB = (() => {
       const d=db.doctors.find(x=>x.id===l.doctor_id);
       if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
       const _ns=("start_date" in body)?body.start_date:l.start_date, _ne=("end_date" in body)?body.end_date:l.end_date;
-      const clash=overlapLeaveFn(db.leaves,l.doctor_id,_ns,_ne,l.id);
+      const _uType=("type" in body)?body.type:l.type;
+      const _uBranch=("secondment_branch_id" in body)?body.secondment_branch_id:l.secondment_branch_id;
+      const _uIsSec=(_uType==="ندب"&&!!_uBranch);
+      const _uShift=_uIsSec?(("shift" in body)?((body.shift==="morning"||body.shift==="evening")?body.shift:null):(l.shift||null)):null;
+      const clash=overlapLeaveFn(db.leaves,l.doctor_id,_ns,_ne,l.id,_uIsSec,_uShift);
       if(clash) throw Object.assign(new Error(`⛔ تعارض في التواريخ: يوجد "${clash.type||"إجازة"}" من ${clash.start_date} إلى ${clash.end_date}`),{status:409});
-      const _before={type:l.type,start_date:l.start_date,end_date:l.end_date,reason:l.reason,secondment_branch_id:l.secondment_branch_id};
+      const _before={type:l.type,start_date:l.start_date,end_date:l.end_date,reason:l.reason,secondment_branch_id:l.secondment_branch_id,shift:l.shift||null};
       ["start_date","end_date","type","reason"].forEach(k=>{ if(k in body) l[k]=body[k]; });
       l.secondment_branch_id=(l.type==="ندب"&&body.secondment_branch_id)?+body.secondment_branch_id:null;
+      if(_uShift) l.shift=_uShift; else delete l.shift;   // تحويل بين ندب كامل/شفت
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
       const lchanges=_diffLeave(db,_before,l);
       const editDetail=lchanges.length?`تعديل ${l.type||"إجازة"} لـ"${d?d.name:""}":\n• ${lchanges.join("\n• ")}`:`فتح إجازة "${d?d.name:""}" دون تغيير`;
@@ -2997,7 +3082,7 @@ const App = (() => {
         ?(shift
           ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
           :"")
-        +`<div class="dcard-shift" style="color:#0e7490;font-size:12px;margin-top:2px">🔀 منتدب إلى: ${esc(live.secondmentBranchName||"")}</div>`
+        +`<div class="dcard-shift" style="color:#0e7490;font-size:12px;margin-top:2px">🔀 منتدب إلى: ${esc(live.secondmentBranchName||"")}${live.secondmentShiftLabel?` — ${esc(live.secondmentShiftLabel)}`:""}</div>`
       :shift
         ?`<div class="dcard-shift">${shift.split(" ، ").map(s=>`<span class="shift-seg">🕐 ${esc(s)}</span>`).join('<span class="shift-sep"> · </span>')}</div>`
         :isLeave
@@ -3090,7 +3175,7 @@ const App = (() => {
       <div class="leave-active-row" style="${isSecondmentCard?"border-color:#06b6d4;background:color-mix(in srgb,#cffafe 30%,var(--surface))":""}">
         <div>
           <div class="la-info">${isSecondmentCard
-            ?`🔀 منتدب إلى: ${esc(secBranchName||"—")}`
+            ?`🔀 منتدب إلى: ${esc(secBranchName||"—")}${live.secondmentShiftLabel?` <span style="font-size:12px">· الشفت: ${esc(live.secondmentShiftLabel)}</span>`:""}`
             :`🔴 ${esc(activeLv?activeLv.type:live.leaveType||"إجازة")}`}</div>
           ${activeLv?`<div class="la-dates">من ${esc(fmtDate(activeLv.start_date))} إلى ${esc(fmtDate(activeLv.end_date))}${activeLv.reason?` · ${esc(activeLv.reason)}`:""}</div>`:""}
         </div>
@@ -3098,6 +3183,25 @@ const App = (() => {
           <button class="btn btn-xs btn-ghost" data-edit-leave="${activeLv.id}">تعديل</button>
           <button class="btn btn-xs btn-danger" data-del-leave="${activeLv.id}">${isSecondmentCard?"إلغاء الندب":"إلغاء"}</button>
         </div>`:""}
+      </div>`:"";
+
+    // ندبات الشفت لهذا اليوم — تُعرض مجتمعة (صباحي + مسائي) مع إبراز الفترة الحالية
+    const shiftSecs=Array.isArray(live.shiftSecondments)?live.shiftSecondments:[];
+    const shiftSecSection=shiftSecs.length?`
+      <div style="margin-top:10px">
+        <div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:6px">🔀 ندب الشفت</div>
+        ${shiftSecs.map(sv=>{
+          const isNow=live.isSecondment&&live.leave&&live.leave.id===sv.id;
+          return `<div class="leave-active-row" style="border-color:#06b6d4;${isNow?"background:color-mix(in srgb,#cffafe 35%,var(--surface))":""}">
+            <div>
+              <div class="la-info">منتدب إلى: ${esc(sv.secondment_branch_name||"—")} · الشفت: ${esc(sv.shift_label||"")}${isNow?' <span style="color:#0e7490;font-size:11.5px">(الفترة الحالية)</span>':""}</div>
+              <div class="la-dates">من ${esc(fmtDate(sv.start_date))} إلى ${esc(fmtDate(sv.end_date))}</div>
+            </div>
+            ${can("leave_manage")?`<div class="la-actions">
+              <button class="btn btn-xs btn-ghost" data-edit-leave="${sv.id}">تعديل</button>
+              <button class="btn btn-xs btn-danger" data-del-leave="${sv.id}">إلغاء</button>
+            </div>`:""}
+          </div>`;}).join("")}
       </div>`:"";
 
     const upcomingSection=upcomingLeaves.map(ul=>`
@@ -3133,7 +3237,7 @@ const App = (() => {
           <div style="margin-top:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">${statusPill(live)}${visitToggle}</div>
         </div>
       </div>
-      ${schedTermSection}${leaveSection}${upcomingSection}
+      ${schedTermSection}${leaveSection}${shiftSecSection}${upcomingSection}
       <div class="qd-rows">${rows.map(([k,v])=>`<div class="qd-row"><div class="k">${k}</div><div class="vv">${v}</div></div>`).join("")}</div>`;
 
     const foot=`
@@ -3536,10 +3640,19 @@ const App = (() => {
       const termDate=d.terminated_date||d.termination_scheduled;
       if(d.terminated||(termDate&&termDate<=ds))
         return {state:"terminated",label:"منتهي العقد",color:"terminated"};
-      const lv=allLeaves.find(l=>!l.synthetic&&String(l.doctor_id)===String(d.id)&&l.start_date<=ds&&l.end_date>=ds);
-      const isSec=!!(lv&&lv.type==="ندب"&&lv.secondment_branch_id);
+      // سجلات ذلك اليوم مفصولة: إجازة حقيقية / ندب شفت / ندب كامل.
+      // بلا ندب شفت النتيجة مطابقة للسلوك السابق حرفياً.
+      const _dayRecs=allLeaves.filter(l=>!l.synthetic&&String(l.doctor_id)===String(d.id)&&l.start_date<=ds&&l.end_date>=ds);
+      const _isSecR=(l)=>!!(l&&l.type==="ندب"&&l.secondment_branch_id);
+      const _dayShiftSecs=_dayRecs.filter(l=>_isSecR(l)&&l.shift);
+      const lv=_dayRecs.find(l=>!_isSecR(l)) || _dayShiftSecs[0] || _dayRecs.find(l=>_isSecR(l)&&!l.shift);
+      const isSec=_isSecR(lv);
       const sec=isSec?{isSecondment:true,secondmentBranchId:lv.secondment_branch_id,
-        secondmentBranchName:bname[lv.secondment_branch_id]||"",leave:lv}:{};
+        secondmentBranchName:bname[lv.secondment_branch_id]||"",leave:lv,
+        ...(lv.shift?{secondmentShift:lv.shift,secondmentShiftLabel:(lv.shift==="morning"?"صباحي":"مسائي")}:{}) ,
+        ...(_dayShiftSecs.length?{shiftSecondments:_dayShiftSecs.map(x=>({...x,
+          secondment_branch_name:bname[x.secondment_branch_id]||"",
+          shift_label:(x.shift==="morning"?"صباحي":"مسائي")}))}:{})}:{};
       if(!isSec&&lv){
         const t=lv.type||"إجازة";
         return {state:"leave",label:"إجازة",color:"leave",leaveType:t,detail:`${t} · حتى ${lv.end_date}`,leave:lv};
@@ -4359,6 +4472,11 @@ const App = (() => {
           const f=new FormData(m.querySelector("#lvf")); const p=Object.fromEntries(f.entries());
           p.doctor_id=+p.doctor_id;
           if(p.type==="ندب"&&!p.secondment_branch_id){toast("اختر الفرع المنتدب إليه","warn");return;}
+          // ندب شفت: يُرسَل حقل shift. ندب كامل: يُحذف تماماً (سلوك قديم حرفياً)
+          if(p.type==="ندب"&&p.sec_mode==="shift"){
+            if(p.shift!=="morning"&&p.shift!=="evening"){toast("اختر الشفت","warn");return;}
+          } else { delete p.shift; }
+          delete p.sec_mode;
           // إنهاء عقد — تاريخ واحد فقط (حالة دائمة)؛ فوري إن كان اليوم/سابقاً، ومجدول إن كان مستقبلاً
           if(p.type==="إنهاء عقد"){
             const dName=(doctors.find(d=>d.id===p.doctor_id)||{}).name||"الممارس";
@@ -4397,6 +4515,20 @@ const App = (() => {
       </div>
       <div class="field"><label>النوع</label><select name="type" id="lve-type">
         ${LEAVE_TYPES.map(t=>`<option ${(lv.type||"")==t?"selected":""}>${t}</option>`).join("")}</select></div>
+      <div class="field" id="lve-secmode-field" style="display:${lv.type==="ندب"?"":"none"}">
+        <label>نوع الندب *</label>
+        <select name="sec_mode" id="lve-secmode">
+          <option value="full" ${!lv.shift?"selected":""}>ندب كامل — طوال اليوم</option>
+          <option value="shift" ${lv.shift?"selected":""}>ندب شفت — فترة محددة فقط</option>
+        </select>
+      </div>
+      <div class="field" id="lve-shift-field" style="display:${(lv.type==="ندب"&&lv.shift)?"":"none"}">
+        <label>الشفت *</label>
+        <select name="shift" id="lve-shift">
+          <option value="morning" ${lv.shift==="morning"?"selected":""}>صباحي</option>
+          <option value="evening" ${lv.shift==="evening"?"selected":""}>مسائي</option>
+        </select>
+      </div>
       <div class="field" id="lve-branch-field" style="display:${lv.type==="ندب"?"":"none"}">
         <label>الفرع المنتدب إليه *</label>
         <select name="secondment_branch_id" id="lve-branch-sel">
@@ -4410,11 +4542,25 @@ const App = (() => {
       footHTML:`<button class="btn btn-primary" id="save-lv-edit">حفظ</button><button class="btn btn-ghost" data-xe>إلغاء</button>`,
       onMount:(m)=>{ m.querySelector("[data-xe]").onclick=closeModal;
         const typeEl=m.querySelector("#lve-type"), branchField=m.querySelector("#lve-branch-field");
-        typeEl.addEventListener("change",()=>{ branchField.style.display=typeEl.value==="ندب"?"":"none"; });
+        const secModeField=m.querySelector("#lve-secmode-field"), secModeEl=m.querySelector("#lve-secmode");
+        const shiftField=m.querySelector("#lve-shift-field");
+        const syncE=()=>{
+          const isSec=typeEl.value==="ندب";
+          branchField.style.display=isSec?"":"none";
+          secModeField.style.display=isSec?"":"none";
+          shiftField.style.display=(isSec&&secModeEl.value==="shift")?"":"none";
+        };
+        typeEl.addEventListener("change",syncE);
+        secModeEl.addEventListener("change",syncE);
+        syncE();
         m.querySelector("#save-lv-edit").onclick=async()=>{
           const f=new FormData(m.querySelector("#lvf-edit")); const p=Object.fromEntries(f.entries());
           if(!p.start_date||!p.end_date){toast("أدخل التواريخ","warn");return;}
           if(p.type==="ندب"&&!p.secondment_branch_id){toast("اختر الفرع المنتدب إليه","warn");return;}
+          if(p.type==="ندب"&&p.sec_mode==="shift"){
+            if(p.shift!=="morning"&&p.shift!=="evening"){toast("اختر الشفت","warn");return;}
+          } else { p.shift=""; }   // فراغ = تحويل لندب كامل (الخادم يحذف الحقل)
+          delete p.sec_mode;
           if(p.start_date>p.end_date){toast("❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء","err");return;}
           try{
             await api("/leaves/"+lv.id,{method:"PUT",body:p});
@@ -4758,6 +4904,10 @@ const App = (() => {
     const upcomingS=secs.filter(l=>stOf(l)==="upcoming");
     const expiredS=secs.filter(l=>stOf(l)==="expired");
     let fBranch="",fSearch="",fStatus="";
+    // تمييز واضح بين الندب الكامل وندب الشفت — منعاً لأي لبس في القائمة
+    const secTypeBadge=(l)=>l.shift
+      ? `<span class="status-pill sp-secondment" style="font-size:11px">شفت ${esc(l.shift_label||(l.shift==="morning"?"صباحي":"مسائي"))}</span>`
+      : `<span class="status-pill sp-off" style="font-size:11px">كامل</span>`;
     const stBadge=(st)=>st==="active"
       ?`<span class="sp-leave" style="font-size:11px;padding:2px 8px">نشط</span>`
       :st==="upcoming"
@@ -4783,6 +4933,7 @@ const App = (() => {
               <div class="lc-rows">
                 <div class="lc-row"><span class="lc-lbl">🏥 الفرع الأساسي</span><span class="lc-val">${esc(l.branch_name||"—")}</span></div>
                 <div class="lc-row"><span class="lc-lbl">🔄 المنتدب إليه</span><span class="lc-val">${esc(l.secondment_branch_name||"—")}</span></div>
+                <div class="lc-row"><span class="lc-lbl">🕐 نوع الندب</span><span class="lc-val">${secTypeBadge(l)}</span></div>
                 <div class="lc-row"><span class="lc-lbl">🩺 التخصص</span><span class="lc-val">${esc(l.specialty||"—")}</span></div>
                 <div class="lc-row"><span class="lc-lbl">📅 الفترة</span><span class="lc-val">${esc(l.start_date)} ← ${esc(l.end_date)}</span></div>
               </div>
@@ -4795,12 +4946,13 @@ const App = (() => {
       } else {
         el.innerHTML=`<div style="color:var(--muted);font-size:13px;margin-bottom:8px">${list.length} ندب</div>
           <table class="tbl"><thead><tr>
-            <th>الممارس</th><th>الفرع الأساسي</th><th>المنتدب إليه</th><th>التخصص</th><th>من</th><th>إلى</th><th>الحالة</th><th></th>
+            <th>الممارس</th><th>الفرع الأساسي</th><th>المنتدب إليه</th><th>النوع</th><th>التخصص</th><th>من</th><th>إلى</th><th>الحالة</th><th></th>
           </tr></thead><tbody>
           ${list.map(l=>`<tr>
             <td><b>${esc(l.doctor_name)}</b></td>
             <td>${esc(l.branch_name||"—")}</td>
             <td>${esc(l.secondment_branch_name||"—")}</td>
+            <td>${secTypeBadge(l)}</td>
             <td>${esc(l.specialty||"—")}</td>
             <td>${esc(l.start_date)}</td>
             <td>${esc(l.end_date)}</td>
