@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-09-13-58">
+<meta name="app-version" content="2026-09-17-59">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -1790,6 +1790,15 @@ const LocalDB = (() => {
     return `${d.getUTCFullYear()}-${p(d.getUTCMonth()+1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
   }
   function _riyadhDate() { return _riyadhTS().slice(0,10); }
+  // اليوم السابق لتاريخ "YYYY-MM-DD" — يُستخدم لحلّ سياق الوردية العابرة لمنتصف الليل
+  function _prevDateStr(ds) {
+    const p = String(ds||"").split("-").map(Number);
+    if (p.length !== 3 || p.some(isNaN)) return ds;
+    const d = new Date(Date.UTC(p[0], p[1]-1, p[2]));
+    d.setUTCDate(d.getUTCDate() - 1);
+    const z = x => String(x).padStart(2,'0');
+    return `${d.getUTCFullYear()}-${z(d.getUTCMonth()+1)}-${z(d.getUTCDate())}`;
+  }
 
   let _lastAction = null; // آخر عملية مسجّلة — لتوثيق النسخة التشغيلية
   function log(db, action, entity, entity_id, detail, extra) {
@@ -2019,20 +2028,6 @@ const LocalDB = (() => {
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
     if (doc.terminated) return {state:"terminated",label:"منتهي العقد",color:"terminated"};
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
-    // الفترة الحالية (صباحي/مسائي) ثم حلّ سجلات اليوم حسبها.
-    // بلا ندب شفت: النتيجة مطابقة تماماً للسلوك السابق.
-    const _shiftKind = _currentShiftKey(doc, nowMin, day);
-    const _rec = _resolveDayRecords(leaves, doc.id, dateStr, _shiftKind);
-    // بلا رجوع إلى activeLeaveFn: كان يلتقط ندب شفت غير مطابق للفترة الحالية
-    // فيُحوّل الممارس إلى "إجازة" في فترة هو فيها بفرعه الأساسي فعلاً.
-    const lv = _rec.realLeave || _rec.sec;
-    const isSecondment = !_rec.realLeave && !!_rec.sec;
-    const sec = isSecondment ? {
-      isSecondment:true, secondmentBranchId:_rec.sec.secondment_branch_id, leave:_rec.sec,
-      ...(_rec.sec.shift ? {secondmentShift:_rec.sec.shift, secondmentShiftLabel:_shiftLabelByKey(doc,_rec.sec.shift)} : {})
-    } : {};
-    // كل ندبات الشفت لهذا اليوم — لعرضها مجتمعة في البطاقة
-    const _shiftSecList = _rec.shiftSecs.length ? {shiftSecondments:_rec.shiftSecs} : {};
 
     const sc = doc.schedule || {};
     // normalise shift: if end < start treat as overnight (end += 1440)
@@ -2041,26 +2036,41 @@ const LocalDB = (() => {
     const yest   = (sc[(day+6)%7] || sc[String((day+6)%7)] || []).map(norm);
 
     // ما بعد منتصف الليل جزء من دوام أمس لا من اليوم الجديد.
-    // الوردية الممتدة كاملة إن كنا داخلها الآن، وإلا null. نحتفظ بـ s,e
-    // الخام (بلا %1440) لعرض المدى الكامل "6:00م–1:00ص" في البطاقة —
-    // بطاقة الممارس كانت تبحث عن دوام اليوم الحالي فقط فتراه فارغاً.
+    // نحتفظ بـ s,e الخام (بلا %1440) لعرض المدى الكامل "6:00م–1:00ص".
     const tail = (() => {
       for (const [s,e] of yest) if (e > 1440 && nowMin < e - 1440) return [s,e];
       return null;
     })();
     const tailEnd = tail ? tail[1]-1440 : null;
 
+    // ── السياق الزمني الحاكم ──────────────────────────────────────────
+    // الوردية العابرة لمنتصف الليل فترة واحدة متصلة تخصّ *يوم بدايتها*.
+    // لذا حين نكون داخل امتدادها، تُحلّ الإجازة والندب بتاريخ الأمس لا اليوم:
+    // تغيّر التاريخ عند 12:00ص وحده لا يُسقط أي حالة قبل انتهاء الوردية فعلياً.
+    const _inTodayShift = todays.some(([s,e]) => s <= nowMin && nowMin < Math.min(e,1440));
+    const _inTail = !_inTodayShift && tail !== null;
+    const _ctxDate = _inTail ? _prevDateStr(dateStr) : dateStr;
+    const _ctxShift = _inTail ? _shiftKeyOf(tail[0], tail[1]) : _currentShiftKey(doc, nowMin, day);
+    const _rec = _resolveDayRecords(leaves, doc.id, _ctxDate, _ctxShift);
+
+    // بلا رجوع إلى activeLeaveFn: كان يلتقط ندب شفت غير مطابق للفترة الحالية
+    // فيُحوّل الممارس إلى "إجازة" في فترة هو فيها بفرعه الأساسي فعلاً.
+    const lv = _rec.realLeave || _rec.sec;
+    const isSecondment = !_rec.realLeave && !!_rec.sec;
+    const sec = isSecondment ? {
+      isSecondment:true, secondmentBranchId:_rec.sec.secondment_branch_id, leave:_rec.sec,
+      ...(_rec.sec.shift ? {secondmentShift:_rec.sec.shift, secondmentShiftLabel:_shiftLabelByKey(doc,_rec.sec.shift)} : {})
+    } : {};
+    // كل ندبات الشفت لهذا السياق — لعرضها مجتمعة في البطاقة
+    const _shiftSecList = _rec.shiftSecs.length ? {shiftSecondments:_rec.shiftSecs} : {};
+
     // الإجازة (غير الندب) تُلغي التواجد — ولا تتأثر بالزيارة.
-    // استثناء: إجازة تبدأ *اليوم* لا تقطع وردية بدأت أمس وامتدت بعد منتصف
-    // الليل؛ الممارس ما زال على دوام الأمس حتى ينتهي. أما إجازة بدأت قبل
-    // اليوم فتعني أنه لم يداوم أمس أصلاً، فلا امتداد.
+    // تُقاس على السياق أعلاه: إجازة تغطي يوم بداية الوردية تستمر حتى نهايتها
+    // الفعلية، وإجازة تبدأ اليوم التالي لا تقطع وردية بدأت أمس.
     if (!isSecondment && (lv || doc.status === "leave")) {
-      const startsToday = !!(lv && lv.start_date === dateStr);
-      if (!(startsToday && tailEnd !== null)) {
-        const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
-        const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
-        return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
-      }
+      const leaveType = lv ? (lv.type||"إجازة") : "إجازة";
+      const detail = lv ? `${leaveType} · حتى ${lv.end_date}` : "";
+      return {state:"leave", label:"إجازة", color:"leave", leaveType, detail, leave: lv||null};
     }
 
     // الزيارة = علامة فوق حالة الدوام الفعلية (لا تُلغي التواجد ولا تغيّر الحالة)
