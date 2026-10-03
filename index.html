@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-10-03-60">
+<meta name="app-version" content="2026-10-04-61">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -118,9 +118,6 @@ a{color:inherit;text-decoration:none}
 .perm-chip.perm-all{background:var(--amber-soft);color:var(--amber)}
 .perm-chip.perm-none{background:var(--bg2);color:var(--muted)}
 .user-card-actions{display:flex;gap:6px;flex-wrap:wrap}
-.btn-pin-eye,.btn-pin-copy{background:none;border:none;cursor:pointer;font-size:13px;padding:1px 3px;opacity:.6;vertical-align:middle}
-.btn-pin-eye:hover,.btn-pin-copy:hover{opacity:1}
-.pin-masked{font-family:monospace;letter-spacing:1px;vertical-align:middle}
 .perms-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
 .perm-check{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:4px 0}
 .perm-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--brand)}
@@ -660,28 +657,10 @@ body.modal-open{overflow:hidden}
 .login-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-l);
   width:100%;max-width:400px;padding:34px 30px}
 .login-card .brand{justify-content:center;padding-bottom:20px}
-.login-roles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
-.role-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.7}
 
-/* ---------- PIN login ---------- */
+/* ---------- Login card ---------- */
 .pin-card{max-width:340px}
 .pin-title{text-align:center;font-weight:600;color:var(--muted);margin:4px 0 10px;font-size:14px}
-.pin-input{width:100%;height:58px;text-align:center;font-size:26px;font-weight:700;letter-spacing:10px;
-  border:1px solid var(--line);background:var(--surface2);border-radius:var(--r);outline:none;transition:.15s;
-  color:var(--text);padding-inline-start:10px}
-.pin-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft);background:var(--surface)}
-.pin-input::placeholder{letter-spacing:6px;color:var(--muted);font-size:20px}
-.pin-display{height:48px;display:flex;align-items:center;justify-content:center;gap:9px;
-  background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);margin-bottom:16px;letter-spacing:2px}
-.pin-display .pin-dot{font-size:13px;color:var(--brand-d)}
-[data-theme="dark"] .pin-display .pin-dot{color:var(--brand)}
-.pin-display .pin-empty{color:var(--muted);letter-spacing:4px;font-size:18px}
-.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.pin-key{height:54px;border-radius:13px;border:1px solid var(--line);background:var(--surface);
-  font-size:22px;font-weight:600;box-shadow:var(--shadow);transition:.1s}
-.pin-key:hover{border-color:var(--brand);color:var(--brand-d)}
-.pin-key:active{transform:scale(.95);background:var(--brand-soft)}
-.pin-key.pin-aux{font-size:15px;font-weight:600;color:var(--muted)}
 
 /* ---------- Tabs (control panel) ---------- */
 .tabs{display:flex;gap:8px;border-bottom:1px solid var(--line);margin:16px 0 4px}
@@ -1052,10 +1031,11 @@ body.modal-open{overflow:hidden}
         <div class="brand-logo">ع</div>
         <div><div class="brand-name">مجموعة عادل الطبية</div><div class="brand-sub">إدارة الممارسين والفروع</div></div>
       </div>
-      <div class="pin-title">أدخل رمز الدخول</div>
+      <div class="pin-title">تسجيل الدخول</div>
       <form onsubmit="return false">
-        <input class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • •">
-        <button class="btn btn-primary btn-block" type="submit" style="margin-top:14px">→ دخول</button>
+        <input class="inp" type="text" dir="ltr" autocomplete="off" placeholder="اسم المستخدم أو البريد" style="width:100%;margin-bottom:10px">
+        <input class="inp" type="password" autocomplete="off" placeholder="كلمة المرور" style="width:100%">
+        <button class="btn btn-primary btn-block" type="submit" style="margin-top:14px">دخول</button>
       </form>
     </div>
   </div></div>
@@ -2188,7 +2168,6 @@ const LocalDB = (() => {
     if (!db.settings.users || !db.settings.users.length) {
       db.settings.users = [{
         id:"super", name:"المدير الرئيسي",
-        pin: db.settings.admin_code||"12345",
         role:"super_admin", active:true,
         permissions:["*"], branches:["*"], specialties:["*"],
         created: new Date().toISOString()
@@ -2220,24 +2199,16 @@ const LocalDB = (() => {
     // USERS MANAGEMENT
     if (method==="GET" && path==="/users") {
       needPerm("users_manage");
-      // PINs are included for users_manage — they need them to help staff recover access
       return {users:(db.settings.users||[]).map(u=>({...u}))};
     }
     if (method==="POST" && path==="/users") {
       needPerm("users_manage");
       const name=(body.name||"").trim(); if(!name) throw new Error("اسم المستخدم مطلوب");
-      const pin=(body.pin||"").trim();
       const email=(body.email||"").trim().toLowerCase();
-      if(!pin&&!email) throw new Error("أدخل البريد أو رمز الدخول");
-      if(pin){
-        if((db.settings.users||[]).some(u=>u.pin===pin)) throw new Error("هذا الرمز مستخدم بالفعل");
-        if(pin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
-      }
-      if(email&&(db.settings.users||[]).some(u=>(u.email||"").toLowerCase()===email)) throw new Error("هذا البريد مرتبط بمستخدم آخر");
+      if(!email) throw new Error("البريد المرتبط بحساب Firebase مطلوب");
+      if((db.settings.users||[]).some(u=>(u.email||"").toLowerCase()===email)) throw new Error("هذا البريد مرتبط بمستخدم آخر");
       const id="u"+Date.now();
-      const u={id,name,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],specialties:body.specialties||["*"],created:new Date().toISOString()};
-      if(pin) u.pin=pin;
-      if(email) u.email=email;
+      const u={id,name,email,role:"user",active:true,permissions:body.permissions||[],branches:body.branches||["*"],specialties:body.specialties||["*"],created:new Date().toISOString()};
       db.settings.users.push(u);
       log(db,"إضافة مستخدم","user",id,`إضافة مستخدم "${name}" (${(u.permissions||[]).length} صلاحية)`); save(db);
       return {id};
@@ -2249,19 +2220,13 @@ const LocalDB = (() => {
         needPerm("users_manage");
         const u=(db.settings.users||[]).find(x=>x.id===uid); if(!u) throw Object.assign(new Error("not found"),{status:404});
         if(u.role==="super_admin"&&sess.userId!==u.id) throw new Error("لا يمكن تعديل المدير الرئيسي");
-        const _uBefore={name:u.name,active:u.active,pin:u.pin,permissions:(u.permissions||[]).slice(),branches:(u.branches||[]).slice(),specialties:(u.specialties||[]).slice()};
+        const _uBefore={name:u.name,active:u.active,permissions:(u.permissions||[]).slice(),branches:(u.branches||[]).slice(),specialties:(u.specialties||[]).slice()};
         if(body.name) u.name=body.name.trim();
         if(body.email!==undefined){
           const em=(body.email||"").trim().toLowerCase();
           if(em&&(db.settings.users||[]).some(x=>x.id!==uid&&(x.email||"").toLowerCase()===em))
             throw new Error("هذا البريد مرتبط بمستخدم آخر");
           if(em) u.email=em; else delete u.email;
-        }
-        if(body.pin){
-          const newPin=body.pin.trim();
-          if((db.settings.users||[]).some(x=>x.id!==uid&&x.pin===newPin)) throw new Error("هذا الرمز مستخدم بالفعل");
-          if(newPin===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز مستخدم");
-          u.pin=newPin;
         }
         if(body.permissions!==undefined&&u.role!=="super_admin"){
           // Prevent privilege escalation: only super_admin can grant wildcard permissions
@@ -2273,7 +2238,6 @@ const LocalDB = (() => {
         if(sess.userId===uid) setSession({...sess,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"]});
         const uch=[];
         if(_uBefore.name!==u.name) uch.push(`الاسم: ${_uBefore.name} ← ${u.name}`);
-        if(_uBefore.pin!==u.pin) uch.push(`تغيير رمز الدخول`);
         if(_uBefore.active!==u.active) uch.push(`الحالة: ${_uBefore.active?"نشط":"متوقف"} ← ${u.active?"نشط":"متوقف"}`);
         const _pb=_uBefore.permissions.join(","), _pa=(u.permissions||[]).join(",");
         if(_pb!==_pa) uch.push(`الصلاحيات: ${_uBefore.permissions.length} ← ${(u.permissions||[]).length} صلاحية`);
@@ -2297,7 +2261,7 @@ const LocalDB = (() => {
     if (method==="GET" && path==="/settings") {
       needPerm("settings_access");
       const _su=(db.settings.users||[]).find(u=>u.role==="super_admin");
-      return {access_code:db.settings.access_code||"123", last_backup_download:db.settings.last_backup_download||null,
+      return {last_backup_download:db.settings.last_backup_download||null,
         last_auto_export:db.settings.last_auto_export||null,
         auto_export_enabled:db.settings.auto_export_enabled!==false,
         auto_export_days:db.settings.auto_export_days||7,
@@ -2312,28 +2276,8 @@ const LocalDB = (() => {
       if(body.last_auto_export){ db.settings.last_auto_export=body.last_auto_export; touched=true; }
       if(typeof body.auto_export_enabled==="boolean"){ db.settings.auto_export_enabled=body.auto_export_enabled; touched=true; }
       if(body.auto_export_days){ const n=+body.auto_export_days; if(n>=1&&n<=90){ db.settings.auto_export_days=n; touched=true; } }
-      if(touched && !(body.access_code&&body.access_code.trim())){ save(db); return {ok:true}; }
-      if(body.access_code&&body.access_code.trim()) db.settings.access_code=body.access_code.trim();
+      if(touched){ save(db); return {ok:true}; }
       log(db,"تغيير إعدادات","settings");
-      save(db); return {ok:true};
-    }
-
-    // تغيير رمز المدير الرئيسي — للمدير الرئيسي نفسه فقط، ولا تُسجَّل أي قيمة للرمز
-    if (method==="POST" && path==="/master-code") {
-      needAuth();
-      const su=(db.settings.users||[]).find(u=>u.role==="super_admin");
-      if(!su) throw Object.assign(new Error("لا يوجد مدير رئيسي"),{status:404});
-      if(sess.userId!==su.id) throw Object.assign(new Error("هذا الخيار متاح للمدير الرئيسي فقط"),{status:403});
-      const cur=(body.current||"").trim(), nw=(body.next||"").trim(), cf=(body.confirm||"").trim();
-      if(!cur||!nw||!cf) throw new Error("جميع الحقول مطلوبة");
-      if(su.pin!==cur) throw Object.assign(new Error("الرمز الحالي غير صحيح"),{status:401});
-      if(nw!==cf) throw new Error("الرمز الجديد وتأكيده غير متطابقين");
-      if(nw===cur) throw new Error("الرمز الجديد مطابق للرمز الحالي");
-      if(nw.length<4) throw new Error("الرمز الجديد يجب ألا يقل عن 4 خانات");
-      if(nw===(db.settings.access_code||"123")) throw new Error("لا يمكن استخدام رمز العرض كرمز للمدير الرئيسي");
-      if((db.settings.users||[]).some(u=>u.id!==su.id&&u.pin===nw)) throw new Error("هذا الرمز مستخدم بالفعل");
-      su.pin=nw;
-      log(db,"تغيير رمز المدير الرئيسي","user",su.id,"تم تغيير رمز المدير الرئيسي");
       save(db); return {ok:true};
     }
 
@@ -5713,10 +5657,6 @@ const App = (() => {
       return sp.map(s=>`<span class="perm-chip spec-chip">${esc(s)}</span>`).join("")||'<span class="perm-chip perm-none">بدون أقسام</span>';
     };
 
-    // Store PINs in a JS closure map — never expose them as DOM attributes
-    const _pinMap={};
-    users.forEach(u=>{_pinMap[u.id]=u.pin;});
-
     $("#ctrl-body").innerHTML=`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div style="font-weight:700;font-size:14px">المستخدمين (${users.length})</div>
@@ -5729,7 +5669,7 @@ const App = (() => {
               <div class="user-card-avatar">${esc(u.name.charAt(0))}</div>
               <div class="user-card-info">
                 <div class="user-card-name">${esc(u.name)}${u.role==="super_admin"?'<span class="user-badge-super">مدير رئيسي</span>':""}</div>
-                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'} · رمز: <span class="pin-masked" data-pinid="${esc(u.id)}">••••</span><button class="btn-pin-eye" data-toggle-pin title="إظهار/إخفاء الرمز">👁</button><button class="btn-pin-copy" data-pinid="${esc(u.id)}" title="نسخ الرمز">📋</button></div>
+                <div class="user-card-meta">${u.active?'<span class="user-status-on">نشط</span>':'<span class="user-status-off">متوقف</span>'}${u.email?` · <span style="direction:ltr;display:inline-block">${esc(u.email)}</span>`:' · <span style="color:var(--amber)">بلا بريد — لا يستطيع الدخول</span>'}</div>
               </div>
             </div>
             <div class="user-card-perms">
@@ -5740,7 +5680,6 @@ const App = (() => {
             <div class="user-card-branches">${spLabel(u)}</div>
             ${u.role!=="super_admin"?`<div class="user-card-actions">
               <button class="btn btn-ghost btn-xs" data-edit-user="${esc(JSON.stringify({id:u.id,name:u.name,permissions:u.permissions,branches:u.branches||["*"],specialties:u.specialties||["*"],active:u.active}))}">✎ تعديل</button>
-              <button class="btn btn-ghost btn-xs" data-pin-user="${u.id}" data-uname="${esc(u.name)}">🔑 تغيير الرمز</button>
               <button class="btn btn-ghost btn-xs" data-toggle-user="${u.id}" data-active="${u.active?1:0}" data-uname="${esc(u.name)}">${u.active?"⏸ إيقاف":"▶ تفعيل"}</button>
               <button class="btn btn-danger btn-xs" data-del-user="${u.id}" data-uname="${esc(u.name)}">✕ حذف</button>
             </div>`:""}
@@ -5749,41 +5688,10 @@ const App = (() => {
 
     $("#add-user").onclick=()=>userForm(null);
 
-    document.querySelectorAll("[data-toggle-pin]").forEach(btn=>{
-      btn.onclick=()=>{
-        const span=btn.previousElementSibling;
-        if(!span) return;
-        const real=_pinMap[span.dataset.pinid]||"";
-        span.textContent=span.textContent==="••••"?real:"••••";
-      };
-    });
-    document.querySelectorAll("[data-copy-pin]").forEach(btn=>{
-      btn.onclick=async()=>{
-        const pin=_pinMap[btn.dataset.pinid]||"";
-        try{await navigator.clipboard.writeText(pin);toast("✅ تم نسخ الرمز","ok");}
-        catch(e){toast("❌ فشل النسخ","err");}
-      };
-    });
-
     document.querySelectorAll("[data-edit-user]").forEach(btn=>btn.onclick=()=>{
       userForm(JSON.parse(btn.dataset.editUser));
     });
 
-    document.querySelectorAll("[data-pin-user]").forEach(btn=>btn.onclick=()=>{
-      const uid=btn.dataset.pinUser, uname=btn.dataset.uname;
-      openModal({title:"🔑 تغيير رمز الدخول — "+uname,
-        bodyHTML:`<div class="field"><label>الرمز الجديد</label><input id="new-pin" class="pin-input" type="password" inputmode="numeric" autocomplete="off" placeholder="• • • •"></div>`,
-        footHTML:`<button class="btn btn-primary" id="do-pin">حفظ</button><button class="btn btn-ghost" data-xp>إلغاء</button>`,
-        onMount:(m)=>{
-          m.querySelector("[data-xp]").onclick=closeModal;
-          m.querySelector("#do-pin").onclick=async()=>{
-            const pin=m.querySelector("#new-pin").value.trim();
-            if(!pin){toast("أدخل الرمز الجديد","warn");return;}
-            try{await api("/users/"+uid,{method:"PUT",body:{pin}});toast("✅ تم تغيير الرمز","ok");closeModal();drawUsersPanel();}
-            catch(e){toast("❌ "+e.message,"err");}
-          };
-        }});
-    });
 
     document.querySelectorAll("[data-toggle-user]").forEach(btn=>btn.onclick=async()=>{
       const uid=btn.dataset.toggleUser, active=btn.dataset.active==="1", uname=btn.dataset.uname;
@@ -5866,7 +5774,6 @@ const App = (() => {
         m.querySelector("#save-user").onclick=async()=>{
           const fd=new FormData(m.querySelector("#userf"));
           const name=fd.get("name")||"";
-          const pin="";
           const permissions=[...m.querySelectorAll('input[name="perm"]:checked')].map(c=>c.value);
           const branches=brAllCb.checked?["*"]:[...m.querySelectorAll('input[name="ubranch"]:checked')].map(c=>+c.value);
           const specialties=spAllCb.checked?["*"]:[...m.querySelectorAll('input[name="uspec"]:checked')].map(c=>c.value);
@@ -5879,7 +5786,7 @@ const App = (() => {
             if(isEdit){
               await api("/users/"+existing.id,{method:"PUT",body:{name:name.trim(),email,permissions,branches,specialties}});
             } else {
-              await api("/users",{method:"POST",body:{name:name.trim(),pin:pin.trim(),email,permissions,branches,specialties}});
+              await api("/users",{method:"POST",body:{name:name.trim(),email,permissions,branches,specialties}});
             }
             toast("✅ تم الحفظ","ok"); closeModal(); drawUsersPanel();
           }catch(e){toast("❌ "+e.message,"err");}
