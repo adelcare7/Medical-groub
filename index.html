@@ -9,7 +9,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- رقم إصدار التطبيق — يُقارن تلقائياً لإجبار الأجهزة على تحميل آخر نسخة -->
-<meta name="app-version" content="2026-10-10-62">
+<meta name="app-version" content="2026-10-10-63">
 <meta http-equiv="X-Frame-Options" content="DENY">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com https://*.googleapis.com https://*.firebaseapp.com https://*.firebaseio.com; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://*.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-ancestors 'none';">
 <title>مجموعة عادل الطبية | إدارة الممارسين والفروع</title>
@@ -4131,7 +4131,7 @@ const App = (() => {
   };
 
   // ---------- Doctor form ----------
-  async function doctorForm(doc, onDone, scheduleOnly){
+  async function doctorForm(doc, onDone){
     const {branches}=await api("/branches");
     const {specialties}=await api("/specialties");
     // لتحذير تكرار الاسم عند الإضافة فقط — لا حاجة لها عند تعديل ممارس موجود
@@ -4158,7 +4158,7 @@ const App = (() => {
       return {day,off:isOff,shifts:ex&&ex.length?ex.map(([s,e])=>({start:minToTime(s),end:minToTime(e)})):[{start:"08:00",end:"16:00"}]};
     });
     const body=`<form id="docf">
-      ${scheduleOnly?"":`<div class="grid2">
+      <div class="grid2">
         <div class="field"><label>الاسم *</label><input name="name" value="${esc(d.name||"")}" required></div>
         <div class="field"><label>الفرع *</label><select name="branch_id" required>${branches.map(b=>`<option value="${b.id}" ${d.branch_id==b.id?"selected":""}>${esc(b.name)}</option>`).join("")}</select></div>
         <div class="field"><label>التخصص *</label>
@@ -4183,17 +4183,17 @@ const App = (() => {
         <div class="field"><label>سنوات الخبرة *</label><input name="experience" value="${esc(d.experience||"")}" required></div>
         <div class="field"><label>المؤهل</label><input name="qualification" value="${esc(d.qualification||"")}"></div>
         <div class="field"><label>رابط الصورة</label><input name="photo" value="${esc(d.photo||"")}" placeholder="https://..."></div>
-      </div>`}
+      </div>
       <div class="field">
         <label>جدول الدوام الأسبوعي</label>
         <div id="sched-grid" class="sched-grid"></div>
       </div>
-      ${scheduleOnly?"":`<div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
-      <div class="field"><label>ملاحظات التنسيق</label><textarea name="notes_coord">${esc(d.notes_coord||"")}</textarea></div>`}
+      <div class="field"><label>الحالات التي يستقبلها</label><textarea name="cases">${esc(d.cases||"")}</textarea></div>
+      <div class="field"><label>ملاحظات التنسيق</label><textarea name="notes_coord">${esc(d.notes_coord||"")}</textarea></div>
     </form>`;
     const foot=`<button class="btn btn-primary" id="save-doc">${doc?"حفظ التعديلات":"إضافة"}</button>
       <button class="btn btn-ghost" data-x2>إلغاء</button>`;
-    openModal({title:scheduleOnly?("🗓️ تعديل الدوام: "+(doc?doc.name:"")):(doc?("تعديل: "+doc.name):"إضافة ممارس"),bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
+    openModal({title:(doc?("تعديل: "+doc.name):"إضافة ممارس"),bodyHTML:body,footHTML:foot,wide:true,onMount:(m)=>{
       m.querySelector("[data-x2]").onclick=closeModal;
       function _syncSchedFromDOM(container, ss) {
         ss.forEach((row, idx) => {
@@ -4288,19 +4288,17 @@ const App = (() => {
       })();
       m.querySelector("#save-doc").onclick=async()=>{
         const f=new FormData(m.querySelector("#docf"));
-        const payload=scheduleOnly?{}:Object.fromEntries(f.entries());
-        if(!scheduleOnly){
-          payload.branch_id=+payload.branch_id;
-          // التخصص إلزامي ومن الأقسام المعتمدة فقط
-          if(!payload.specialty||!specList.includes(payload.specialty)){ toast("اختر التخصص من قائمة الأقسام","warn"); return; }
-          // زر الحفظ عادي (بلا submit) فلا يُفعِّل تحقق required الخاص بالمتصفح —
-          // تحقق يدوي هنا يمنع حفظ بطاقة ناقصة بصمت (الخادم يرفضها أيضاً كخط دفاع أخير).
-          for(const [key,label] of [["name","الاسم"],["rank","الرتبة / التخصص الدقيق"],
-              ["nationality","الجنسية"],["gender","الجنس"],["experience","سنوات الخبرة"]]){
-            if(!payload[key]||!String(payload[key]).trim()){ toast(`أدخل ${label}`,"warn"); return; }
-          }
-          payload.name=payload.name.trim();
+        const payload=Object.fromEntries(f.entries());
+        payload.branch_id=+payload.branch_id;
+        // التخصص إلزامي ومن الأقسام المعتمدة فقط
+        if(!payload.specialty||!specList.includes(payload.specialty)){ toast("اختر التخصص من قائمة الأقسام","warn"); return; }
+        // زر الحفظ عادي (بلا submit) فلا يُفعِّل تحقق required الخاص بالمتصفح —
+        // تحقق يدوي هنا يمنع حفظ بطاقة ناقصة بصمت (الخادم يرفضها أيضاً كخط دفاع أخير).
+        for(const [key,label] of [["name","الاسم"],["rank","الرتبة / التخصص الدقيق"],
+            ["nationality","الجنسية"],["gender","الجنس"],["experience","سنوات الخبرة"]]){
+          if(!payload[key]||!String(payload[key]).trim()){ toast(`أدخل ${label}`,"warn"); return; }
         }
+        payload.name=payload.name.trim();
         const schedule={},dayoff=[];
         const grid=m.querySelector("#sched-grid");
         schedState.forEach(({day,off,shifts},idx)=>{
@@ -4330,7 +4328,7 @@ const App = (() => {
         const _normName=(v)=>(v||"").trim()
           .replace(/[\u064B-\u065F\u0670\u0640]/g,"")
           .replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه");
-        if(!doc && !scheduleOnly && payload.name){
+        if(!doc && payload.name){
           const nName=_normName(payload.name);
           const dup=existingDoctors.find(x=>x.branch_id===payload.branch_id && _normName(x.name)===nName);
           if(dup && !confirm(`⚠️ يوجد ممارس بنفس الاسم "${dup.name}" في هذا الفرع بالفعل.\n\nهل تريد المتابعة والإضافة كممارس جديد رغم ذلك؟`)) return;
@@ -4340,7 +4338,7 @@ const App = (() => {
         try{
           if(doc)await api("/doctors/"+doc.id,{method:"PUT",body:payload});
           else await api("/doctors",{method:"POST",body:payload});
-          toast(scheduleOnly?"✅ تم تحديث الدوام بنجاح":(doc?"✅ تم تحديث بيانات الممارس بنجاح":"✅ تمت إضافة الممارس بنجاح"),"ok"); closeModal();
+          toast(doc?"✅ تم تحديث بيانات الممارس بنجاح":"✅ تمت إضافة الممارس بنجاح","ok"); closeModal();
           if(onDone) onDone(); else if(state.route==="control") drawDoctorsMgmtPanel(); else render();
         }catch(e){toast("❌ "+e.message,"err");}
       };
