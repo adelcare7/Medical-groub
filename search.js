@@ -981,6 +981,66 @@ const LocalDB = (() => {
     return changed;
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  الأرشفة التلقائية بعد انتهاء العقد
+  // ══════════════════════════════════════════════════════════════════
+  //  بعد مرور ARCHIVE_AFTER_DAYS يوماً كاملة من تاريخ انتهاء العقد يُخفى
+  //  الممارس من كل القوائم. إخفاء لا حذف: البيانات تبقى كما هي، والاسترجاع
+  //  بزر واحد. لذلك لا تلزم نسخة احتياطية مسبقة ولا بيئة تنفيذ خاصة.
+  //
+  //  يُوسم بـ auto_archived لتمييزه عن أرشفة أجراها موظف بيده — التمديد
+  //  يلغي أرشفتنا وحدها، وقرار الموظف يبقى قراره.
+  const ARCHIVE_AFTER_DAYS = 30;
+
+  //  يقبل "YYYY-MM-DD" وحدها ويرفض ما عداها: فارغ، نص حر، أو يوم لا وجود له
+  //  (2026-02-31). الرفض يعني «لا تؤرشف» لا «أرشِف الآن».
+  function _parseISODate(s) {
+    if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const [y, m, d] = s.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+    return dt;
+  }
+  //  فرق الأيام بين تاريخين — يُحسب على UTC فلا يتأثر بمنطقة جهاز المستخدم
+  function _daysSince(fromISO, toISO) {
+    const a = _parseISODate(fromISO), b = _parseISODate(toISO);
+    if (!a || !b) return null;
+    return Math.floor((b - a) / 86400000);
+  }
+
+  function autoArchiveExpired(db) {
+    if (!db || !Array.isArray(db.doctors)) return false;
+    const today = _riyadhDate();
+    let changed = false;
+    db.doctors.forEach(d => {
+      if (!d.terminated || d.archived) return;          // غير منتهٍ، أو مخفي أصلاً
+      if (d.auto_archive_optout) return;                // استرجعه موظف بيده ⇒ قراره يُحترم
+      const days = _daysSince(d.terminated_date, today);
+      if (days === null) return;                        // تاريخ مفقود أو تالف ⇒ لا شيء
+      if (days < ARCHIVE_AFTER_DAYS) return;            // لم تمض المدة بعد
+      d.archived = 1;
+      d.auto_archived = 1;
+      d.auto_archived_at = today;
+      const bn = ((db.branches || []).find(b => b.id === d.branch_id) || {}).name || "";
+      log(db, "أرشفة تلقائية", "doctor", d.id,
+        `أُخفي "${d.name}" تلقائياً بعد ${days} يوماً من انتهاء عقده (${_fmtD(d.terminated_date)}) — البيانات محفوظة ويمكن استرجاعه`,
+        { user: "النظام", userId: null, auto: 1, branch: bn, branch_id: d.branch_id });
+      changed = true;
+    });
+    return changed;
+  }
+
+  //  يلغي الأرشفة التلقائية وحدها. تُستدعى عند تمديد العقد أو إلغاء إنهائه
+  //  أو تغيير تاريخه، فيُعاد الاحتساب من التاريخ الجديد.
+  function clearAutoArchive(d) {
+    if (!d || !d.auto_archived) return false;
+    d.archived = 0;
+    delete d.auto_archived;
+    delete d.auto_archived_at;
+    delete d.auto_archive_optout;   // دورة عقد جديدة ⇒ احتساب جديد
+    return true;
+  }
+
   function computeStatus(doc, nowMin, day, dateStr, leaves) {
     if (doc.terminated) return {state:"terminated",label:"منتهي العقد",color:"terminated"};
     if (doc.archived) return {state:"archived",label:"مؤرشف",color:"gray"};
@@ -1154,6 +1214,8 @@ const LocalDB = (() => {
     (db.settings.users||[]).forEach(u=>{if(!u.branches){u.branches=["*"];_needSave=true;}if(!u.specialties){u.specialties=["*"];_needSave=true;}});
     // تفعيل أي إنهاء عقد مجدول حان تاريخه (حالة دائمة)
     if(applyDueTerminations(db)) _needSave = true;
+    // إخفاء من مضى على انتهاء عقده 30 يوماً — مراجعة تلقائية لا تنتظر فتح بطاقته
+    if(autoArchiveExpired(db)) _needSave = true;
     // يُحفظ فقط ضمن طلب تعديل — لا كتابة إطلاقاً عند القراءة
     if(_needSave && _isWrite) save(db);
 
@@ -1398,6 +1460,10 @@ const LocalDB = (() => {
         needBranch(d.branch_id);
         needSpecialty(d.specialty);
         d.archived=body.unarchive?0:1;
+        // استرجاع يدوي ⇒ استثناء دائم من الأرشفة التلقائية حتى تتغيّر حالة العقد.
+        // أرشفة يدوية ⇒ تصير قرار موظف لا أرشفة تلقائية.
+        if(body.unarchive){ delete d.auto_archived; delete d.auto_archived_at; d.auto_archive_optout=1; }
+        else { delete d.auto_archived; delete d.auto_archived_at; }
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
         log(db,d.archived?"أرشفة طبيب":"استرجاع طبيب","doctor",did,`${d.archived?"أرشفة":"استرجاع"} الممارس "${d.name}" (الفرع ${bn||"—"})`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
@@ -1412,16 +1478,19 @@ const LocalDB = (() => {
           // إلغاء إنهاء العقد / إعادة تفعيل — يمسح المجدول والمنفّذ
           const wasSched=d.termination_scheduled;
           d.terminated=0; delete d.terminated_date; delete d.termination_scheduled;
-          log(db,"إعادة تفعيل طبيب","doctor",did,`إلغاء إنهاء عقد "${d.name}"${wasSched?` (كان مجدولاً بتاريخ ${_fmtD(wasSched)})`:""} وإعادة تفعيله`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
+          const wasAuto=clearAutoArchive(d);   // كان مخفياً تلقائياً ⇒ يعود للظهور
+          log(db,"إعادة تفعيل طبيب","doctor",did,`إلغاء إنهاء عقد "${d.name}"${wasSched?` (كان مجدولاً بتاريخ ${_fmtD(wasSched)})`:""} وإعادة تفعيله${wasAuto?" وإلغاء إخفائه التلقائي":""}`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
         }
         const date=body.date||today;
         if(date>today){
           // تاريخ مستقبلي — يُفعّل تلقائياً عند وصوله (لا يزال يعمل حتى ذلك اليوم)
           d.termination_scheduled=date; d.terminated=0; delete d.terminated_date;
+          clearAutoArchive(d);   // يستمر بالعمل حتى التاريخ الجديد
           log(db,"جدولة إنهاء عقد","doctor",did,`جدولة إنهاء عقد "${d.name}" بتاريخ ${_fmtD(date)} (يستمر بالعمل حتى ذلك التاريخ)`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true,scheduled:date};
         }
         // اليوم أو تاريخ سابق — إنهاء فوري
         d.terminated=1; d.terminated_date=date; delete d.termination_scheduled;
+        clearAutoArchive(d);   // تاريخ جديد ⇒ تُحتسب الثلاثون يوماً منه
         log(db,"إنهاء عقد طبيب","doctor",did,`إنهاء عقد "${d.name}" بتاريخ ${_fmtD(date)}`,{branch:bn,branch_id:d.branch_id}); save(db); return {ok:true};
       }
       if (method==="DELETE") {
@@ -1716,7 +1785,11 @@ const LocalDB = (() => {
     save(db);
   }
 
-  return { call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); }, resync: ()=>_forceResync(),
+  return {
+    // سطح مكشوف للاختبارات فقط — دوال خالصة تعمل على كائن يُمرَّر إليها،
+    // لا تقرأ ولا تكتب في قاعدة البيانات الحيّة.
+    __contract: { ARCHIVE_AFTER_DAYS, _parseISODate, _daysSince, autoArchiveExpired, clearAutoArchive },
+    call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); }, resync: ()=>_forceResync(),
     // ── الكاشف: يقارن أرقام المراجعة بأحدث نسخة احتياطية ──────────────
     // رقم المراجعة لا ينقص أبداً في التشغيل السليم، والنسخة مستند كُتب في
     // الماضي فلا يستطيع جهاز قديم تزويرها ⇒ نقصانه دليل قاطع لا احتمال.
