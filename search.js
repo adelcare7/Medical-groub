@@ -886,6 +886,26 @@ const LocalDB = (() => {
   // المفتاح "بداية-نهاية" بالدقائق (مثل "480-720") مشتق من نفس بيانات الجدول
   // المخزَّنة: schedule[يوم] = [[بداية, نهاية], ...]
   const _isSecRec = (l) => !!(l && l.type === "ندب" && l.secondment_branch_id);
+
+  // ── الفرع صاحب صلاحية التعديل على الممارس ────────────────────────
+  //  أثناء ندب سارٍ اليوم تنتقل الصلاحية إلى فرع الندب وحده، ويُمنع الفرع
+  //  الأساسي حتى ينتهي الندب أو يُلغى — فتعود إليه تلقائياً بلا أي إجراء.
+  //
+  //  تُحتسب على فترة الندب (التواريخ) لا على ساعة الشفت: لو ربطناها بالوقت
+  //  لتأرجحت الصلاحية داخل اليوم الواحد وصار من يعدّل في العاشرة ممنوعاً في
+  //  الحادية عشرة. وندب الشفت يبقى ندباً، فالفرع المضيف هو المسؤول يومها.
+  //
+  //  تُرجع مصفوفة: ندبان ساريان لفرعين ⇒ كلاهما يملك التعديل.
+  //  المشرف العام غير معني بهذا كله — صلاحيته "*" تمرّ من _hasBranch.
+  function _editBranchesOf(db, doc) {
+    if (!doc) return [];
+    const today = _riyadhDate();
+    const live = ((db && db.leaves) || []).filter(l =>
+      _isSecRec(l) && l.doctor_id === doc.id &&
+      String(l.start_date || "") <= today && today <= String(l.end_date || ""));
+    if (!live.length) return [doc.branch_id];
+    return [...new Set(live.map(l => l.secondment_branch_id))];
+  }
   const _shiftKeyOf = (st, en) => `${st}-${en}`;
   // تسميات قديمة (morning/evening) — لأي سجل أُنشئ قبل هذا التعديل
   const SHIFT_LABEL = { morning:"صباحي", evening:"مسائي" };
@@ -1164,7 +1184,10 @@ const LocalDB = (() => {
   }
   function withStatus(doc, db) {
     const {day,nowMin,dateStr} = nowInfo();
-    return { ...doc, live: _liveOf(doc, db, nowMin, day, dateStr) };
+    // edit_branches: الفروع التي تملك التعديل عليه الآن — تحسبها الواجهة
+    // من هنا بدل أن تعيد اشتقاق القاعدة، فيبقى مصدر الحقيقة واحداً.
+    return { ...doc, live: _liveOf(doc, db, nowMin, day, dateStr),
+             edit_branches: _editBranchesOf(db, doc) };
   }
 
   function getExtra(db) {
@@ -1191,6 +1214,17 @@ const LocalDB = (() => {
     const needAnyPerm = (...perms) => { needAuth(); if(!perms.some(p=>_hasPerm(sess,p))) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); };
     const _hasBranch = (s, bid) => { const b=s.branches||[]; return b.includes("*")||b.includes(bid)||b.includes(String(bid)); };
     const needBranch = (bid) => { if(!_hasBranch(sess,bid)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا الفرع"),{status:403}); };
+    // التحقق من فرع الممارس — يراعي الندب. يُستعمل في كل مسار يعدّل ممارساً
+    // قائماً. (إضافة ممارس جديد تبقى على needBranch: لا ندب قبل وجوده.)
+    const needDoctorBranch = (doc) => {
+      const allowed = _editBranchesOf(db, doc);
+      if (allowed.some(b => _hasBranch(sess, b))) return;
+      const seconded = allowed.length && String(allowed[0]) !== String(doc && doc.branch_id);
+      const bn = seconded ? ((db.branches.find(x=>x.id==allowed[0])||{}).name||"") : "";
+      throw Object.assign(new Error(seconded
+        ? `الممارس منتدب حالياً إلى ${bn||"فرع آخر"} — صلاحية التعديل لفرع الندب حتى انتهائه`
+        : "لا تملك صلاحية للتعديل على هذا الفرع"), {status:403});
+    };
     const _hasSpecialty = (s, spec) => { if(!spec) return true; const sp=s.specialties||[]; return sp.includes("*")||sp.includes(spec); };
     const needSpecialty = (spec) => { if(!_hasSpecialty(sess,spec)) throw Object.assign(new Error("لا تملك صلاحية للتعديل على هذا القسم"),{status:403}); };
 
@@ -1434,7 +1468,7 @@ const LocalDB = (() => {
         else needAnyPerm("doctor_edit","schedule_edit"); // تعديل البطاقة بالكامل
         const idx=db.doctors.findIndex(x=>x.id===did); if(idx<0) throw Object.assign(new Error("not found"),{status:404});
         const old=db.doctors[idx];
-        needBranch(old.branch_id);
+        needDoctorBranch(old);
         needSpecialty(old.specialty);
         let updated;
         if(_statusOnly){
@@ -1457,7 +1491,7 @@ const LocalDB = (() => {
       if (method==="POST" && docM[2]==="/archive") {
         needPerm("doctor_delete");
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
-        needBranch(d.branch_id);
+        needDoctorBranch(d);
         needSpecialty(d.specialty);
         d.archived=body.unarchive?0:1;
         // استرجاع يدوي ⇒ استثناء دائم من الأرشفة التلقائية حتى تتغيّر حالة العقد.
@@ -1470,7 +1504,7 @@ const LocalDB = (() => {
       if (method==="POST" && docM[2]==="/terminate") {
         needAnyPerm("doctor_edit","status_manage");
         const d=db.doctors.find(x=>x.id===did); if(!d) throw Object.assign(new Error("not found"),{status:404});
-        needBranch(d.branch_id);
+        needDoctorBranch(d);
         needSpecialty(d.specialty);
         const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
         const today=_riyadhDate();
@@ -1496,7 +1530,7 @@ const LocalDB = (() => {
       if (method==="DELETE") {
         needPerm("doctor_delete");
         const d=db.doctors.find(x=>x.id===did);
-        if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
+        if(d){ needDoctorBranch(d); needSpecialty(d.specialty); }
         db.doctors=db.doctors.filter(x=>x.id!==did);
         db.leaves=db.leaves.filter(l=>l.doctor_id!==did);
         const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
@@ -1519,7 +1553,7 @@ const LocalDB = (() => {
       needPerm("visit_manage"); // صلاحية مستقلة لزر الزيارة فقط
       const vid=+visitM[1];
       const d=db.doctors.find(x=>x.id===vid); if(!d) throw Object.assign(new Error("not found"),{status:404});
-      needBranch(d.branch_id);
+      needDoctorBranch(d);
       needSpecialty(d.specialty);
       d.in_visit=!!body.in_visit;
       const bn=(db.branches.find(x=>x.id===d.branch_id)||{}).name||"";
@@ -1554,7 +1588,7 @@ const LocalDB = (() => {
       needAnyPerm("leave_manage","status_manage");
       const d=db.doctors.find(x=>x.id===+body.doctor_id);
       if(!d) throw Object.assign(new Error("الممارس غير موجود"),{status:404}); // منع إنشاء إجازة لممارس غير موجود
-      needBranch(d.branch_id); needSpecialty(d.specialty);
+      needDoctorBranch(d); needSpecialty(d.specialty);
       const _newIsSec=(body.type==="ندب"&&!!body.secondment_branch_id);
       // الوردية يجب أن تكون مسجّلة فعلاً في جدول هذا الممارس
       const _docShiftKeys=new Set(_doctorShifts(d).map(x=>x.key));
@@ -1584,7 +1618,7 @@ const LocalDB = (() => {
       const l=db.leaves.find(x=>x.id===+lvM[1]);
       if(!l) throw Object.assign(new Error("not found"),{status:404});
       const d=db.doctors.find(x=>x.id===l.doctor_id);
-      if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }
+      if(d){ needDoctorBranch(d); needSpecialty(d.specialty); }
       const _ns=("start_date" in body)?body.start_date:l.start_date, _ne=("end_date" in body)?body.end_date:l.end_date;
       const _uType=("type" in body)?body.type:l.type;
       const _uBranch=("secondment_branch_id" in body)?body.secondment_branch_id:l.secondment_branch_id;
@@ -1615,7 +1649,7 @@ const LocalDB = (() => {
     if(lvM&&method==="DELETE"){
       needAnyPerm("leave_manage","status_manage");
       const l=db.leaves.find(x=>x.id===+lvM[1]);
-      if(l){const d=db.doctors.find(x=>x.id===l.doctor_id); if(d){ needBranch(d.branch_id); needSpecialty(d.specialty); }}
+      if(l){const d=db.doctors.find(x=>x.id===l.doctor_id); if(d){ needDoctorBranch(d); needSpecialty(d.specialty); }}
       db.leaves=db.leaves.filter(lx=>lx.id!==+lvM[1]);
       const d=l?db.doctors.find(x=>x.id===l.doctor_id):null;
       const bn=d?(db.branches.find(x=>x.id===d.branch_id)||{}).name||"":"";
@@ -1788,7 +1822,7 @@ const LocalDB = (() => {
   return {
     // سطح مكشوف للاختبارات فقط — دوال خالصة تعمل على كائن يُمرَّر إليها،
     // لا تقرأ ولا تكتب في قاعدة البيانات الحيّة.
-    __contract: { ARCHIVE_AFTER_DAYS, _parseISODate, _daysSince, autoArchiveExpired, clearAutoArchive },
+    __contract: { ARCHIVE_AFTER_DAYS, _editBranchesOf, _isSecRec, _parseISODate, _daysSince, autoArchiveExpired, clearAutoArchive },
     call: (m,p,b)=>{ if(m==="GET"&&p==="/export-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return exportDB();} if(m==="POST"&&p==="/import-db"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});importDB(b);return{ok:true};} if(m==="GET"&&p==="/snapshots"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)return Promise.resolve({snapshots:[]});return _readSnapIndex().then(list=>({snapshots:list}));} if(m==="POST"&&p==="/snapshot-now"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});const coll=_snapColl();if(!coll)throw new Error("النسخ الاحتياطية غير متاحة حالياً");const id='manual_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,23);return _writeSnapshot(id,null,{kind:'manual',action:(b&&b.note)||'نسخة يدوية',user:(s.name||"")}).then(()=>({ok:true,id}));} if(m==="POST"&&p==="/restore-snapshot"){const s=getSession();if(!s.auth)throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true});if(!_permOk(s,"settings_access"))throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403});return (async()=>{const coll=_snapColl();if(!coll)throw new Error("النسخ التلقائية غير متاحة حالياً");const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);await _writeSnapshot('pre_restore_'+ts,null,{kind:'pre',action:'نسخة أمان قبل الاستعادة',user:(s.name||"")});const snap=await coll.doc(b.id).get();if(!snap.exists||!snap.data().data)throw new Error("النسخة غير موجودة");const main=JSON.parse(snap.data().data);const db={...main,audit:(_memDB&&_memDB.audit)||[]};log(db,"استعادة نسخة تلقائية: "+b.id,"settings");save(db);return{ok:true};})();} return call(m,p,b); }, reset: async()=>{ const s=getSession(); if(!s.auth) throw Object.assign(new Error("يرجى تسجيل الدخول أولاً"),{status:401,isAuth:true}); if(!_permOk(s,"settings_access")) throw Object.assign(new Error("لا تملك صلاحية لهذا الإجراء"),{status:403}); const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19); try{ await _writeSnapshot('pre_reset_'+ts,null,{kind:'pre',action:'نسخة أمان قبل التصفير',user:(s.name||"")}); }catch(e){ console.error('[Adelcare] pre-reset snapshot:', e); } const fresh=JSON.parse(JSON.stringify({doctors:SEED.doctors,branches:SEED.branches,leaves:[],settings:SEED.settings,audit:[],_seq:SEED._seq||{doctors:200,branches:10,leaves:50,audit:100}})); _memDB=fresh; await _writeAllSections(fresh); }, resync: ()=>_forceResync(),
     // ── الكاشف: يقارن أرقام المراجعة بأحدث نسخة احتياطية ──────────────
     // رقم المراجعة لا ينقص أبداً في التشغيل السليم، والنسخة مستند كُتب في

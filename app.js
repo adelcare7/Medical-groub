@@ -365,7 +365,7 @@ const App = (() => {
             toast(nd>today?"✅ تم تحديث موعد إنهاء العقد":"✅ تم إنهاء العقد","ok");
             closeModal(); go(state.route);
           }catch(e){toast("❌ "+e.message,"err");}
-        },d.branch_id,d.specialty);
+        },_dBr(d),d.specialty);
       }});
   }
 
@@ -474,7 +474,7 @@ const App = (() => {
         </div>`:""}
       </div>`:"";
 
-    const visitToggle=can("visit_manage")&&canBranch(d.branch_id)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
+    const visitToggle=can("visit_manage")&&canEditDoctor(d)&&canSpecialty(d.specialty)?`<button class="btn btn-xs ${d.in_visit?"btn-visit-on":"btn-ghost"}" data-toggle-visit="${d.id}" style="margin-inline-start:8px">${d.in_visit?"🏠 إلغاء الزيارة":"🏠 في زيارة"}</button>`:"";
     const body=`
       <div class="qd-head">
         <div class="avatar qd-avatar">${d.photo?`<img src="${esc(d.photo)}">`:esc(initials(d.name))}</div>
@@ -496,40 +496,40 @@ const App = (() => {
         try{await api("/doctors/"+d.id+"/visit",{method:"POST",body:{in_visit:!d.in_visit}});
           toast(d.in_visit?"✅ تم إلغاء الزيارة":"✅ تم تفعيل حالة الزيارة","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      },d.branch_id,d.specialty);
-      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requireAny(["doctor_edit","schedule_edit"],()=>doctorForm(d),d.branch_id,d.specialty);
-      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveForm(d.id,d.name),d.branch_id,d.specialty);
+      },_dBr(d),d.specialty);
+      const eb=m.querySelector("[data-edit]"); if(eb)eb.onclick=()=>requireAny(["doctor_edit","schedule_edit"],()=>doctorForm(d),_dBr(d),d.specialty);
+      const lb=m.querySelector("[data-leave]"); if(lb)lb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveForm(d.id,d.name),_dBr(d),d.specialty);
       const ctb=m.querySelector("[data-cancel-term]"); if(ctb)ctb.onclick=()=>requireAny(["doctor_edit","status_manage"],async()=>{
         if(!confirm(`حذف جدولة إنهاء عقد "${d.name}"؟\nسيستمر الممارس بالعمل كالمعتاد.`))return;
         try{await api("/doctors/"+d.id+"/terminate",{method:"POST",body:{unterm:true}});
           toast("✅ تم حذف جدولة إنهاء العقد","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      },d.branch_id,d.specialty);
-      const etb=m.querySelector("[data-edit-sched-term]"); if(etb)etb.onclick=()=>requireAny(["doctor_edit","status_manage"],()=>editSchedTerm(d),d.branch_id,d.specialty);
+      },_dBr(d),d.specialty);
+      const etb=m.querySelector("[data-edit-sched-term]"); if(etb)etb.onclick=()=>requireAny(["doctor_edit","status_manage"],()=>editSchedTerm(d),_dBr(d),d.specialty);
       // Active leave inline buttons
-      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
+      const elb=m.querySelector("[data-edit-leave]"); if(elb)elb.onclick=()=>requireAny(["leave_manage","status_manage"],()=>leaveEditForm(activeLv,()=>{closeModal();quickCard(id);}),_dBr(d),d.specialty);
       const dlb=m.querySelector("[data-del-leave]"); if(dlb)dlb.onclick=()=>requireAny(["leave_manage","status_manage"],async()=>{
         if(!confirm("إلغاء الإجازة الحالية؟"))return;
         try{await api("/leaves/"+activeLv.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      },d.branch_id,d.specialty);
+      },_dBr(d),d.specialty);
       // End manual leave (doctor.status="leave" with no leave record)
       const elv=m.querySelector("[data-end-leave]"); if(elv)elv.onclick=()=>requireAny(["leave_manage","status_manage"],async()=>{
         if(!confirm("إلغاء الإجازة وإعادة الممارس للعمل؟"))return;
         try{await api("/doctors/"+d.id,{method:"PUT",body:{status:"active"}});
           toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();go(state.route);}
         catch(e){toast("❌ "+e.message,"err");}
-      },d.branch_id,d.specialty);
+      },_dBr(d),d.specialty);
       // Upcoming leave inline buttons
       upcomingLeaves.forEach(ul=>{
         const eul=m.querySelector(`[data-edit-ul="${ul.id}"]`);
-        if(eul)eul.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}),d.branch_id,d.specialty);
+        if(eul)eul.onclick=()=>requirePerm("leave_manage",()=>leaveEditForm(ul,()=>{closeModal();quickCard(id);}),_dBr(d),d.specialty);
         const dul=m.querySelector(`[data-del-ul="${ul.id}"]`);
         if(dul)dul.onclick=()=>requirePerm("leave_manage",async()=>{
           if(!confirm("إلغاء الإجازة القادمة؟"))return;
           try{await api("/leaves/"+ul.id,{method:"DELETE"});toast("✅ تم حذف الإجازة بنجاح","ok");closeModal();quickCard(id);}
           catch(e){toast("❌ "+e.message,"err");}
-        },d.branch_id,d.specialty);
+        },_dBr(d),d.specialty);
       });
     }});
   }
@@ -611,6 +611,16 @@ const App = (() => {
     fn();
   }
   // فحوص مجمّعة للعرض (إظهار/إخفاء الأزرار)
+  // فروع التعديل على ممارس بعينه — يحسبها المصدر (edit_branches) مراعياً
+  // الندب: أثناءه فرع الندب وحده. السقوط إلى branch_id يحمي من نسخة واجهة
+  // أقدم من المصدر، فلا تنكسر الأزرار لو تأخّر تحديث أحد الأجهزة.
+  const _dBr = (d) => { const bs = doctorEditBranches(d);
+    return bs.find(b => canBranch(b)) !== undefined ? bs.find(b => canBranch(b)) : bs[0]; };
+  const doctorEditBranches = (d) =>
+    (d && Array.isArray(d.edit_branches) && d.edit_branches.length)
+      ? d.edit_branches : [d && d.branch_id];
+  const canEditDoctor = (d) => doctorEditBranches(d).some(b => canBranch(b));
+
   const canEditCard = () => can("doctor_edit")||can("schedule_edit");   // تعديل بطاقة الممارس بالكامل
   const canStatus   = () => can("leave_manage")||can("status_manage");  // إجازات/ندب
   const canTerm     = () => can("doctor_edit")||can("status_manage");   // إنهاء العقد
@@ -1893,7 +1903,7 @@ const App = (() => {
 
     const bindEvents=()=>{
       document.querySelectorAll("[data-edit-doc]").forEach(btn=>btn.onclick=()=>{
-        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)requirePerm("doctor_edit",()=>doctorForm(d),d.branch_id,d.specialty);
+        const d=doctors.find(x=>String(x.id)===btn.dataset.editDoc); if(d)requirePerm("doctor_edit",()=>doctorForm(d),_dBr(d),d.specialty);
       });
       document.querySelectorAll("[data-arch]").forEach(btn=>btn.onclick=()=>{
         const d=doctors.find(x=>String(x.id)===btn.dataset.arch);
@@ -2345,7 +2355,7 @@ const App = (() => {
       el.querySelectorAll("[data-edit-term]").forEach(btn=>{
         const id=+btn.dataset.editTerm;
         const d=termed.find(x=>x.id===id); if(!d)return;
-        btn.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d,()=>drawTerminatedPanel()),d.branch_id,d.specialty);
+        btn.onclick=()=>requirePerm("doctor_edit",()=>doctorForm(d,()=>drawTerminatedPanel()),_dBr(d),d.specialty);
       });
       el.querySelectorAll("[data-unterm]").forEach(btn=>{
         const id=+btn.dataset.unterm;
